@@ -139,6 +139,12 @@ async function init() {
         authContainer.style.display = 'flex'; // or block/flex based on css, form-group is usually block or flex column
     }
 
+    // Add change calculator input listener
+    const cashInput = document.getElementById('cash-received');
+    if (cashInput) {
+        cashInput.addEventListener('input', updateChange);
+    }
+
     showView('auth');
 }
 
@@ -304,6 +310,8 @@ async function loadSagraResources() {
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
     STATE.products = await res.json();
     STATE.cart = [];
+    const cashInput = document.getElementById('cash-received');
+    if (cashInput) cashInput.value = '';
     renderProducts();
     renderCart();
 }
@@ -511,6 +519,31 @@ function renderCart() {
     });
 
     totalEl.innerText = `€ ${total.toFixed(2)}`;
+    updateChange();
+}
+
+function updateChange() {
+    const total = STATE.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const cashInput = document.getElementById('cash-received');
+    const changeEl = document.getElementById('change-amount');
+    
+    if (!cashInput || !changeEl) return;
+    
+    const cashReceived = parseFloat(cashInput.value);
+    if (isNaN(cashReceived) || cashReceived <= 0) {
+        changeEl.innerText = '€ 0.00';
+        changeEl.classList.remove('has-change');
+        return;
+    }
+    
+    const change = cashReceived - total;
+    if (change >= 0) {
+        changeEl.innerText = `€ ${change.toFixed(2)}`;
+        changeEl.classList.add('has-change');
+    } else {
+        changeEl.innerText = '€ 0.00';
+        changeEl.classList.remove('has-change');
+    }
 }
 
 function decreaseQuantity(idx) {
@@ -524,6 +557,8 @@ async function clearCart() {
     if (STATE.cart.length === 0) return;
     if (await showConfirm("Svuotare il carrello?")) {
         STATE.cart = [];
+        const cashInput = document.getElementById('cash-received');
+        if (cashInput) cashInput.value = '';
         renderCart();
     }
 }
@@ -565,6 +600,8 @@ async function printOrder() {
             }
 
             STATE.cart = [];
+            const cashInput = document.getElementById('cash-received');
+            if (cashInput) cashInput.value = '';
             renderCart();
 
             // Refresh Inventory from Server

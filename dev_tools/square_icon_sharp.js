@@ -1,8 +1,8 @@
 const sharp = require('sharp');
 const path = require('path');
 
-const input = path.join(__dirname, 'public', 'logo.png');
-const output = path.join(__dirname, 'public', 'icon.png');
+const input = path.join(__dirname, '..', 'public', 'logo.png');
+const output = path.join(__dirname, '..', 'public', 'icon.png');
 
 sharp(input)
     .resize(512, 512, {

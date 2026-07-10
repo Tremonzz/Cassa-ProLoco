@@ -927,3 +927,66 @@ button:active {
   font-weight: 600;
   color: var(--text-light);
 }
+
+/* --- CHANGE CALCULATOR --- */
+.change-calculator {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius);
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calc-row label {
+  font-weight: 600;
+  color: var(--text-light);
+  font-size: 0.95rem;
+}
+
+.calc-row span {
+  font-weight: 600;
+  color: var(--text-light);
+  font-size: 0.95rem;
+}
+
+.calc-input {
+  width: 120px;
+  text-align: right;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-color: #cbd5e0;
+  color: var(--primary);
+  background: #f8fafc;
+}
+
+.calc-input::-webkit-outer-spin-button,
+.calc-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.calc-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.change-amount {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-main);
+  transition: color 0.2s ease;
+}
+
+.change-amount.has-change {
+  color: var(--success);
+}

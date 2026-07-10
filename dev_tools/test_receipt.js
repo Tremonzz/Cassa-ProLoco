@@ -3,6 +3,7 @@ const PrinterTypes = require("node-thermal-printer").types;
 const electron = require("electron");
 const { PosPrinter } = require("electron-pos-printer");
 const path = require("path");
+const fs = require("fs");
 
 // Function to generate receipt data
 async function generateReceipt() {
@@ -10,7 +11,7 @@ async function generateReceipt() {
     // We only want the buffer.
     let printer = new ThermalPrinter({
         type: PrinterTypes.EPSON,
-        interface: path.join(__dirname, 'printer-output.bin'), // Use file interface to avoid TCP errors
+        interface: path.join(__dirname, '..', 'printer-output.bin'), // Use file interface to avoid TCP errors
         width: 48,
         removeSpecialCharacters: false,
         lineCharacter: "=",
@@ -21,14 +22,14 @@ async function generateReceipt() {
 
     // --- 1. HEADER: Static Image (Logo + Title) ---
     // User must save the image as 'public/receipt_header.png'
-    const headerPath = path.join(__dirname, 'public', 'receipt_header.png');
+    const headerPath = path.join(__dirname, '..', 'public', 'receipt_header.png');
 
     if (fs.existsSync(headerPath)) {
         try {
             // Resize to 380px width (max for 58mm/80mm safe area) if needed, 
             // but assuming user provides correct size or we resize for safety.
             const sharp = require('sharp');
-            const resizedHeaderPath = path.join(__dirname, 'public', 'receipt_header_resized.png');
+            const resizedHeaderPath = path.join(__dirname, '..', 'public', 'receipt_header_resized.png');
 
             await sharp(headerPath)
                 .resize({ width: 380 }) // Ensure it fits
@@ -104,7 +105,6 @@ async function generateReceipt() {
 // A robust way in Node without Electron running is using 'bady-os-printer' or similar,
 // but let's try a simple approach: saving to file and sending to printer via RAW.
 
-const fs = require('fs');
 const { exec } = require('child_process');
 const readline = require('readline');
 
@@ -119,7 +119,7 @@ async function run() {
     // Generate the buffer
     try {
         const buffer = await generateReceipt();
-        const tempFile = path.join(__dirname, 'temp_receipt.bin');
+        const tempFile = path.join(__dirname, '..', 'temp_receipt.bin');
         fs.writeFileSync(tempFile, buffer);
         console.log("Scontrino generato in memoria.");
 
@@ -133,7 +133,7 @@ async function run() {
             // Defines a PowerShell command to send RAW BYTES to the printer
             // This bypasses the text driver and sends ESC/POS commands directly
             // Use the Robust PowerShell Script
-            const psScript = path.join(__dirname, 'print_raw.ps1');
+            const psScript = path.join(__dirname, '..', 'print_raw.ps1');
             const cmd = `powershell -ExecutionPolicy Bypass -File "${psScript}" -PrinterName "${printerName}" -FilePath "${tempFile}"`;
 
             exec(cmd, (error, stdout, stderr) => {
