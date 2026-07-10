@@ -1,0 +1,22 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+
+# Local databases & SQLite temp files (prevent overwriting local data or leaking database)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Temporary / test outputs
+printer-output.bin
+temp_print_job.bin
+temp_receipt.bin
+public/receipt_header_resized.png
+
+# OS generated files
+.DS_Store
+Thumbs.db
+Desktop.ini

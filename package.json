@@ -1,0 +1,43 @@
+{
+  "name": "sagra-manager",
+  "version": "1.0.1",
+  "description": "Gestione ordini eventi",
+  "author": "Proloco Lorenzago",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "start-electron": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.sagra.manager",
+    "productName": "Gestione Ordini",
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.png"
+    },
+    "files": [
+      "**/*",
+      "!**/*.map",
+      "!**/*.db"
+    ],
+    "asarUnpack": [
+      "*.ps1",
+      "templates/**"
+    ]
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-thermal-printer": "^4.6.0",
+    "pdfkit": "^0.13.0",
+    "sharp": "^0.34.5",
+    "sqlite3": "^5.1.6"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12",
+    "electron-pos-printer": "^1.3.8",
+    "png-to-ico": "^3.0.1"
+  }
+}

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cassa Evento</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- VIEW 0: AUTH (Initial) -->
+  <div id="view-auth" class="view active">
+    <!-- Decorations (reused) -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+    <div class="bg-shape shape-4"></div>
+
+    <div class="login-container">
+      <img src="logo.png" alt="Proloco Lorenzago" class="login-logo">
+      <h1>Benvenuto</h1>
+      <p>Accedi al sistema gestionale</p>
+
+      <div id="auth-input-container" class="form-group" style="margin-bottom: 20px;">
+        <input type="password" id="auth-password" class="input-field" placeholder="Password (opzionale)"
+          onclick="this.select()" onkeydown="if(event.key === 'Enter') checkLogin()" style="text-align: center;">
+        <p id="auth-error" style="color: #ef4444; margin-top: 10px; min-height: 1.5em; font-weight: bold;"></p>
+      </div>
+
+      <button class="btn-new-sagra" onclick="checkLogin()">Accedi</button>
+    </div>
+  </div>
+
+  <!-- VIEW 1: LOGIN / SELECT SAGRA -->
+  <div id="view-login" class="view">
+    <!-- Decorations -->
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+    <div class="bg-shape shape-3"></div>
+    <div class="bg-shape shape-4"></div>
+
+    <!-- Top Right Settings Button -->
+    <button class="btn-icon settings-btn" onclick="openSettings()"
+      style="position: absolute; top: 20px; right: 20px; z-index: 10;">
+      <span class="material-symbols-rounded" style="font-size: 32px; color: white;">settings</span>
+    </button>
+
+    <div class="login-container">
+      <img src="logo.png" alt="Proloco Lorenzago" class="login-logo">
+      <h1>Sagra Manager</h1>
+      <p>Proloco Lorenzago</p>
+      <p>Seleziona un evento o creane uno nuovo</p>
+
+      <div id="sagra-list" class="sagra-list">
+        <!-- Injected via JS -->
+      </div>
+
+      <button class="btn-new-sagra" onclick="createNewSagra()">+ Nuovo Evento</button>
+    </div>
+  </div>
+
+  <!-- VIEW 2: MENU EDITOR -->
+  <div id="view-editor" class="view">
+    <div class="editor-header">
+      <div style="display:flex; align-items:center; gap: 15px;">
+        <img src="logo.png" class="editor-logo" alt="Logo">
+        <h2 id="editor-title">Modifica Menu</h2>
+      </div>
+      <div class="editor-actions">
+        <button class="btn-small btn-del" onclick="showLogin()">Annulla</button>
+        <button class="btn-save" onclick="saveMenu()">SALVA</button>
+      </div>
+    </div>
+    <div id="editor-container">
+      <!-- Injected via JS -->
+      <!-- Will contain Forms for Categories and Products -->
+    </div>
+    <div style="margin-top: 20px; text-align: center;">
+      <button class="btn-add" onclick="addCategoryUI()">+ Aggiungi Categoria</button>
+    </div>
+  </div>
+
+  <!-- VIEW 3: POS INTERFACE -->
+  <div id="view-pos" class="view">
+    <!-- NEW POS HEADER -->
+    <div class="pos-header">
+      <div style="display:flex; align-items:center; gap: 15px;">
+        <img src="logo.png" class="editor-logo" alt="Logo">
+        <h2 id="pos-sagra-name">Nome Evento</h2>
+      </div>
+      <div>
+        <button class="btn-small btn-del" onclick="showLogin()">Torna alla Home</button>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT WRAPPER -->
+    <div class="pos-content">
+      <!-- Left: Products -->
+      <div class="products-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h2 style="margin:0">Prodotti</h2>
+          <button class="btn-small" onclick="switchToEditor()">Modifica Menu</button>
+        </div>
+        <div id="products-container">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+
+      <!-- Right: Order -->
+      <div class="order-panel">
+        <div class="order-header">
+          <h2>Ordine Corrente</h2>
+          <button class="btn-small" onclick="clearCart()">Svuota</button>
+        </div>
+
+        <div class="order-items" id="cart-items">
+          <!-- Injected by JS -->
+        </div>
+
+        <div class="order-footer">
+          <div class="total-display" id="total-amount">€ 0.00</div>
+          <div class="actions">
+            <button class="btn-action btn-history" onclick="showHistory()">Storico</button>
+            <button class="btn-action btn-print" onclick="printOrder()">STAMPA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div id="history-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Storico Ordini</h2>
+        <div>
+          <button class="btn-action" style="padding: 10px; font-size: 1rem;" onclick="showStats()">Statistiche</button>
+          <button class="btn-action" style="padding: 10px; font-size: 1rem;" onclick="exportData()">Esporta CSV</button>
+          <span class="close-modal" onclick="closeHistory()">&times;</span>
+        </div>
+      </div>
+      <div class="history-list" id="history-list">
+        <!-- Injected JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Modal -->
+  <div id="stats-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Statistiche Evento</h2>
+        <span class="close-modal" onclick="closeStats()">&times;</span>
+      </div>
+      <div class="stats-body">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>Incasso Totale</h3>
+            <div class="stat-value" id="stat-revenue">€ 0.00</div>
+          </div>
+          <div class="stat-card">
+            <h3>Ordini Totali</h3>
+            <div class="stat-value" id="stat-orders">0</div>
+          </div>
+        </div>
+        <h3>Prodotti più venduti</h3>
+        <div class="top-products-list" id="top-products">
+          <!-- Injected JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Impostazioni</h2>
+        <span class="close-modal" onclick="closeSettings()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="printer-select">Stampante Termica</label>
+          <select id="printer-select" class="input-field">
+            <option value="">Caricamento...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="template-select">Modello Scontrino</label>
+          <select id="template-select" class="input-field">
+            <option value="compact">Compatto (Unico)</option>
+            <option value="split">Diviso (Cibo + Bevande)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="settings-password">Password Accesso (Lascia vuoto per nessuna)</label>
+          <input type="password" id="settings-password" class="input-field" placeholder="Nuova Password">
+          <div class="form-group" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px;">
+            <label style="font-weight:bold;">Gestione Database</label>
+            <div style="display:flex; gap:10px; margin-top:5px;">
+              <button class="btn" onclick="exportDB()" style="flex:1;">
+                <span class="material-symbols-rounded">download</span> Esporta
+              </button>
+              <button class="btn" onclick="document.getElementById('db-upload').click()"
+                style="flex:1; background: var(--secondary);">
+                <span class="material-symbols-rounded">upload</span> Importa
+              </button>
+              <input type="file" id="db-upload" style="display:none" onchange="importDB(this)">
+            </div>
+            <small style="color:#666; display:block; margin-top:5px;">Utile per backup o spostare dati su un altro
+              PC.</small>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" onclick="saveSettings()">Salva</button>
+      </div>
+    </div>
+
+    <!-- Generic Dialog Modal -->
+    <!-- Generic Dialog Modal (Handled by JS now) -->
+
+    <script src="app.js"></script>
+</body>
+
+</html>
