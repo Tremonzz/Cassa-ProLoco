@@ -985,6 +985,7 @@ button:active {
   font-weight: 700;
   color: var(--text-main);
   transition: color 0.2s ease;
+  padding-right: 14px; /* Allineamento visivo con l'input sopra */
 }
 
 .change-amount.has-change {
