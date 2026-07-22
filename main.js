@@ -10,13 +10,15 @@ function createWindow() {
         width: 1280,
         height: 800,
         title: "Gestione Ordini",
-        icon: path.join(__dirname, 'public/logo.png'),
+        icon: path.join(__dirname, 'public/images/logo.png'),
         webPreferences: {
             nodeIntegration: false, // Security best practice
             contextIsolation: true  // Security best practice
         },
         autoHideMenuBar: true // Makes it look more app-like
     });
+
+    win.maximize();
 
     // Load the local server
     // We add a small delay or retry mechanic could be useful, 

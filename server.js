@@ -1,8 +1,8 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
-const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { exec } = require('child_process');
 const { generateReceiptBuffer: generateCompactReceipt } = require('./templates/receipt_compact');
 const { generateSplitReceipt } = require('./templates/receipt_split');
@@ -47,6 +47,19 @@ let db = new sqlite3.Database(dbPath, (err) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+
+// Serve resized header image from OS temp dir or fallback
+app.get('/receipt_header_resized.png', (req, res) => {
+  const resizedPath = path.join(os.tmpdir(), 'receipt_header_resized.png');
+  if (fs.existsSync(resizedPath)) {
+    return res.sendFile(resizedPath);
+  }
+  const originalPath = path.join(__dirname, 'public', 'images', 'receipt_header.png');
+  if (fs.existsSync(originalPath)) {
+    return res.sendFile(originalPath);
+  }
+  res.status(404).send('Not found');
+});
 
 // Helper for Promisified DB Run
 function dbRun(sql, params = []) {
@@ -340,7 +353,7 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
 
 // Create Order (SEQ LOGIC + THERMAL PRINT + INVENTORY)
 app.post('/api/orders', async (req, res) => {
-  const { items, total, sagraId, printerName, template } = req.body;
+  const { items, total, sagraId, printerName, template, testMode } = req.body;
   if (!items || items.length === 0) return res.status(400).send('Empty order');
   const targetSagra = sagraId || 1;
 
@@ -349,18 +362,14 @@ app.post('/api/orders', async (req, res) => {
 
     // 1. Inventory Check & Update
     for (const item of items) {
-      // Fetch current quantity
-      // usage of 'id' from frontend items which corresponds to product.id
       if (item.id) {
         const rows = await dbAll("SELECT quantity FROM products WHERE id = ?", [item.id]);
         if (rows.length > 0) {
           const currentQty = rows[0].quantity;
-          // If quantity is NOT NULL (limited stock)
           if (currentQty !== null) {
             if (currentQty < item.quantity) {
               throw new Error(`Scorte insufficienti per: ${item.name} (Rimasti: ${currentQty})`);
             }
-            // Decrement
             await dbRun("UPDATE products SET quantity = quantity - ? WHERE id = ?", [item.quantity, item.id]);
           }
         }
@@ -385,50 +394,40 @@ app.post('/api/orders', async (req, res) => {
 
     await dbRun("COMMIT");
 
-    // 5. Print (Async, don't block response)
-    // ... logic remains same ...
-    // Note: We need to re-fetch printer options or pass them down
-    // Since print logic is below, we continue.
-
-    // --- Printing Logic (Copied from previous implementation context) ---
-    // But since I replaced the top block, I must ensure I don't break the flow.
-    // The previous code had "const row = await dbAll..." and then printing.
-    // I need to make sure I finish the function correctly.
-
-    // Printing
+    // 5. Printing / Test Mode Logic
     try {
+      const receiptData = {
+        seq: seq,
+        items: items,
+        total: total,
+        date: new Date().toLocaleString('it-IT')
+      };
+
+      let printResult = null;
+      if (template === 'split') {
+        printResult = await generateSplitReceipt(receiptData);
+      } else {
+        printResult = await generateCompactReceipt(receiptData);
+      }
+
+      if (testMode) {
+        console.log(`[TEST MODE] Order #${seq} saved. Skipping physical printer output.`);
+        return res.json({ success: true, orderId: seq, testMode: true, preview: printResult.preview });
+      }
+
       if (printerName) {
-        // Need to construct receipt data
-        // Since we are inside the endpoint, we can call the service
-        let buffer = null;
-        const receiptData = {
-          seq: seq,
-          items: items,
-          total: total,
-          date: new Date().toLocaleString('it-IT')
-        };
-
-        if (template === 'split') {
-          // New Split Template (Food + Drinks)
-          buffer = await generateSplitReceipt(receiptData);
-        } else {
-          // Default Compact Template
-          buffer = await generateCompactReceipt(receiptData);
-        }
-
         const targetPrinter = printerName || "POS-80";
         console.log(`Printing Order #${seq} to "${targetPrinter}"...`);
-
-        await printRawBuffer(buffer, targetPrinter);
+        await printRawBuffer(printResult.buffer, targetPrinter);
       }
+
+      res.json({ success: true, orderId: seq, preview: printResult.preview });
+
     } catch (printErr) {
       console.error("Printing Error:", printErr);
-      // We don't fail the order if print fails, just warn
       res.json({ success: true, orderId: seq, warning: "Ordine salvato ma errore stampa: " + printErr.message });
       return;
     }
-
-    res.json({ success: true, orderId: seq });
 
   } catch (err) {
     await dbRun("ROLLBACK");
@@ -436,13 +435,6 @@ app.post('/api/orders', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-/*
-// OLD ENDPOINT FOR REFERENCE (Replaced by above)
-app.post('/api/orders', async (req, res) => {
-  const { items, total, sagraId, printerName, template } = req.body;
-  if (!items || items.length === 0) return res.status(400).send('Empty order');
-  const targetSagra = sagraId || 1;
-*/
 
 // Get History
 app.get('/api/history', (req, res) => {

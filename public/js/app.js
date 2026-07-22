@@ -290,7 +290,6 @@ async function createNewSagra() {
         showAlert("Errore: " + e.message);
     }
 }
-window.createNewSagra = createNewSagra;
 
 async function selectSagra(id, name) {
     try {
@@ -571,43 +570,42 @@ async function printOrder() {
     const printerName = localStorage.getItem('thermalPrinterName');
     const template = localStorage.getItem('receiptTemplate') || 'compact';
 
-    const payload = {
-        sagraId: STATE.currentSagra.id,
-        items: STATE.cart,
-        total: total,
-        printerName: printerName,
-        template: template
-    };
+        const payload = {
+            sagraId: STATE.currentSagra.id,
+            items: STATE.cart,
+            total: total,
+            printerName: printerName,
+            template: template,
+            testMode: (localStorage.getItem('appTestMode') === 'true')
+        };
 
-    try {
-        const res = await fetch('/api/orders', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        const data = await res.json();
+            const data = await res.json();
 
-        if (res.ok && data.success) {
-            // Success
-            if (data.warning) {
-                showAlert(`Nota: ${data.warning}`);
+            if (res.ok && data.success) {
+                if (data.testMode && data.preview) {
+                    showReceiptPreviewModal(data.preview);
+                } else if (data.warning) {
+                    showAlert(`Nota: ${data.warning}`);
+                } else {
+                    console.log(`Ordine #${data.orderId} Stampato!`);
+                }
+
+                STATE.cart = [];
+                const cashInput = document.getElementById('cash-received');
+                if (cashInput) cashInput.value = '';
+                renderCart();
+
+                // Refresh Inventory from Server
+                await loadSagraResources();
+                renderProducts();
             } else {
-                // Silent success per user request
-                console.log(`Ordine #${data.orderId} Stampato!`);
-                // Optional: distinct sound or quick toast?
-                // showAlert("Ordine inviato!", 1000); 
-            }
-
-            STATE.cart = [];
-            const cashInput = document.getElementById('cash-received');
-            if (cashInput) cashInput.value = '';
-            renderCart();
-
-            // Refresh Inventory from Server
-            await loadSagraResources();
-            renderProducts();
-        } else {
             // Error (likely inventory)
             const msg = data.error || 'Sconosciuto';
             alert('Errore: ' + msg);
@@ -721,9 +719,10 @@ window.openSettings = async function () {
     settingsModal.style.display = 'flex';
     printerSelect.innerHTML = '<option>Caricamento...</option>';
 
-    // Load Password & Template
+    // Load Password, Template & Test Mode
     settingsPasswordInput.value = localStorage.getItem('appPassword') || "";
     document.getElementById('template-select').value = localStorage.getItem('receiptTemplate') || 'compact';
+    document.getElementById('test-mode-toggle').checked = (localStorage.getItem('appTestMode') === 'true');
 
     try {
         const res = await fetch('/api/printers');
@@ -755,14 +754,16 @@ window.saveSettings = function () {
     const selectedPrinter = printerSelect.value;
     const newPassword = settingsPasswordInput.value.trim();
     const selectedTemplate = document.getElementById('template-select').value;
+    const isTestMode = document.getElementById('test-mode-toggle').checked;
 
     if (selectedPrinter) {
         localStorage.setItem('thermalPrinterName', selectedPrinter);
     }
 
-    // Save Password & Template
+    // Save Password, Template & Test Mode
     localStorage.setItem('appPassword', newPassword);
     localStorage.setItem('receiptTemplate', selectedTemplate);
+    localStorage.setItem('appTestMode', isTestMode ? 'true' : 'false');
 
     showAlert("Impostazioni salvate!");
     closeSettings();
@@ -770,6 +771,84 @@ window.saveSettings = function () {
 
 window.checkLogin = checkLogin;
 window.showAlert = showAlert;
+
+// --- RECEIPT PREVIEW MODAL ---
+function showReceiptPreviewModal(preview) {
+    const container = document.getElementById('receipt-preview-container');
+    if (!container || !preview || !preview.receipts) return;
+
+    let html = '<div class="thermal-paper-wrapper" style="width:100%; display:flex; flex-direction:column; align-items:center;">';
+    html += '<div class="thermal-paper">';
+
+    preview.receipts.forEach((receipt, index) => {
+        if (index > 0) {
+            html += `
+                <div class="paper-cut-indicator">
+                    <span class="paper-cut-label">✂ TAGLIO CARTA ✂</span>
+                </div>
+            `;
+        }
+
+        if (receipt.hasHeaderImage) {
+            html += `<img src="/receipt_header_resized.png" class="thermal-header-img" alt="Header Logo">`;
+        }
+
+        if (receipt.title) {
+            html += `<div class="thermal-title">${receipt.title}</div>`;
+        }
+
+        if (receipt.headerLines && receipt.headerLines.length > 0) {
+            html += `<div class="thermal-text-center">`;
+            receipt.headerLines.forEach(line => {
+                html += `<div>${line}</div>`;
+            });
+            html += `</div>`;
+        }
+
+        html += `<div class="thermal-divider"></div>`;
+
+        if (receipt.items && receipt.items.length > 0) {
+            receipt.items.forEach(item => {
+                const boldStyle = item.isBold ? 'thermal-bold' : '';
+                html += `
+                    <div class="thermal-row ${boldStyle}">
+                        <span>${item.left}</span>
+                        <span>${item.right}</span>
+                    </div>
+                `;
+            });
+        }
+
+        html += `<div class="thermal-divider"></div>`;
+
+        if (receipt.totalLabel && receipt.totalValue) {
+            html += `
+                <div class="thermal-row thermal-row-bold">
+                    <span>${receipt.totalLabel}</span>
+                    <span>${receipt.totalValue}</span>
+                </div>
+            `;
+        }
+
+        if (receipt.footerLines && receipt.footerLines.length > 0) {
+            html += `<div class="thermal-divider"></div>`;
+            html += `<div class="thermal-text-center">`;
+            receipt.footerLines.forEach(line => {
+                html += `<div>${line}</div>`;
+            });
+            html += `</div>`;
+        }
+    });
+
+    html += '</div></div>';
+    container.innerHTML = html;
+    document.getElementById('receipt-modal').style.display = 'flex';
+}
+
+function closeReceiptModal() {
+    document.getElementById('receipt-modal').style.display = 'none';
+}
+window.closeReceiptModal = closeReceiptModal;
 
 // --- DATABASE FUNCTIONS ---
 window.exportDB = function () {

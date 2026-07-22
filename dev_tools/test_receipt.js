@@ -21,15 +21,13 @@ async function generateReceipt() {
     });
 
     // --- 1. HEADER: Static Image (Logo + Title) ---
-    // User must save the image as 'public/receipt_header.png'
-    const headerPath = path.join(__dirname, '..', 'public', 'receipt_header.png');
+    const headerPath = path.join(__dirname, '..', 'public', 'images', 'receipt_header.png');
 
     if (fs.existsSync(headerPath)) {
         try {
-            // Resize to 380px width (max for 58mm/80mm safe area) if needed, 
-            // but assuming user provides correct size or we resize for safety.
             const sharp = require('sharp');
-            const resizedHeaderPath = path.join(__dirname, '..', 'public', 'receipt_header_resized.png');
+            const os = require('os');
+            const resizedHeaderPath = path.join(os.tmpdir(), 'receipt_header_resized.png');
 
             await sharp(headerPath)
                 .resize({ width: 380 }) // Ensure it fits

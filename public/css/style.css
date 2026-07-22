@@ -991,3 +991,88 @@ button:active {
 .change-amount.has-change {
   color: var(--success);
 }
+
+/* --- RECEIPT PREVIEW (THERMAL PAPER) --- */
+.receipt-modal-content {
+  max-width: 440px !important;
+  width: 90% !important;
+}
+
+.receipt-modal-body {
+  background: #cbd5e1;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.thermal-paper {
+  background: #ffffff;
+  width: 100%;
+  max-width: 350px;
+  padding: 25px 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  font-family: 'Courier New', Courier, monospace;
+  color: #111827;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  border-radius: 4px;
+}
+
+.thermal-header-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 12px auto;
+}
+
+.thermal-text-center {
+  text-align: center;
+}
+
+.thermal-bold {
+  font-weight: bold;
+}
+
+.thermal-title {
+  font-size: 1.3rem;
+  font-weight: bold;
+  text-align: center;
+  margin: 10px 0;
+}
+
+.thermal-divider {
+  border-top: 1px dashed #4b5563;
+  margin: 12px 0;
+}
+
+.thermal-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+
+.thermal-row-bold {
+  font-weight: bold;
+  font-size: 1.05rem;
+}
+
+.paper-cut-indicator {
+  position: relative;
+  border-top: 2px dashed #94a3b8;
+  margin: 30px -20px;
+  text-align: center;
+}
+
+.paper-cut-label {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #cbd5e1;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #475569;
+  letter-spacing: 1px;
+}
