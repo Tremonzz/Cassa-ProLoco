@@ -71,19 +71,28 @@
     <div class="editor-header">
       <div style="display:flex; align-items:center; gap: 15px;">
         <img src="images/logo.png" class="editor-logo" alt="Logo">
-        <h2 id="editor-title">Modifica Menu</h2>
+        <h2 id="editor-title">
+          <span class="material-symbols-rounded" style="font-size: 1.4rem;">edit_note</span>
+          Modifica Menu
+        </h2>
       </div>
       <div class="editor-actions">
-        <button class="btn-small btn-del" onclick="showLogin()">Annulla</button>
-        <button class="btn-save" onclick="saveMenu()">SALVA</button>
+        <button class="btn-editor-cancel" onclick="showView('pos')">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">close</span> Annulla
+        </button>
+        <button class="btn-editor-save" onclick="saveMenu()">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">save</span> Salva Menu
+        </button>
       </div>
     </div>
-    <div id="editor-container">
-      <!-- Injected via JS -->
-      <!-- Will contain Forms for Categories and Products -->
-    </div>
-    <div style="margin-top: 20px; text-align: center;">
-      <button class="btn-add" onclick="addCategoryUI()">+ Aggiungi Categoria</button>
+
+    <div id="editor-scroll-area">
+      <div id="editor-container">
+        <div id="editor-sections-list"></div>
+        <button class="btn-add-category" onclick="addCategoryUI()">
+          <span class="material-symbols-rounded">library_add</span> Aggiungi Nuova Categoria
+        </button>
+      </div>
     </div>
   </div>
 
@@ -93,10 +102,21 @@
     <div class="pos-header">
       <div style="display:flex; align-items:center; gap: 15px;">
         <img src="images/logo.png" class="editor-logo" alt="Logo">
-        <h2 id="pos-sagra-name">Nome Evento</h2>
+        <h2 id="pos-sagra-name">
+          <span class="material-symbols-rounded" style="font-size: 1.4rem; color: var(--primary);">point_of_sale</span>
+          Cassa Evento
+        </h2>
       </div>
-      <div>
-        <button class="btn-small btn-del" onclick="showLogin()">Torna alla Home</button>
+      <div style="display:flex; gap: 10px;">
+        <button class="btn-pos-secondary" onclick="switchToEditor()">
+          <span class="material-symbols-rounded">edit_note</span> Modifica Menu
+        </button>
+        <button class="btn-pos-secondary" onclick="showStats()">
+          <span class="material-symbols-rounded">bar_chart</span> Statistiche
+        </button>
+        <button class="btn-pos-home" onclick="showLogin()">
+          <span class="material-symbols-rounded">home</span> Torna alla Home
+        </button>
       </div>
     </div>
 
@@ -104,10 +124,6 @@
     <div class="pos-content">
       <!-- Left: Products -->
       <div class="products-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <h2 style="margin:0">Prodotti</h2>
-          <button class="btn-small" onclick="switchToEditor()">Modifica Menu</button>
-        </div>
         <div id="products-container">
           <!-- Injected by JS -->
         </div>
@@ -116,8 +132,12 @@
       <!-- Right: Order -->
       <div class="order-panel">
         <div class="order-header">
-          <h2>Ordine Corrente</h2>
-          <button class="btn-small" onclick="clearCart()">Svuota</button>
+          <h2>
+            <span class="material-symbols-rounded">shopping_bag</span> Ordine Corrente
+          </h2>
+          <button class="btn-clear-cart" onclick="clearCart()">
+            <span class="material-symbols-rounded" style="font-size: 1.1rem;">delete_sweep</span> Svuota
+          </button>
         </div>
 
         <div class="order-items" id="cart-items">
@@ -125,23 +145,39 @@
         </div>
 
         <div class="order-footer">
-          <div class="total-display" id="total-amount">€ 0.00</div>
-          
+          <div class="total-display-card">
+            <span class="total-label">TOTALE DA PAGARE</span>
+            <span class="total-amount" id="total-amount">€ 0.00</span>
+          </div>
+
           <!-- Resto Calculator -->
           <div class="change-calculator">
             <div class="calc-row">
               <label for="cash-received">Contante Ricevuto</label>
               <input type="number" id="cash-received" class="input-field calc-input" placeholder="0.00" step="0.01" min="0" onclick="this.select()">
             </div>
-            <div class="calc-row">
+
+            <!-- Quick Cash Buttons -->
+            <div class="quick-cash-bar">
+              <button type="button" class="btn-quick-cash" onclick="setQuickCash(5)">€ 5</button>
+              <button type="button" class="btn-quick-cash" onclick="setQuickCash(10)">€ 10</button>
+              <button type="button" class="btn-quick-cash" onclick="setQuickCash(20)">€ 20</button>
+              <button type="button" class="btn-quick-cash" onclick="setQuickCash(50)">€ 50</button>
+            </div>
+
+            <div class="calc-row change-row">
               <span>Resto da consegnare</span>
               <span class="change-amount" id="change-amount">€ 0.00</span>
             </div>
           </div>
 
           <div class="actions">
-            <button class="btn-action btn-history" onclick="showHistory()">Storico</button>
-            <button class="btn-action btn-print" onclick="printOrder()">STAMPA</button>
+            <button class="btn-action btn-history" onclick="showHistory()">
+              <span class="material-symbols-rounded">history</span> Storico
+            </button>
+            <button class="btn-action btn-print" onclick="printOrder()">
+              <span class="material-symbols-rounded">print</span> STAMPA ORDINE
+            </button>
           </div>
         </div>
       </div>
@@ -150,14 +186,20 @@
 
   <!-- History Modal -->
   <div id="history-modal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content history-modal-content">
       <div class="modal-header">
-        <h2>Storico Ordini</h2>
-        <div>
-          <button class="btn-action" style="padding: 10px; font-size: 1rem;" onclick="showStats()">Statistiche</button>
-          <button class="btn-action" style="padding: 10px; font-size: 1rem;" onclick="exportData()">Esporta CSV</button>
+        <h2>
+          <span class="material-symbols-rounded">history</span> Storico Ordini
+        </h2>
+        <div style="display:flex; align-items:center; gap: 8px;">
+          <button class="btn-history-hdr" onclick="exportData()">
+            <span class="material-symbols-rounded" style="font-size: 1.1rem;">download</span> Esporta CSV
+          </button>
           <span class="close-modal" onclick="closeHistory()">&times;</span>
         </div>
+      </div>
+      <div class="history-summary-bar" id="history-summary-bar">
+        <!-- Injected JS summary pills -->
       </div>
       <div class="history-list" id="history-list">
         <!-- Injected JS -->
@@ -167,25 +209,40 @@
 
   <!-- Stats Modal -->
   <div id="stats-modal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content stats-modal-content">
       <div class="modal-header">
-        <h2>Statistiche Evento</h2>
+        <h2>
+          <span class="material-symbols-rounded">bar_chart</span> Statistiche Evento
+        </h2>
         <span class="close-modal" onclick="closeStats()">&times;</span>
       </div>
       <div class="stats-body">
         <div class="stats-grid">
           <div class="stat-card">
-            <h3>Incasso Totale</h3>
+            <div class="stat-card-header">
+              <span class="material-symbols-rounded stat-icon">payments</span>
+              <span class="stat-card-title">INCASSO TOTALE</span>
+            </div>
             <div class="stat-value" id="stat-revenue">€ 0.00</div>
           </div>
           <div class="stat-card">
-            <h3>Ordini Totali</h3>
+            <div class="stat-card-header">
+              <span class="material-symbols-rounded stat-icon">receipt_long</span>
+              <span class="stat-card-title">ORDINI TOTALI</span>
+            </div>
             <div class="stat-value" id="stat-orders">0</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <span class="material-symbols-rounded stat-icon">analytics</span>
+              <span class="stat-card-title">SCONTRINO MEDIO</span>
+            </div>
+            <div class="stat-value" id="stat-avg-order">€ 0.00</div>
+          </div>
         </div>
-        <h3>Prodotti più venduti</h3>
-        <div class="top-products-list" id="top-products">
-          <!-- Injected JS -->
+
+        <div id="top-products">
+          <!-- Injected JS by category -->
         </div>
       </div>
     </div>
@@ -193,57 +250,88 @@
 
   <!-- Settings Modal -->
   <div id="settings-modal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content settings-modal-content">
       <div class="modal-header">
-        <h2>Impostazioni</h2>
+        <div class="modal-title-group">
+          <span class="material-symbols-rounded modal-title-icon">settings</span>
+          <h2>Impostazioni</h2>
+        </div>
         <span class="close-modal" onclick="closeSettings()">&times;</span>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="printer-select">Stampante Termica</label>
-          <select id="printer-select" class="input-field">
-            <option value="">Caricamento...</option>
-          </select>
-        </div>
+      <div class="modal-body settings-body">
 
-        <div class="form-group">
-          <label for="template-select">Modello Scontrino</label>
-          <select id="template-select" class="input-field">
-            <option value="compact">Compatto (Unico)</option>
-            <option value="split">Diviso (Cibo + Bevande)</option>
-          </select>
-        </div>
-
-        <div class="form-group" style="flex-direction: row; align-items: center; justify-content: space-between; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 10px;">
-          <div>
-            <label for="test-mode-toggle" style="margin: 0; cursor: pointer; color: var(--primary);">Modalità Test (Anteprima)</label>
-            <small style="display: block; color: #666; font-weight: normal;">Mostra a schermo lo scontrino senza stampare</small>
+        <!-- SECTION 1: STAMPA E SICUREZZA -->
+        <div class="settings-section">
+          <div class="settings-section-title">
+            <span class="material-symbols-rounded">print</span>
+            Stampa & Sicurezza
           </div>
-          <input type="checkbox" id="test-mode-toggle" style="width: 22px; height: 22px; cursor: pointer;">
+
+          <div class="form-group">
+            <label for="printer-select">Stampante Termica</label>
+            <div class="printer-select-row">
+              <select id="printer-select" class="input-field">
+                <option value="">Caricamento...</option>
+              </select>
+              <button type="button" class="btn-test-printer" onclick="testPrinter()">
+                <span class="material-symbols-rounded">print</span> Test
+              </button>
+            </div>
+            <div id="test-printer-status" class="status-banner"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="template-select">Modello Scontrino</label>
+            <select id="template-select" class="input-field">
+              <option value="compact">Compatto (Unico)</option>
+              <option value="split">Diviso (Cibo + Bevande)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="settings-password">Password Accesso</label>
+            <input type="password" id="settings-password" class="input-field" placeholder="Lascia vuoto per disattivare">
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="settings-password">Password Accesso (Lascia vuoto per nessuna)</label>
-          <input type="password" id="settings-password" class="input-field" placeholder="Nuova Password">
-          <div class="form-group" style="margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px;">
-            <label style="font-weight:bold;">Gestione Database</label>
-            <div style="display:flex; gap:10px; margin-top:5px;">
-              <button class="btn" onclick="exportDB()" style="flex:1;">
-                <span class="material-symbols-rounded">download</span> Esporta
+        <!-- SECTION 2: AVANZATE -->
+        <div class="settings-section settings-section-advanced">
+          <div class="settings-section-title">
+            <span class="material-symbols-rounded">tune</span>
+            Avanzate
+          </div>
+
+          <div class="settings-card-row">
+            <div class="settings-card-info">
+              <label for="test-mode-toggle" class="clickable-label">Modalità Test (Anteprima)</label>
+              <span class="settings-card-sub">Mostra lo scontrino a schermo senza stampare</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="test-mode-toggle">
+              <span class="slider round"></span>
+            </label>
+          </div>
+
+          <div class="form-group" style="margin-top: 5px;">
+            <label style="margin: 0; font-size: 0.95rem;">Gestione Database</label>
+            <span class="settings-card-sub">Backup ed esportazione/importazione dati</span>
+            <div class="db-actions-row">
+              <button type="button" class="btn-db-action" onclick="exportDB()">
+                <span class="material-symbols-rounded">download</span> Esporta DB
               </button>
-              <button class="btn" onclick="document.getElementById('db-upload').click()"
-                style="flex:1; background: var(--secondary);">
-                <span class="material-symbols-rounded">upload</span> Importa
+              <button type="button" class="btn-db-action" onclick="document.getElementById('db-upload').click()">
+                <span class="material-symbols-rounded">upload</span> Importa DB
               </button>
               <input type="file" id="db-upload" style="display:none" onchange="importDB(this)">
             </div>
-            <small style="color:#666; display:block; margin-top:5px;">Utile per backup o spostare dati su un altro
-              PC.</small>
           </div>
         </div>
+
       </div>
       <div class="modal-footer">
-        <button class="btn-save" onclick="saveSettings()">Salva</button>
+        <button class="btn-save" onclick="saveSettings()">
+          <span class="material-symbols-rounded" style="vertical-align: middle; margin-right: 4px;">check</span> Salva Impostazioni
+        </button>
       </div>
     </div>
   </div>
@@ -263,6 +351,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Toast Notifications Container -->
+  <div id="toast-container" class="toast-container"></div>
 
   <script src="js/app.js"></script>
 </body>

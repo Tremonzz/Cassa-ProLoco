@@ -1,6 +1,6 @@
 {
   "name": "sagra-manager",
-  "version": "1.3.2",
+  "version": "2.0.4",
   "description": "Gestione ordini eventi",
   "author": "Proloco Lorenzago",
   "main": "main.js",

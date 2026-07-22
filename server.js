@@ -102,9 +102,12 @@ function runMigrations() {
       CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        is_hidden INTEGER DEFAULT 0,
         sagra_id INTEGER DEFAULT 1
       )
-    `);
+    `, (err) => {
+      db.run("ALTER TABLE categories ADD COLUMN is_hidden INTEGER DEFAULT 0", (e) => { });
+    });
 
     // Products
     db.run(`
@@ -292,7 +295,7 @@ app.delete('/api/sagras/:id', async (req, res) => {
 app.get('/api/sagras/:id/products', (req, res) => {
   const sagraId = req.params.id;
   const sql = `
-      SELECT c.id as category_id, c.name as category, p.id, p.name, p.price, p.quantity
+      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity
       FROM categories c
       LEFT JOIN products p ON c.id = p.category_id
       WHERE c.sagra_id = ?
@@ -302,14 +305,20 @@ app.get('/api/sagras/:id/products', (req, res) => {
   db.all(sql, [sagraId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
 
-    const grouped = rows.reduce((acc, curr) => {
-      if (!acc[curr.category]) acc[curr.category] = [];
-      if (curr.id) { // Only add if product exists (id is not null)
-        acc[curr.category].push(curr);
+    const grouped = {};
+    const meta = {};
+
+    rows.forEach(curr => {
+      if (!grouped[curr.category]) {
+        grouped[curr.category] = [];
+        meta[curr.category] = { is_hidden: curr.category_is_hidden || 0 };
       }
-      return acc;
-    }, {});
-    res.json(grouped);
+      if (curr.id) {
+        grouped[curr.category].push(curr);
+      }
+    });
+
+    res.json({ products: grouped, meta });
   });
 });
 
@@ -321,22 +330,15 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
 
   try {
     await dbRun("BEGIN TRANSACTION");
-    // Wipe old menu for this Sagra (simple replacement strategy)
-    // Note: This resets stock counts if not careful. 
-    // Ideally we should update existing, but for this simple app, 
-    // the user "Saves" the whole state from the editor. 
-    // The Editor MUST send back the current quantities.
-
-    // First, get all category IDs for this sagra to delete products
     await dbRun("DELETE FROM products WHERE category_id IN (SELECT id FROM categories WHERE sagra_id = ?)", [sagraId]);
     await dbRun("DELETE FROM categories WHERE sagra_id = ?", [sagraId]);
 
     for (const cat of categories) {
-      const result = await dbRun("INSERT INTO categories (name, sagra_id) VALUES (?, ?)", [cat.name, sagraId]);
+      const isHidden = cat.is_hidden ? 1 : 0;
+      const result = await dbRun("INSERT INTO categories (name, sagra_id, is_hidden) VALUES (?, ?, ?)", [cat.name, sagraId, isHidden]);
       const catId = result.lastID;
       if (cat.products && cat.products.length > 0) {
         for (const p of cat.products) {
-          // Quantity: null means infinite, 0 means infinite (per user req), >0 means limit
           const qty = (p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
           await dbRun("INSERT INTO products (name, price, quantity, category_id) VALUES (?, ?, ?, ?)", [p.name, p.price, qty, catId]);
         }
@@ -497,8 +499,7 @@ app.get('/api/stats', async (req, res) => {
             FROM order_items 
             WHERE order_id IN (SELECT id FROM orders WHERE sagra_id = ?)
             GROUP BY product_name 
-            ORDER BY qty DESC 
-            LIMIT 5
+            ORDER BY qty DESC
         `, [sagraId], (err, rows) => {
         if (err) reject(err); else resolve(rows);
       });
@@ -537,6 +538,32 @@ app.get('/api/printers', (req, res) => {
       res.json([]); // Return empty if parsing fails (e.g. no printers)
     }
   });
+});
+
+// TEST PRINTER API
+app.post('/api/print-test', async (req, res) => {
+  const { printerName } = req.body;
+  if (!printerName) {
+    return res.status(400).json({ error: "Nessuna stampante selezionata" });
+  }
+
+  try {
+    const testData = {
+      sagraName: "STAMPA DI PROVA",
+      items: [{ name: "Test Connessione OK", price: 0.00, quantity: 1 }],
+      total: 0.00,
+      seq: "TEST"
+    };
+
+    const printResult = await generateCompactReceipt(testData);
+    console.log(`Sending test print to "${printerName}"...`);
+    await printRawBuffer(printResult.buffer, printerName);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Test Print Error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Export CSV

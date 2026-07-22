@@ -252,6 +252,7 @@ async function archiveSagra(e, id) {
     e.stopPropagation();
     if (!await showConfirm("Vuoi archiviare questo evento?")) return;
     await fetch(`/api/sagras/${id}/archive`, { method: 'PUT' });
+    showToast("Evento archiviato", "info");
     loadSagras();
 }
 
@@ -259,6 +260,7 @@ async function unarchiveSagra(e, id) {
     e.stopPropagation();
     if (!await showConfirm("Riportare questo evento tra quelli attivi?")) return;
     await fetch(`/api/sagras/${id}/unarchive`, { method: 'PUT' });
+    showToast("Evento ripristinato con successo", "success");
     loadSagras();
 }
 
@@ -266,6 +268,7 @@ async function deleteSagra(e, id) {
     e.stopPropagation();
     if (!await showConfirm("ATTENZIONE: Eliminazione definitiva (Ordini, Menu, Statistiche).\nContinuare?")) return;
     await fetch(`/api/sagras/${id}`, { method: 'DELETE' });
+    showToast("Evento eliminato", "error");
     loadSagras();
 }
 
@@ -307,7 +310,14 @@ async function selectSagra(id, name) {
 async function loadSagraResources() {
     const res = await fetch(`/api/sagras/${STATE.currentSagra.id}/products`);
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
-    STATE.products = await res.json();
+    const data = await res.json();
+    if (data && data.products) {
+        STATE.products = data.products;
+        STATE.categoryMeta = data.meta || {};
+    } else {
+        STATE.products = data;
+        STATE.categoryMeta = {};
+    }
     STATE.cart = [];
     const cashInput = document.getElementById('cash-received');
     if (cashInput) cashInput.value = '';
@@ -324,35 +334,118 @@ function switchToEditor() {
     showView('editor');
 }
 
-function renderEditor() {
-    editorContainer.innerHTML = '';
-    const categories = Object.keys(STATE.products).length > 0
-        ? Object.keys(STATE.products)
-        : [];
+function toggleHideCategory(btn) {
+    const sec = btn.closest('.editor-section');
+    if (!sec) return;
 
-    if (categories.length === 0) {
-        addCategoryUI();
+    const isHidden = sec.classList.toggle('is-hidden-category');
+    const iconEl = btn.querySelector('.material-symbols-rounded');
+    const textEl = btn.querySelector('.hide-text');
+
+    if (isHidden) {
+        if (iconEl) iconEl.innerText = 'visibility';
+        if (textEl) textEl.innerText = 'Mostra Categoria';
     } else {
-        categories.forEach(catName => {
-            addCategoryUI(catName, STATE.products[catName]);
-        });
+        if (iconEl) iconEl.innerText = 'visibility_off';
+        if (textEl) textEl.innerText = 'Nascondi Categoria';
     }
 }
+window.toggleHideCategory = toggleHideCategory;
 
-function addCategoryUI(name = '', products = []) {
+function renderEditor() {
+    const listEl = document.getElementById('editor-sections-list') || editorContainer;
+    listEl.innerHTML = '';
+
+    const categories = Object.keys(STATE.products);
+
+    // Guarantee Cibo and Bevande always exist at top
+    if (!categories.includes('Cibo')) categories.unshift('Cibo');
+    if (!categories.includes('Bevande')) {
+        const ciboIdx = categories.indexOf('Cibo');
+        categories.splice(ciboIdx + 1, 0, 'Bevande');
+    }
+
+    categories.forEach(catName => {
+        const prods = STATE.products[catName] || [];
+        const meta = STATE.categoryMeta ? STATE.categoryMeta[catName] : null;
+        let isHidden = false;
+        if (meta && meta.is_hidden === 1) {
+            isHidden = true;
+        } else if (prods.length > 0 && prods[0].category_is_hidden === 1) {
+            isHidden = true;
+        }
+        addCategoryUI(catName, prods, isHidden);
+    });
+}
+
+function addCategoryUI(name = '', products = [], isHidden = false) {
+    const listEl = document.getElementById('editor-sections-list') || editorContainer;
     const div = document.createElement('div');
-    div.className = 'editor-section';
+    div.className = `editor-section ${isHidden ? 'is-hidden-category' : ''}`;
+
+    const trimmedName = name.trim();
+    const isCibo = (trimmedName === 'Cibo');
+    const isBevande = (trimmedName === 'Bevande');
+    const isFixedCategory = isCibo || isBevande;
+
+    let categoryIcon = 'category';
+    if (isCibo) {
+        categoryIcon = 'restaurant';
+    } else if (isBevande) {
+        categoryIcon = 'local_bar';
+    }
+
+    let headerTitleHTML = '';
+    let actionBtnHTML = '';
+
+    if (isFixedCategory) {
+        headerTitleHTML = `
+            <span class="material-symbols-rounded" style="font-size: 1.4rem; color: var(--primary);">${categoryIcon}</span>
+            <span class="fixed-cat-title-text" style="font-size: 1.15rem; font-weight: 700; color: var(--primary);">${trimmedName}</span>
+            <input type="hidden" class="cat-name-input" value="${trimmedName}">
+        `;
+        actionBtnHTML = `
+            <button type="button" class="btn-hide-cat" onclick="toggleHideCategory(this)">
+                <span class="material-symbols-rounded" style="font-size: 1.1rem;">${isHidden ? 'visibility' : 'visibility_off'}</span>
+                <span class="hide-text">${isHidden ? 'Mostra Categoria' : 'Nascondi Categoria'}</span>
+            </button>
+        `;
+    } else {
+        headerTitleHTML = `
+            <span class="material-symbols-rounded" style="font-size: 1.4rem; color: var(--primary);">${categoryIcon}</span>
+            <input type="text" class="cat-name-input" placeholder="Nome Categoria (es. Sconto, Gadget)" value="${name}">
+        `;
+        actionBtnHTML = `
+            <button type="button" class="btn-del-cat" onclick="this.closest('.editor-section').remove()">
+                <span class="material-symbols-rounded" style="font-size: 1.1rem;">delete</span> Elimina Categoria
+            </button>
+        `;
+    }
+
     div.innerHTML = `
-    <div class="cat-row">
-      <input type="text" class="cat-name-input" placeholder="Nome Categoria" value="${name}">
-      <button class="btn-small btn-del" onclick="this.closest('.editor-section').remove()">Elimina Cat.</button>
-    </div>
-    <div class="products-list"></div>
-    <div style="margin-top:10px; margin-left:30px;">
-      <button class="btn-small btn-add" onclick="addProductUI(this.parentElement.previousElementSibling)">+ Prodotto</button>
-    </div>
-  `;
-    editorContainer.appendChild(div);
+      <div class="cat-row">
+        <div class="cat-input-group">
+          ${headerTitleHTML}
+        </div>
+        ${actionBtnHTML}
+      </div>
+
+      <div class="product-table-header">
+        <span class="col-name">Nome Prodotto</span>
+        <span class="col-price">Prezzo (€)</span>
+        <span class="col-qty">Scorta (Vuoto = ∞)</span>
+        <span class="col-action"></span>
+      </div>
+
+      <div class="products-list"></div>
+
+      <div class="editor-card-footer">
+        <button type="button" class="btn-add-product" onclick="addProductUI(this.parentElement.previousElementSibling)">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto
+        </button>
+      </div>
+    `;
+    listEl.appendChild(div);
 
     const pList = div.querySelector('.products-list');
     if (products.length > 0) {
@@ -367,25 +460,38 @@ function addProductUI(container, name = '', price = '', quantity = '') {
     row.className = 'product-row';
     const qtyVal = (quantity !== null && quantity !== undefined) ? quantity : '';
     row.innerHTML = `
-    <input type="text" class="input-field" placeholder="Nome Prodotto" value="${name}">
-    <input type="number" class="input-field" placeholder="Prezzo" value="${price}" step="0.10" style="width:80px;">
-    <input type="number" class="input-field" placeholder="Q.tà" value="${qtyVal}" style="width:60px;" title="Lascia vuoto per infinito">
-    <button class="btn-small btn-del" onclick="this.parentElement.remove()">x</button>
-  `;
+      <input type="text" class="input-field col-name" placeholder="es. Panino con Salamella" value="${name}">
+      <input type="number" class="input-field col-price" placeholder="0.00" value="${price}" step="0.10" min="0">
+      <input type="number" class="input-field col-qty" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
+      <button type="button" class="btn-del-product" title="Elimina Prodotto" onclick="this.parentElement.remove()">
+        <span class="material-symbols-rounded" style="font-size: 1.2rem;">delete_outline</span>
+      </button>
+    `;
     container.appendChild(row);
 }
 
 async function saveMenu() {
     if (!STATE.currentSagra) return;
 
-    const sections = editorContainer.querySelectorAll('.editor-section');
+    const sections = document.querySelectorAll('.editor-section');
     const payload = { categories: [] };
 
     sections.forEach(sec => {
-        const catName = sec.querySelector('.cat-name-input').value.trim();
+        let catName = '';
+        const nameInput = sec.querySelector('.cat-name-input');
+        if (nameInput) {
+            catName = nameInput.value.trim();
+        } else {
+            const titleEl = sec.querySelector('.fixed-cat-title-text');
+            if (titleEl) catName = titleEl.innerText.trim();
+        }
+
         if (!catName) return;
 
+        const isHidden = sec.classList.contains('is-hidden-category');
         const products = [];
+
+        // Always preserve and save products even when category is hidden
         sec.querySelectorAll('.product-row').forEach(row => {
             const inputs = row.querySelectorAll('input');
             const pName = inputs[0].value.trim();
@@ -393,7 +499,6 @@ async function saveMenu() {
             const pQtyStr = inputs[2].value.trim();
 
             if (pName && !isNaN(pPrice)) {
-                // Handle Quantity: Empty = null, 0 = null (infinite), >0 = limit
                 let pQty = null;
                 if (pQtyStr && !isNaN(parseInt(pQtyStr))) {
                     const parsed = parseInt(pQtyStr);
@@ -403,7 +508,7 @@ async function saveMenu() {
             }
         });
 
-        payload.categories.push({ name: catName, products });
+        payload.categories.push({ name: catName, is_hidden: isHidden, products });
     });
 
     try {
@@ -414,40 +519,84 @@ async function saveMenu() {
         });
 
         if (res.ok) {
-            await showAlert("Menu Salvato!");
+            showToast("Menu salvato con successo!", "success");
             await loadSagraResources();
             showView('pos');
         } else {
-            alert("Errore salvataggio");
+            showToast("Errore durante il salvataggio del menu", "error");
         }
     } catch (e) {
         console.error(e);
-        alert("Errore comunicazione");
+        showToast("Errore di comunicazione col server", "error");
     }
 }
+
+function setQuickCash(amount) {
+    const cashInput = document.getElementById('cash-received');
+    if (!cashInput) return;
+
+    if (amount === 'exact') {
+        const total = STATE.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        cashInput.value = total > 0 ? total.toFixed(2) : '';
+    } else {
+        cashInput.value = parseFloat(amount).toFixed(2);
+    }
+
+    updateChange();
+}
+window.setQuickCash = setQuickCash;
 
 // --- POS LOGIC ---
 function renderProducts() {
     productsEl.innerHTML = '';
-    if (Object.keys(STATE.products).length === 0) {
-        productsEl.innerHTML = '<div style="padding:20px; text-align:center;">Nessun prodotto. <br>Clicca "Modifica Menu" per aggiungere.</div>';
+
+    const categories = Object.entries(STATE.products);
+    if (categories.length === 0) {
+        productsEl.innerHTML = '<div style="padding:20px; text-align:center; color: var(--text-light);">Nessun prodotto. <br>Clicca "Modifica Menu" per aggiungere.</div>';
         return;
     }
 
-    for (const [category, products] of Object.entries(STATE.products)) {
+    let renderedCount = 0;
+
+    for (const [category, products] of categories) {
+        // Skip hidden category in POS Cassa view
+        const meta = STATE.categoryMeta ? STATE.categoryMeta[category] : null;
+        const isCatHidden = (meta && meta.is_hidden === 1) || (products.length > 0 && products[0].category_is_hidden === 1);
+        if (isCatHidden) continue;
+
+        // Skip empty category (0 products) in POS Cassa view
+        if (!products || products.length === 0) continue;
+
+        renderedCount++;
+
+        const trimmedName = category.trim();
+        let catIcon = 'category';
+        if (trimmedName === 'Cibo') catIcon = 'restaurant';
+        if (trimmedName === 'Bevande') catIcon = 'local_bar';
+
         const section = document.createElement('div');
         section.className = 'category-section';
 
         section.innerHTML = `
-      <div class="category-title">${category}</div>
+      <div class="category-title">
+        <span class="material-symbols-rounded" style="font-size: 1.3rem;">${catIcon}</span>
+        ${category}
+      </div>
       <div class="product-grid">
         ${products.map(p => {
             const hasLimit = (p.quantity !== null && p.quantity !== undefined);
-            const isOOS = hasLimit && p.quantity <= 0;
-            const qtyLabel = hasLimit ? `<span class="qty-badge ${isOOS ? 'oos' : ''}">${p.quantity}</span>` : '';
+
+            // Calculate current quantity of this product already in cart
+            const inCartItem = STATE.cart.find(item => item.id === p.id || item.name === p.name);
+            const inCartQty = inCartItem ? inCartItem.quantity : 0;
+
+            // Real-time remaining available stock
+            const remainingStock = hasLimit ? (p.quantity - inCartQty) : null;
+            const isOOS = hasLimit && remainingStock <= 0;
+            const qtyLabel = hasLimit ? `<span class="qty-badge ${isOOS ? 'oos' : ''}">${Math.max(0, remainingStock)}</span>` : '';
 
             return `
-          <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id}, '${p.name}', ${p.price}, '${category}', ${hasLimit ? p.quantity : 'null'})">
+          <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id})">
             ${qtyLabel}
             <span class="product-name">${p.name}</span>
             <span class="product-price">€ ${p.price.toFixed(2)}</span>
@@ -457,39 +606,76 @@ function renderProducts() {
     `;
         productsEl.appendChild(section);
     }
+
+    if (renderedCount === 0) {
+        productsEl.innerHTML = '<div style="padding:20px; text-align:center; color: var(--text-light);">Nessun prodotto disponibile in cassa. <br>Clicca "Modifica Menu" per aggiungere.</div>';
+    }
 }
 
-function addToCart(id, name, price, category = 'Altro', maxQty = null) {
-    const existing = STATE.cart.find(i => i.name === name && i.price === price);
+function addToCart(productId) {
+    let foundProduct = null;
+    let foundCategory = 'Altro';
+
+    for (const [cat, prods] of Object.entries(STATE.products)) {
+        const prod = prods.find(p => p.id === productId);
+        if (prod) {
+            foundProduct = prod;
+            foundCategory = cat;
+            break;
+        }
+    }
+
+    if (!foundProduct) return;
+
+    const maxQty = foundProduct.quantity;
+    const existing = STATE.cart.find(i => i.id === productId || i.name === foundProduct.name);
     let currentCartQty = existing ? existing.quantity : 0;
 
-    // Check Limit
-    if (maxQty !== null && (currentCartQty + 1) > maxQty) {
-        // Simple visual feedback could be improved, but alert is effective
-        alert(`Scorte esaurite per: ${name}`);
+    // Check Limit against original DB stock
+    if (maxQty !== null && maxQty !== undefined && (currentCartQty + 1) > maxQty) {
+        showToast(`Scorte esaurite per: ${foundProduct.name}`, "error");
         return;
     }
 
     if (existing) {
+        existing.id = foundProduct.id; // Ensure ID is present
         existing.quantity++;
     } else {
-        STATE.cart.push({ id, name, price, quantity: 1, category });
+        STATE.cart.push({
+            id: foundProduct.id,
+            name: foundProduct.name,
+            price: foundProduct.price,
+            quantity: 1,
+            category: foundCategory
+        });
     }
+
     renderCart();
+    renderProducts();
 }
 
 function removeFromCart(idx) {
     STATE.cart.splice(idx, 1);
     renderCart();
+    renderProducts();
 }
-
-
-
-
 
 function renderCart() {
     cartEl.innerHTML = '';
     let total = 0;
+
+    if (STATE.cart.length === 0) {
+        cartEl.innerHTML = `
+            <div class="empty-cart-state">
+                <span class="material-symbols-rounded">shopping_cart</span>
+                <p>Carrello vuoto</p>
+                <small>Seleziona i prodotti a sinistra per iniziare l'ordine</small>
+            </div>
+        `;
+        totalEl.innerText = `€ 0.00`;
+        updateChange();
+        return;
+    }
 
     STATE.cart.forEach((item, idx) => {
         const itemTotal = item.price * item.quantity;
@@ -498,22 +684,22 @@ function renderCart() {
         const div = document.createElement('div');
         div.className = 'order-item';
 
-        // Conditional Button Rendering
-        const decreaseBtn = item.quantity > 1
-            ? `<button class="btn-decrease" onclick="decreaseQuantity(${idx})">-</button>`
-            : '';
-
         div.innerHTML = `
-      <div class="item-left">
-        <button class="btn-remove" onclick="removeFromCart(${idx})">×</button>
-        ${decreaseBtn}
-        <div>
-          <b>${item.name}</b><br>
-          ${item.quantity} x €${item.price.toFixed(2)}
-        </div>
-      </div>
-      <div>€${itemTotal.toFixed(2)}</div>
-    `;
+          <div class="order-item-controls">
+            <button type="button" class="btn-cart-action btn-cart-remove" title="Rimuovi dal carrello" onclick="removeFromCart(${idx})">
+              <span class="material-symbols-rounded" style="font-size: 0.95rem;">close</span>
+            </button>
+            <button type="button" class="btn-cart-action btn-cart-decrease" title="Riduci di 1" onclick="decreaseQuantity(${idx})">
+              <span class="material-symbols-rounded" style="font-size: 0.95rem;">remove</span>
+            </button>
+            <span class="order-item-qty">${item.quantity}</span>
+          </div>
+          <div class="order-item-info">
+            <span class="order-item-name">${item.name}</span>
+            <span class="order-item-unit-price">€ ${item.price.toFixed(2)} cad.</span>
+          </div>
+          <span class="order-item-total">€${itemTotal.toFixed(2)}</span>
+        `;
         cartEl.appendChild(div);
     });
 
@@ -525,31 +711,35 @@ function updateChange() {
     const total = STATE.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const cashInput = document.getElementById('cash-received');
     const changeEl = document.getElementById('change-amount');
+    const changeRow = changeEl ? changeEl.closest('.change-row') : null;
     
     if (!cashInput || !changeEl) return;
     
     const cashReceived = parseFloat(cashInput.value);
     if (isNaN(cashReceived) || cashReceived <= 0) {
         changeEl.innerText = '€ 0.00';
-        changeEl.classList.remove('has-change');
+        if (changeRow) changeRow.classList.remove('has-change');
         return;
     }
     
     const change = cashReceived - total;
     if (change >= 0) {
         changeEl.innerText = `€ ${change.toFixed(2)}`;
-        changeEl.classList.add('has-change');
+        if (changeRow) changeRow.classList.add('has-change');
     } else {
         changeEl.innerText = '€ 0.00';
-        changeEl.classList.remove('has-change');
+        if (changeRow) changeRow.classList.remove('has-change');
     }
 }
 
 function decreaseQuantity(idx) {
     if (STATE.cart[idx].quantity > 1) {
         STATE.cart[idx].quantity--;
-        renderCart();
+    } else {
+        STATE.cart.splice(idx, 1);
     }
+    renderCart();
+    renderProducts();
 }
 
 async function clearCart() {
@@ -559,11 +749,13 @@ async function clearCart() {
         const cashInput = document.getElementById('cash-received');
         if (cashInput) cashInput.value = '';
         renderCart();
+        renderProducts();
     }
 }
 
+
 async function printOrder() {
-    if (STATE.cart.length === 0) return alert('Ordine vuoto!');
+    if (STATE.cart.length === 0) return showToast("Il carrello è vuoto", "error");
     const total = STATE.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
     // Get stored printer name and template
@@ -616,29 +808,124 @@ async function printOrder() {
     }
 }
 
+async function reprintOrderFromHistory(orderId) {
+    const order = STATE.history.find(o => o.id === orderId || o.seq === orderId);
+    if (!order) return showToast("Ordine non trovato", "error");
+
+    const printerName = localStorage.getItem('thermalPrinterName');
+    const template = localStorage.getItem('receiptTemplate') || 'compact';
+
+    const payload = {
+        sagraId: STATE.currentSagra.id,
+        items: order.items,
+        total: order.total,
+        orderId: order.seq || order.id,
+        printerName: printerName,
+        template: template,
+        isReprint: true,
+        testMode: (localStorage.getItem('appTestMode') === 'true')
+    };
+
+    try {
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+            if (data.testMode && data.preview) {
+                showReceiptPreviewModal(data.preview);
+            } else {
+                showToast(`Ristampato Ordine #${order.seq || order.id}`, "success");
+            }
+        } else {
+            showToast(data.error || "Errore durante la ristampa", "error");
+        }
+    } catch (e) {
+        showToast("Errore di connessione", "error");
+    }
+}
+window.reprintOrderFromHistory = reprintOrderFromHistory;
+
 async function showHistory() {
-    // Simple check for Sagra
     if (!STATE.currentSagra) return;
 
-    const res = await fetch(`/api/history?sagraId=${STATE.currentSagra.id}`);
-    STATE.history = await res.json();
+    try {
+        const res = await fetch(`/api/history?sagraId=${STATE.currentSagra.id}`);
+        STATE.history = await res.json();
 
-    if (STATE.history.length === 0) {
-        historyListEl.innerHTML = '<div style="padding:20px;">Nessun ordine.</div>';
-    } else {
-        historyListEl.innerHTML = STATE.history.map(o => `
-      <div class="history-item" style="flex-direction: column; align-items: flex-start;">
-        <div style="display:flex; justify-content:space-between; width:100%; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:5px;">
-          <span><b>#${o.seq || o.id}</b> - ${new Date(o.created_at).toLocaleString()}</span>
-          <b>€ ${o.total.toFixed(2)}</b>
-        </div>
-        <div style="font-size: 0.9rem; color: #555;">
-          ${o.items.map(i => `<div>${i.quantity}x ${i.name} (€${i.price.toFixed(2)})</div>`).join('')}
-        </div>
-      </div>
-    `).join('');
+        const summaryBarEl = document.getElementById('history-summary-bar');
+        const historyListEl = document.getElementById('history-list');
+
+        if (!STATE.history || STATE.history.length === 0) {
+            if (summaryBarEl) summaryBarEl.innerHTML = '';
+            if (historyListEl) historyListEl.innerHTML = '<div class="empty-history-state"><span class="material-symbols-rounded">history</span><p>Nessun ordine nello storico</p></div>';
+        } else {
+            const totalRevenue = STATE.history.reduce((sum, o) => sum + (o.total || 0), 0);
+            const totalOrders = STATE.history.length;
+
+            if (summaryBarEl) {
+                summaryBarEl.innerHTML = `
+                    <div class="history-summary-pill">
+                        <span class="material-symbols-rounded">receipt_long</span>
+                        <span>Ordini Totali: <b>${totalOrders}</b></span>
+                    </div>
+                    <div class="history-summary-pill highlight">
+                        <span class="material-symbols-rounded">payments</span>
+                        <span>Incasso Totale: <b>€ ${totalRevenue.toFixed(2)}</b></span>
+                    </div>
+                `;
+            }
+
+            if (historyListEl) {
+                // Reverse order so most recent is first
+                const displayOrders = [...STATE.history].reverse();
+
+                historyListEl.innerHTML = displayOrders.map(o => {
+                    const formattedDate = new Date(o.created_at).toLocaleString('it-IT', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    });
+
+                    return `
+                      <div class="history-card">
+                        <div class="history-card-header">
+                          <div class="history-card-info">
+                            <span class="history-order-badge">#${o.seq || o.id}</span>
+                            <span class="history-order-date">
+                              <span class="material-symbols-rounded" style="font-size: 1rem;">schedule</span>
+                              ${formattedDate}
+                            </span>
+                          </div>
+                          <div style="display:flex; align-items:center; gap: 10px;">
+                            <span class="history-order-total">€ ${o.total.toFixed(2)}</span>
+                            <button type="button" class="btn-reprint-order" onclick="reprintOrderFromHistory(${o.id})" title="Ristampa Scontrino">
+                              <span class="material-symbols-rounded" style="font-size: 0.95rem;">print</span> Ristampa
+                            </button>
+                          </div>
+                        </div>
+                        <div class="history-card-body">
+                          ${o.items.map(i => `
+                            <div class="history-item-row">
+                              <span class="history-item-qty">${i.quantity}x</span>
+                              <span class="history-item-name">${i.name}</span>
+                              <span class="history-item-price">€ ${(i.price * i.quantity).toFixed(2)}</span>
+                            </div>
+                          `).join('')}
+                        </div>
+                      </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        const modalEl = document.getElementById('history-modal');
+        if (modalEl) modalEl.style.display = 'flex';
+    } catch (e) {
+        console.error(e);
+        showToast("Errore durante il recupero dello storico", "error");
     }
-    modalEl.style.display = 'flex';
 }
 
 function exportData() {
@@ -654,30 +941,83 @@ async function showStats() {
         const res = await fetch(`/api/stats?sagraId=${STATE.currentSagra.id}`);
         const data = await res.json();
 
-        document.getElementById('stat-revenue').innerText = `€ ${data.totalRevenue.toFixed(2)}`;
-        document.getElementById('stat-orders').innerText = data.ordersCount;
+        const revEl = document.getElementById('stat-revenue');
+        const ordEl = document.getElementById('stat-orders');
+        const avgEl = document.getElementById('stat-avg-order');
 
-        const topList = document.getElementById('top-products');
-        if (data.topItems.length === 0) {
-            topList.innerHTML = '<div style="text-align:center; padding:10px; color:#777;">Nessun dato.</div>';
+        if (revEl) revEl.innerText = `€ ${data.totalRevenue.toFixed(2)}`;
+        if (ordEl) ordEl.innerText = data.ordersCount;
+
+        const avgOrder = data.ordersCount > 0 ? (data.totalRevenue / data.ordersCount) : 0;
+        if (avgEl) avgEl.innerText = `€ ${avgOrder.toFixed(2)}`;
+
+        const topContainer = document.getElementById('top-products');
+        if (!topContainer) return;
+
+        if (!data.topItems || data.topItems.length === 0) {
+            topContainer.innerHTML = '<div class="empty-stats-state"><span class="material-symbols-rounded">bar_chart</span><p>Nessun dato di vendita disponibile.</p></div>';
         } else {
-            topList.innerHTML = data.topItems.map((item, index) => `
-                <div class="top-product-item">
-                    <div class="top-product-name">
-                        <span class="top-badge">#${index + 1}</span> ${item.product_name}
+            // Group items by category using STATE.products
+            const categoryGroups = {};
+
+            // Initialize categories from STATE.products to maintain menu order
+            if (STATE.products) {
+                for (const catName of Object.keys(STATE.products)) {
+                    categoryGroups[catName] = [];
+                }
+            }
+
+            data.topItems.forEach(item => {
+                let matchedCat = 'Altro';
+                if (STATE.products) {
+                    for (const [catName, prods] of Object.entries(STATE.products)) {
+                        if (prods.some(p => p.name === item.product_name)) {
+                            matchedCat = catName;
+                            break;
+                        }
+                    }
+                }
+                if (!categoryGroups[matchedCat]) categoryGroups[matchedCat] = [];
+                categoryGroups[matchedCat].push(item);
+            });
+
+            let html = '';
+            for (const [catName, items] of Object.entries(categoryGroups)) {
+                if (items.length === 0) continue; // Skip empty categories in stats
+
+                const trimmed = catName.trim();
+                let catIcon = 'category';
+                if (trimmed === 'Cibo') catIcon = 'restaurant';
+                if (trimmed === 'Bevande') catIcon = 'local_bar';
+
+                html += `
+                    <div class="stats-category-group">
+                        <div class="stats-category-title">
+                            <span class="material-symbols-rounded" style="font-size: 1.2rem;">${catIcon}</span>
+                            ${catName}
+                        </div>
+                        <div class="top-products-list">
+                            ${items.map(item => `
+                                <div class="top-product-item">
+                                    <span class="top-product-name">${item.product_name}</span>
+                                    <div class="top-product-right">
+                                        <span class="top-qty-pill"><b>${item.qty}</b> venduti</span>
+                                        <span class="top-revenue-tag">€ ${item.revenue.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
-                    <div class="top-product-stats">
-                        <b>${item.qty}</b> venduti<br>
-                        <small>€ ${item.revenue.toFixed(2)}</small>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }
+
+            topContainer.innerHTML = html || '<div class="empty-stats-state"><span class="material-symbols-rounded">bar_chart</span><p>Nessun dato di vendita disponibile.</p></div>';
         }
 
         statsModalEl.style.display = 'flex';
     } catch (e) {
         console.error(e);
-        showAlert("Errore caricamento statistiche");
+        showToast("Errore durante il caricamento delle statistiche", "error");
     }
 }
 
@@ -710,19 +1050,106 @@ window.exportData = exportData;
 window.closeHistory = closeHistory;
 window.showStats = showStats;
 window.closeStats = closeStats;
+// --- CUSTOM SELECT DROPDOWN COMPONENT ---
+function syncCustomSelect(selectId) {
+    const selectEl = document.getElementById(selectId);
+    if (!selectEl) return;
+
+    let container = selectEl.previousElementSibling;
+    if (!container || !container.classList.contains('custom-select-container')) {
+        container = document.createElement('div');
+        container.className = 'custom-select-container';
+        selectEl.parentNode.insertBefore(container, selectEl);
+        selectEl.classList.add('hidden-native-select');
+
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'custom-select-trigger';
+        trigger.innerHTML = `
+            <span class="custom-select-value"></span>
+            <span class="material-symbols-rounded custom-select-icon">expand_more</span>
+        `;
+        container.appendChild(trigger);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'custom-select-dropdown';
+        container.appendChild(dropdown);
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = container.classList.contains('open');
+            document.querySelectorAll('.custom-select-container.open').forEach(c => c.classList.remove('open'));
+            if (!isOpen) container.classList.add('open');
+        });
+    }
+
+    const valueEl = container.querySelector('.custom-select-value');
+    const dropdownEl = container.querySelector('.custom-select-dropdown');
+    dropdownEl.innerHTML = '';
+
+    const options = Array.from(selectEl.options);
+    const selectedOpt = options.find(o => o.selected) || options[0];
+
+    if (selectedOpt) {
+        valueEl.innerText = selectedOpt.text;
+    }
+
+    options.forEach(opt => {
+        const item = document.createElement('div');
+        item.className = 'custom-select-option' + (opt.selected ? ' selected' : '');
+        item.innerHTML = `
+            <span>${opt.text}</span>
+            <span class="material-symbols-rounded check-icon">check</span>
+        `;
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectEl.value = opt.value;
+            selectEl.dispatchEvent(new Event('change'));
+            container.classList.remove('open');
+            syncCustomSelect(selectId);
+        });
+        dropdownEl.appendChild(item);
+    });
+}
+
+document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-select-container.open').forEach(c => c.classList.remove('open'));
+});
+
 // --- SETTINGS LOGIC ---
 const settingsModal = document.getElementById('settings-modal');
 const printerSelect = document.getElementById('printer-select');
 const settingsPasswordInput = document.getElementById('settings-password');
 
+function showTestStatus(type, text) {
+    const statusEl = document.getElementById('test-printer-status');
+    if (!statusEl) return;
+
+    if (!type || !text) {
+        statusEl.className = 'status-banner';
+        statusEl.innerHTML = '';
+        return;
+    }
+
+    let iconName = 'info';
+    if (type === 'loading') iconName = 'hourglass_top';
+    if (type === 'success') iconName = 'check_circle';
+    if (type === 'error') iconName = 'error';
+
+    statusEl.className = `status-banner visible status-${type}`;
+    statusEl.innerHTML = `<span class="material-symbols-rounded">${iconName}</span><span>${text}</span>`;
+}
+
 window.openSettings = async function () {
     settingsModal.style.display = 'flex';
-    printerSelect.innerHTML = '<option>Caricamento...</option>';
+    showTestStatus(null);
 
     // Load Password, Template & Test Mode
     settingsPasswordInput.value = localStorage.getItem('appPassword') || "";
     document.getElementById('template-select').value = localStorage.getItem('receiptTemplate') || 'compact';
     document.getElementById('test-mode-toggle').checked = (localStorage.getItem('appTestMode') === 'true');
+
+    syncCustomSelect('template-select');
 
     try {
         const res = await fetch('/api/printers');
@@ -740,15 +1167,52 @@ window.openSettings = async function () {
                 printerSelect.appendChild(opt);
             });
         }
+        syncCustomSelect('printer-select');
     } catch (e) {
         console.error(e);
         printerSelect.innerHTML = '<option>Errore caricamento</option>';
+        syncCustomSelect('printer-select');
     }
 }
 
 window.closeSettings = function () {
     settingsModal.style.display = 'none';
 }
+
+// --- TOAST NOTIFICATIONS ---
+function showToast(message, type = 'success', duration = 3000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+
+    let iconName = 'check_circle';
+    if (type === 'error') iconName = 'error';
+    if (type === 'info') iconName = 'info';
+
+    toast.innerHTML = `
+        <span class="material-symbols-rounded toast-icon">${iconName}</span>
+        <span class="toast-message">${message}</span>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('toast-hide');
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, duration);
+}
+window.showToast = showToast;
 
 window.saveSettings = function () {
     const selectedPrinter = printerSelect.value;
@@ -765,9 +1229,39 @@ window.saveSettings = function () {
     localStorage.setItem('receiptTemplate', selectedTemplate);
     localStorage.setItem('appTestMode', isTestMode ? 'true' : 'false');
 
-    showAlert("Impostazioni salvate!");
+    showToast("Impostazioni salvate con successo!", "success");
     closeSettings();
 }
+
+async function testPrinter() {
+    const printerSelect = document.getElementById('printer-select');
+    const printerName = printerSelect ? printerSelect.value : '';
+
+    if (!printerName) {
+        showTestStatus('error', 'Seleziona prima una stampante dal menu');
+        return;
+    }
+
+    showTestStatus('loading', 'Stampa di prova in corso...');
+
+    try {
+        const res = await fetch('/api/print-test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ printerName })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            showTestStatus('success', 'Stampa di prova inviata con successo');
+        } else {
+            throw new Error(data.error || 'Errore durante la stampa');
+        }
+    } catch (e) {
+        showTestStatus('error', e.message);
+    }
+}
+window.testPrinter = testPrinter;
 
 window.checkLogin = checkLogin;
 window.showAlert = showAlert;
