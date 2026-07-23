@@ -30,25 +30,47 @@ const dialogOk = document.getElementById('dialog-ok');
 const dialogCancel = document.getElementById('dialog-cancel');
 
 // --- GENERIC DIALOG ---
-function showDialog(title, message, isPrompt = false, isAlert = false) {
+function showDialog(optsOrTitle, messageStr = '', isPrompt = false, isAlert = false, defaultValue = '') {
+    let opts = {};
+    if (typeof optsOrTitle === 'object' && optsOrTitle !== null) {
+        opts = optsOrTitle;
+    } else {
+        opts = {
+            title: optsOrTitle,
+            message: messageStr,
+            isPrompt: isPrompt,
+            isAlert: isAlert,
+            defaultValue: defaultValue
+        };
+    }
+
+    const title = opts.title || 'Messaggio';
+    const message = opts.message || '';
+    const icon = opts.icon || (opts.isPrompt ? 'edit_note' : (opts.isDanger ? 'delete' : (opts.isAlert ? 'info' : 'help_outline')));
+    const isDanger = !!opts.isDanger;
+    const okText = opts.okText || 'Conferma';
+    const cancelText = opts.cancelText || 'Annulla';
+
     return new Promise((resolve) => {
         // 1. Ensure Dialog Elements Exist (Auto-Repair)
         let dOverlay = document.getElementById('dialog-overlay');
 
         if (!dOverlay) {
-            console.log("Re-creating Dialog DOM...");
             dOverlay = document.createElement('div');
             dOverlay.id = 'dialog-overlay';
             dOverlay.className = 'modal';
             dOverlay.style.zIndex = '99999'; // FORCE TOP
             dOverlay.innerHTML = `
                 <div class="modal-content dialog-content" style="z-index:100000;">
-                    <h3 id="dialog-title"></h3>
-                    <p id="dialog-message"></p>
-                    <input type="text" id="dialog-input" class="input-field" style="display:none; width:100%; margin: 15px 0; user-select: text !important; pointer-events: auto !important;">
-                    <div class="dialog-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-                        <button id="dialog-cancel" class="btn-small">Annulla</button>
-                        <button id="dialog-ok" class="btn-save" style="padding: 10px 20px;">OK</button>
+                    <div class="dialog-header">
+                        <span class="material-symbols-rounded dialog-header-icon" id="dialog-icon">help_outline</span>
+                        <h3 id="dialog-title"></h3>
+                    </div>
+                    <p id="dialog-message" class="dialog-message"></p>
+                    <input type="text" id="dialog-input" class="input-field dialog-input" style="display:none; width:100%; user-select: text !important; pointer-events: auto !important;">
+                    <div class="dialog-actions">
+                        <button id="dialog-cancel" class="btn-dialog-cancel">Annulla</button>
+                        <button id="dialog-ok" class="btn-dialog-ok">Conferma</button>
                     </div>
                 </div>
             `;
@@ -61,22 +83,39 @@ function showDialog(title, message, isPrompt = false, isAlert = false) {
         const dInput = document.getElementById('dialog-input');
         const dOk = document.getElementById('dialog-ok');
         const dCancel = document.getElementById('dialog-cancel');
+        const dIcon = document.getElementById('dialog-icon');
 
-        // 3. Setup Content
+        // 3. Setup Content & Icons
         dTitle.innerText = title;
-        dMessage.innerText = message;
-        dInput.value = '';
+        if (dMessage) dMessage.innerText = message;
+        if (dInput) dInput.value = opts.defaultValue || '';
+        if (dOk) dOk.innerText = okText;
+        if (dCancel) dCancel.innerText = cancelText;
+
+        if (dIcon) {
+            dIcon.innerText = icon;
+            if (isDanger) dIcon.classList.add('danger');
+            else dIcon.classList.remove('danger');
+        }
+
+        if (dOk) {
+            if (isDanger) dOk.classList.add('danger');
+            else dOk.classList.remove('danger');
+        }
 
         // Show/Hide Input
-        if (isPrompt) {
+        if (opts.isPrompt) {
             dInput.style.display = 'block';
-            setTimeout(() => dInput.focus(), 100);
+            setTimeout(() => {
+                dInput.focus();
+                if (opts.defaultValue) dInput.select();
+            }, 100);
         } else {
             dInput.style.display = 'none';
         }
 
         // Show/Hide Cancel
-        if (isAlert) {
+        if (opts.isAlert) {
             dCancel.style.display = 'none';
         } else {
             dCancel.style.display = 'block';
@@ -94,15 +133,15 @@ function showDialog(title, message, isPrompt = false, isAlert = false) {
         };
 
         dOk.onclick = () => {
-            const val = isPrompt ? dInput.value : true;
-            if (isPrompt && !val.trim()) return;
+            const val = opts.isPrompt ? dInput.value : true;
+            if (opts.isPrompt && !val.trim()) return;
             cleanup();
             resolve(val);
         };
 
         dCancel.onclick = () => {
             cleanup();
-            resolve(isPrompt ? null : false);
+            resolve(opts.isPrompt ? null : false);
         };
 
         dInput.onkeydown = (e) => {
@@ -112,16 +151,28 @@ function showDialog(title, message, isPrompt = false, isAlert = false) {
     });
 }
 
-function showConfirm(message) {
-    return showDialog("Conferma", message, false, false);
+function showConfirm(titleOrMessage, messageStr = '', isDanger = false) {
+    if (typeof titleOrMessage === 'object' && titleOrMessage !== null) {
+        return showDialog(titleOrMessage);
+    }
+    if (!messageStr) {
+        return showDialog({ title: "Conferma Operazione", message: titleOrMessage, isDanger });
+    }
+    return showDialog({ title: titleOrMessage, message: messageStr, isDanger });
 }
 
-function showPrompt(message) {
-    return showDialog("Nuovo Evento", message, true, false);
+function showPrompt(titleOrMessage, messageOrDefault = '', defaultValueStr = '') {
+    if (typeof messageOrDefault === 'string' && defaultValueStr !== '') {
+        return showDialog({ title: titleOrMessage, message: messageOrDefault, isPrompt: true, defaultValue: defaultValueStr });
+    } else if (typeof messageOrDefault === 'string' && messageOrDefault !== '') {
+        return showDialog({ title: titleOrMessage, message: messageOrDefault, isPrompt: true, defaultValue: '' });
+    } else {
+        return showDialog({ title: "Nuovo Evento", message: titleOrMessage, isPrompt: true, defaultValue: '' });
+    }
 }
 
 function showAlert(message) {
-    return showDialog("Avviso", message, false, true);
+    return showDialog({ title: "Avviso", message, isAlert: true });
 }
 
 
@@ -145,31 +196,140 @@ async function init() {
         cashInput.addEventListener('input', updateChange);
     }
 
+    initKeyboardShortcuts();
     showView('auth');
+    checkAppUpdateSilent();
+}
+
+function initKeyboardShortcuts() {
+    window.addEventListener('keydown', (e) => {
+        // 1. Check if any modal or dialog is open
+        const dialogOverlay = document.getElementById('dialog-overlay');
+        const isDialogVisible = dialogOverlay && (dialogOverlay.style.display === 'flex' || getComputedStyle(dialogOverlay).display === 'flex');
+
+        if (isDialogVisible) {
+            return;
+        }
+
+        const modals = ['history-modal', 'stats-modal', 'settings-modal', 'sagra-options-modal', 'receipt-preview-modal'];
+        const openModalId = modals.find(id => {
+            const el = document.getElementById(id);
+            return el && (el.style.display === 'flex' || getComputedStyle(el).display === 'flex');
+        });
+
+        if (openModalId) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (openModalId === 'history-modal') closeHistory();
+                else if (openModalId === 'stats-modal') closeStats();
+                else if (openModalId === 'settings-modal') closeSettings();
+                else if (openModalId === 'sagra-options-modal') closeSagraOptions();
+                else if (openModalId === 'receipt-preview-modal') closeReceiptPreviewModal();
+            }
+            return;
+        }
+
+        // 2. POS View Shortcuts
+        const isPosView = views.pos && views.pos.classList.contains('active');
+        if (!isPosView) return;
+
+        // F1 -> Storico Ordini
+        if (e.key === 'F1') {
+            e.preventDefault();
+            showHistory();
+            return;
+        }
+
+        // F2 -> Statistiche Evento
+        if (e.key === 'F2') {
+            e.preventDefault();
+            showStats();
+            return;
+        }
+
+        // F3 -> Modifica Menu
+        if (e.key === 'F3') {
+            e.preventDefault();
+            showEditor();
+            return;
+        }
+
+        // Escape -> Svuota Carrello
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            clearCart();
+            return;
+        }
+
+        // Enter -> Stampa / Conferma Ordine
+        if (e.key === 'Enter') {
+            const activeEl = document.activeElement;
+            const isCashInput = activeEl && activeEl.id === 'cash-received';
+            const isOtherInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable);
+
+            if (isCashInput || !isOtherInput) {
+                e.preventDefault();
+                printOrder();
+            }
+            return;
+        }
+
+        // Auto-focus cash input if typing a digit without active input
+        const isDigit = (e.key >= '0' && e.key <= '9') || e.key === '.' || e.key === ',';
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        const isInputFocused = activeTag === 'INPUT' || activeTag === 'TEXTAREA';
+
+        if (isDigit && !isInputFocused) {
+            const cashInput = document.getElementById('cash-received');
+            if (cashInput) {
+                cashInput.focus();
+            }
+        }
+    });
 }
 
 // --- AUTH LOGIC ---
 const authPasswordInput = document.getElementById('auth-password');
-const authErrorEl = document.getElementById('auth-error');
+const authErrorBanner = document.getElementById('auth-error-banner');
+
+function togglePasswordVisibility() {
+    const pwdInput = document.getElementById('auth-password');
+    const toggleIcon = document.getElementById('auth-password-toggle-icon');
+    if (!pwdInput || !toggleIcon) return;
+
+    if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        toggleIcon.innerText = 'visibility_off';
+    } else {
+        pwdInput.type = 'password';
+        toggleIcon.innerText = 'visibility';
+    }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
 
 function checkLogin() {
     const savedPassword = localStorage.getItem('appPassword') || "";
-    const inputPassword = authPasswordInput.value;
+    const pwdInput = document.getElementById('auth-password');
+    const errBanner = document.getElementById('auth-error-banner');
+    const inputPassword = pwdInput ? pwdInput.value : "";
 
     if (savedPassword === "" || inputPassword === savedPassword) {
         // Login Success
-        authPasswordInput.value = ''; // clear
-        authErrorEl.innerText = '';
+        if (pwdInput) pwdInput.value = '';
+        if (errBanner) errBanner.classList.remove('visible');
         loadSagras();
         showView('login');
     } else {
-        authErrorEl.innerText = "Password Errata!";
-        authPasswordInput.value = '';
-        authPasswordInput.focus();
-
-        // Shake animation effect (optional simple inline)
-        authPasswordInput.style.borderColor = 'var(--danger)';
-        setTimeout(() => authPasswordInput.style.borderColor = '', 500);
+        if (errBanner) errBanner.classList.add('visible');
+        if (pwdInput) {
+            pwdInput.value = '';
+            pwdInput.focus();
+            const wrapper = pwdInput.closest('.password-input-wrapper');
+            if (wrapper) {
+                wrapper.classList.add('error');
+                setTimeout(() => wrapper.classList.remove('error'), 600);
+            }
+        }
     }
 }
 
@@ -200,10 +360,11 @@ async function loadSagras() {
     let html = '';
 
     // Active List
+    const titleEl = views.login.querySelector('.login-title') || views.login.querySelector('h1');
     if (activeSagras.length === 0 && archivedSagras.length === 0) {
-        views.login.querySelector('h1').innerText = "Benvenuto! Crea il tuo primo Evento.";
+        if (titleEl) titleEl.innerText = "Benvenuto! Crea il tuo primo Evento.";
     } else {
-        views.login.querySelector('h1').innerText = "Gestione Ordini";
+        if (titleEl) titleEl.innerText = "Gestione Ordini";
     }
 
     html += activeSagras.map(s => renderSagraCard(s, false)).join('');
@@ -232,43 +393,164 @@ function toggleArchived() {
 
 function renderSagraCard(s, isArchived) {
     const safeName = encodeURIComponent(s.name);
+    const dateFormatted = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    }) : '';
+
     return `
-    <div class="sagra-card" onclick="selectSagra(${s.id}, '${safeName}')" style="cursor: pointer;">
+    <div class="sagra-card ${isArchived ? 'is-archived' : ''}" onclick="selectSagra(${s.id}, '${safeName}')">
       <div class="sagra-card-content">
-        ${s.name} ${isArchived ? '(Archiviata)' : ''}
+        <div class="sagra-card-info">
+          <span class="sagra-card-title">${s.name} ${isArchived ? '(Archiviata)' : ''}</span>
+          ${dateFormatted ? `<span class="sagra-card-date"><span class="material-symbols-rounded" style="font-size: 0.85rem;">calendar_today</span> Creato il ${dateFormatted}</span>` : ''}
+        </div>
       </div>
-      <div class="sagra-actions">
-        ${!isArchived
-            ? `<button class="btn-icon" title="Archivia" onclick="archiveSagra(event, ${s.id})"><span class="material-symbols-rounded">inventory_2</span></button>`
-            : `<button class="btn-icon" title="Ripristina" onclick="unarchiveSagra(event, ${s.id})"><span class="material-symbols-rounded">restore_from_trash</span></button>`
-        }
-        <button class="btn-icon" title="Elimina" onclick="deleteSagra(event, ${s.id})"><span class="material-symbols-rounded">delete</span></button>
+      <div class="sagra-actions" onclick="event.stopPropagation()">
+        <button class="sagra-action-btn btn-settings" title="Opzioni Evento" onclick="openSagraOptions(event, ${s.id}, '${safeName}', ${isArchived})">
+          <span class="material-symbols-rounded">settings</span>
+        </button>
       </div>
     </div>
   `;
 }
 
-async function archiveSagra(e, id) {
-    e.stopPropagation();
-    if (!await showConfirm("Vuoi archiviare questo evento?")) return;
-    await fetch(`/api/sagras/${id}/archive`, { method: 'PUT' });
+function openSagraOptions(event, id, nameEncoded, isArchived) {
+    if (event) event.stopPropagation();
+    const sagraName = decodeURIComponent(nameEncoded);
+
+    const modalEl = document.getElementById('sagra-options-modal');
+    const titleEl = document.getElementById('sagra-options-title-text');
+    const bodyEl = document.getElementById('sagra-options-body');
+
+    if (titleEl) titleEl.innerText = sagraName;
+
+    if (bodyEl) {
+        bodyEl.innerHTML = `
+            <button class="sagra-option-item" onclick="renameSagra(${id}, '${nameEncoded}')">
+                <span class="material-symbols-rounded">edit</span>
+                <span>Rinomina Evento</span>
+            </button>
+            <button class="sagra-option-item" onclick="duplicateSagra(${id})">
+                <span class="material-symbols-rounded">content_copy</span>
+                <span>Duplica Evento</span>
+            </button>
+            <button class="sagra-option-item" onclick="${isArchived ? `unarchiveSagra(${id})` : `archiveSagra(${id})`}">
+                <span class="material-symbols-rounded">${isArchived ? 'unarchive' : 'inventory_2'}</span>
+                <span>${isArchived ? 'Ripristina Evento' : 'Archivia Evento'}</span>
+            </button>
+            <button class="sagra-option-item danger" onclick="deleteSagra(${id})">
+                <span class="material-symbols-rounded">delete</span>
+                <span>Elimina Evento</span>
+            </button>
+        `;
+    }
+
+    if (modalEl) modalEl.style.display = 'flex';
+}
+
+function closeSagraOptions() {
+    const modalEl = document.getElementById('sagra-options-modal');
+    if (modalEl) modalEl.style.display = 'none';
+}
+window.openSagraOptions = openSagraOptions;
+window.closeSagraOptions = closeSagraOptions;
+
+async function renameSagra(id, currentNameEncoded) {
+    closeSagraOptions();
+    const currentName = decodeURIComponent(currentNameEncoded);
+    const newName = await showPrompt("Rinomina Evento", "Inserisci il nuovo nome dell'evento:", currentName);
+    if (!newName || !newName.trim() || newName.trim() === currentName) return;
+
+    try {
+        const res = await fetch(`/api/sagras/${id}/rename`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName.trim() })
+        });
+        if (res.ok) {
+            showToast("Evento rinominato con successo!", "success");
+            loadSagras();
+        } else {
+            const err = await res.text();
+            showToast("Errore rinomina: " + err, "error");
+        }
+    } catch (e) {
+        showToast("Errore di connessione", "error");
+    }
+}
+window.renameSagra = renameSagra;
+
+async function duplicateSagra(eOrId, id) {
+    const targetId = typeof eOrId === 'number' ? eOrId : id;
+    if (eOrId && typeof eOrId === 'object' && eOrId.stopPropagation) eOrId.stopPropagation();
+    closeSagraOptions();
+    try {
+        const res = await fetch(`/api/sagras/${targetId}/duplicate`, { method: 'POST' });
+        if (res.ok) {
+            showToast("Evento duplicato con successo!", "success");
+            loadSagras();
+        } else {
+            const err = await res.text();
+            showToast("Errore durante la duplicazione: " + err, "error");
+        }
+    } catch (err) {
+        showToast("Errore di connessione", "error");
+    }
+}
+window.duplicateSagra = duplicateSagra;
+
+async function archiveSagra(eOrId, id) {
+    const targetId = typeof eOrId === 'number' ? eOrId : id;
+    if (eOrId && typeof eOrId === 'object' && eOrId.stopPropagation) eOrId.stopPropagation();
+    closeSagraOptions();
+
+    const confirmed = await showDialog({
+        title: "Archivia Evento",
+        message: "Sei sicuro di voler archiviare questo evento? Potrai ripristinarlo in qualsiasi momento dalla sezione archiviati.",
+        icon: "inventory_2",
+        okText: "Archivia"
+    });
+    if (!confirmed) return;
+
+    await fetch(`/api/sagras/${targetId}/archive`, { method: 'PUT' });
     showToast("Evento archiviato", "info");
     loadSagras();
 }
 
-async function unarchiveSagra(e, id) {
-    e.stopPropagation();
-    if (!await showConfirm("Riportare questo evento tra quelli attivi?")) return;
-    await fetch(`/api/sagras/${id}/unarchive`, { method: 'PUT' });
+async function unarchiveSagra(eOrId, id) {
+    const targetId = typeof eOrId === 'number' ? eOrId : id;
+    if (eOrId && typeof eOrId === 'object' && eOrId.stopPropagation) eOrId.stopPropagation();
+    closeSagraOptions();
+
+    const confirmed = await showDialog({
+        title: "Ripristina Evento",
+        message: "Vuoi riportare questo evento tra quelli attivi?",
+        icon: "unarchive",
+        okText: "Ripristina"
+    });
+    if (!confirmed) return;
+
+    await fetch(`/api/sagras/${targetId}/unarchive`, { method: 'PUT' });
     showToast("Evento ripristinato con successo", "success");
     loadSagras();
 }
 
-async function deleteSagra(e, id) {
-    e.stopPropagation();
-    if (!await showConfirm("ATTENZIONE: Eliminazione definitiva (Ordini, Menu, Statistiche).\nContinuare?")) return;
-    await fetch(`/api/sagras/${id}`, { method: 'DELETE' });
-    showToast("Evento eliminato", "error");
+async function deleteSagra(eOrId, id) {
+    const targetId = typeof eOrId === 'number' ? eOrId : id;
+    if (eOrId && typeof eOrId === 'object' && eOrId.stopPropagation) eOrId.stopPropagation();
+    closeSagraOptions();
+
+    const confirmed = await showDialog({
+        title: "Elimina Evento",
+        message: "Sei sicuro di voler eliminare definitivamente questo evento? Verranno rimossi anche gli ordini, il menu e le relative statistiche.",
+        icon: "delete",
+        isDanger: true,
+        okText: "Elimina"
+    });
+    if (!confirmed) return;
+
+    await fetch(`/api/sagras/${targetId}`, { method: 'DELETE' });
+    showToast("Evento eliminato", "warning");
     loadSagras();
 }
 
@@ -413,7 +695,7 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
     } else {
         headerTitleHTML = `
             <span class="material-symbols-rounded" style="font-size: 1.4rem; color: var(--primary);">${categoryIcon}</span>
-            <input type="text" class="cat-name-input" placeholder="Nome Categoria (es. Sconto, Gadget)" value="${name}">
+            <input type="text" class="cat-name-input" placeholder="Nome Categoria (es. Dolci)" value="${name}">
         `;
         actionBtnHTML = `
             <button type="button" class="btn-del-cat" onclick="this.closest('.editor-section').remove()">
@@ -460,7 +742,7 @@ function addProductUI(container, name = '', price = '', quantity = '') {
     row.className = 'product-row';
     const qtyVal = (quantity !== null && quantity !== undefined) ? quantity : '';
     row.innerHTML = `
-      <input type="text" class="input-field col-name" placeholder="es. Panino con Salamella" value="${name}">
+      <input type="text" class="input-field col-name" placeholder="es. Panino con salsiccia" value="${name}">
       <input type="number" class="input-field col-price" placeholder="0.00" value="${price}" step="0.10" min="0">
       <input type="number" class="input-field col-qty" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
       <button type="button" class="btn-del-product" title="Elimina Prodotto" onclick="this.parentElement.remove()">
@@ -1144,6 +1426,16 @@ window.openSettings = async function () {
     settingsModal.style.display = 'flex';
     showTestStatus(null);
 
+    // Dynamic Version Fetch
+    try {
+        const verRes = await fetch('/api/version');
+        const verData = await verRes.json();
+        const verEl = document.getElementById('current-app-version');
+        if (verEl && verData.version) verEl.innerText = verData.version;
+    } catch (e) {
+        console.error("Errore caricamento versione:", e);
+    }
+
     // Load Password, Template & Test Mode
     settingsPasswordInput.value = localStorage.getItem('appPassword') || "";
     document.getElementById('template-select').value = localStorage.getItem('receiptTemplate') || 'compact';
@@ -1386,5 +1678,152 @@ window.importDB = async function (input) {
         input.value = ''; // Reset
     }
 };
+
+async function checkAppUpdate() {
+    const btn = document.getElementById('btn-check-update');
+    const banner = document.getElementById('update-result-banner');
+
+    if (btn) btn.disabled = true;
+    if (banner) {
+        banner.style.display = 'block';
+        banner.className = 'status-banner status-info';
+        banner.innerText = 'Verifica aggiornamenti su GitHub in corso...';
+    }
+
+    try {
+        const res = await fetch('/api/check-update');
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+            if (banner) {
+                banner.className = 'status-banner status-error';
+                banner.innerText = data.error || 'Errore durante la verifica';
+            }
+            return;
+        }
+
+        // Dynamically update displayed version
+        const verEl = document.getElementById('current-app-version');
+        if (verEl && data.currentVersion) verEl.innerText = data.currentVersion;
+
+        if (data.hasUpdate) {
+            if (banner) {
+                banner.className = 'status-banner status-success';
+                banner.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                        <span><b>Nuova versione v${data.latestVersion} disponibile!</b> (Installata: v${data.currentVersion})</span>
+                        <button type="button" onclick="startAutoUpdate('${data.downloadUrl}')" class="btn-update-action" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;">
+                            <span class="material-symbols-rounded" style="font-size:1.1rem;">system_update</span> Aggiorna Ora
+                        </button>
+                    </div>
+                `;
+            }
+        } else {
+            if (banner) {
+                banner.className = 'status-banner status-info';
+                banner.innerText = `L'applicazione è già aggiornata all'ultima versione (v${data.currentVersion}).`;
+            }
+        }
+    } catch (e) {
+        if (banner) {
+            banner.className = 'status-banner status-error';
+            banner.innerText = 'Impossibile verificare gli aggiornamenti.';
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+window.checkAppUpdate = checkAppUpdate;
+
+async function startAutoUpdate(downloadUrl) {
+    const banner = document.getElementById('update-result-banner');
+    if (banner) {
+        banner.className = 'status-banner status-info';
+        banner.innerHTML = `
+            <div style="display:flex; align-items:center; justify-content:center; gap:10px; padding:4px;">
+                <span class="material-symbols-rounded" style="animation: spin 1s linear infinite;">sync</span>
+                <span><b>Download dell'aggiornamento in corso...</b> Si prega di non chiudere l'applicazione.</span>
+            </div>
+        `;
+    }
+
+    try {
+        const res = await fetch('/api/download-and-install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ downloadUrl })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            if (banner) {
+                banner.className = 'status-banner status-success';
+                banner.innerText = 'Download completato! Avvio dell\'installatore e chiusura dell\'applicazione...';
+            }
+        } else if (data.redirectUrl) {
+            window.open(data.redirectUrl, '_blank');
+        } else {
+            if (banner) {
+                banner.className = 'status-banner status-error';
+                banner.innerText = data.error || 'Errore durante il download.';
+            }
+        }
+    } catch (e) {
+        if (banner) {
+            banner.className = 'status-banner status-error';
+            banner.innerText = 'Errore di rete durante il download dell\'aggiornamento.';
+        }
+    }
+}
+window.startAutoUpdate = startAutoUpdate;
+
+let latestUpdateData = null;
+
+async function checkAppUpdateSilent() {
+    try {
+        const res = await fetch('/api/check-update');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Dynamically update current version in settings if element exists
+        const verEl = document.getElementById('current-app-version');
+        if (verEl && data.currentVersion) verEl.innerText = data.currentVersion;
+
+        if (data.hasUpdate) {
+            latestUpdateData = data;
+            const dismissedTag = sessionStorage.getItem('dismissUpdateTag');
+            if (dismissedTag !== data.latestVersion) {
+                showUpdateToast(data);
+            }
+        }
+    } catch (e) {
+        console.log("Silent update check skipped (offline or network error)");
+    }
+}
+
+function showUpdateToast(data) {
+    const toast = document.getElementById('update-toast-banner');
+    const verEl = document.getElementById('update-toast-ver');
+    const btn = document.getElementById('update-toast-btn');
+    if (!toast || !verEl || !btn) return;
+
+    verEl.innerText = `v${data.latestVersion}`;
+    btn.onclick = function() {
+        if (data.downloadUrl) {
+            startAutoUpdate(data.downloadUrl);
+        }
+    };
+    toast.classList.add('visible');
+}
+
+function dismissUpdateToast() {
+    const toast = document.getElementById('update-toast-banner');
+    if (toast) toast.classList.remove('visible');
+    if (latestUpdateData && latestUpdateData.latestVersion) {
+        sessionStorage.setItem('dismissUpdateTag', latestUpdateData.latestVersion);
+    }
+}
+window.dismissUpdateToast = dismissUpdateToast;
+window.checkAppUpdateSilent = checkAppUpdateSilent;
 
 init();

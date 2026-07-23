@@ -23,18 +23,29 @@
     <div class="bg-shape shape-3"></div>
     <div class="bg-shape shape-4"></div>
 
-    <div class="login-container">
+    <div class="login-container auth-container">
       <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo">
-      <h1>Benvenuto</h1>
-      <p>Accedi al sistema gestionale</p>
+      <h1 class="login-title">Benvenuto</h1>
+      <p class="login-subtitle">Accedi al sistema gestionale</p>
 
       <div id="auth-input-container" class="form-group" style="margin-bottom: 20px;">
-        <input type="password" id="auth-password" class="input-field" placeholder="Password (opzionale)"
-          onclick="this.select()" onkeydown="if(event.key === 'Enter') checkLogin()" style="text-align: center;">
-        <p id="auth-error" style="color: #ef4444; margin-top: 10px; min-height: 1.5em; font-weight: bold;"></p>
+        <div class="password-input-wrapper">
+          <span class="material-symbols-rounded password-icon-left">lock</span>
+          <input type="password" id="auth-password" class="input-field password-input" placeholder="Password"
+            onkeydown="if(event.key === 'Enter') checkLogin()">
+          <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility()" title="Mostra/Nascondi password">
+            <span class="material-symbols-rounded" id="auth-password-toggle-icon">visibility</span>
+          </button>
+        </div>
+        <div id="auth-error-banner" class="auth-error-banner">
+          <span class="material-symbols-rounded">error</span>
+          <span id="auth-error-text">Password errata!</span>
+        </div>
       </div>
 
-      <button class="btn-new-sagra" onclick="checkLogin()">Accedi</button>
+      <button class="btn-new-sagra" onclick="checkLogin()">
+        <span class="material-symbols-rounded">login</span> Accedi
+      </button>
     </div>
   </div>
 
@@ -47,22 +58,24 @@
     <div class="bg-shape shape-4"></div>
 
     <!-- Top Right Settings Button -->
-    <button class="btn-icon settings-btn" onclick="openSettings()"
-      style="position: absolute; top: 20px; right: 20px; z-index: 10;">
-      <span class="material-symbols-rounded" style="font-size: 32px; color: white;">settings</span>
+    <button class="btn-top-settings" onclick="openSettings()">
+      <span class="material-symbols-rounded">settings</span>
+      <span>Impostazioni</span>
     </button>
 
     <div class="login-container">
       <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo">
-      <h1>Sagra Manager</h1>
-      <p>Proloco Lorenzago</p>
-      <p>Seleziona un evento o creane uno nuovo</p>
+      <h1 class="login-title">Gestione Ordini</h1>
+      <p class="login-subtitle">Proloco Lorenzago</p>
+      <p class="login-instruction">Seleziona un evento per accedere alla cassa o creane uno nuovo</p>
 
       <div id="sagra-list" class="sagra-list">
         <!-- Injected via JS -->
       </div>
 
-      <button class="btn-new-sagra" onclick="createNewSagra()">+ Nuovo Evento</button>
+      <button class="btn-new-sagra" onclick="createNewSagra()">
+        <span class="material-symbols-rounded">add_circle</span> Nuovo Evento
+      </button>
     </div>
   </div>
 
@@ -248,6 +261,22 @@
     </div>
   </div>
 
+  <!-- Sagra Options Modal -->
+  <div id="sagra-options-modal" class="modal">
+    <div class="modal-content sagra-options-modal-content">
+      <div class="modal-header">
+        <h2>
+          <span class="material-symbols-rounded">settings</span>
+          <span id="sagra-options-title-text">Opzioni Evento</span>
+        </h2>
+        <span class="close-modal" onclick="closeSagraOptions()">&times;</span>
+      </div>
+      <div class="sagra-options-body" id="sagra-options-body">
+        <!-- Injected JS -->
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Modal -->
   <div id="settings-modal" class="modal">
     <div class="modal-content settings-modal-content">
@@ -303,7 +332,7 @@
 
           <div class="settings-card-row">
             <div class="settings-card-info">
-              <label for="test-mode-toggle" class="clickable-label">Modalità Test (Anteprima)</label>
+              <label for="test-mode-toggle" class="clickable-label">Modalità Test</label>
               <span class="settings-card-sub">Mostra lo scontrino a schermo senza stampare</span>
             </div>
             <label class="switch">
@@ -324,6 +353,26 @@
               </button>
               <input type="file" id="db-upload" style="display:none" onchange="importDB(this)">
             </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: AGGIORNAMENTO SOFTWARE -->
+        <div class="settings-section">
+          <div class="settings-section-title">
+            <span class="material-symbols-rounded">system_update</span>
+            Aggiornamento Software
+          </div>
+
+          <div class="form-group">
+            <div class="update-check-container">
+              <div class="update-info-text">
+                <span class="update-version-label">Versione: v<span id="current-app-version">--</span></span>
+              </div>
+              <button type="button" class="btn-pos-secondary" id="btn-check-update" onclick="checkAppUpdate()">
+                <span class="material-symbols-rounded">sync</span> Verifica Aggiornamenti
+              </button>
+            </div>
+            <div id="update-result-banner" class="status-banner" style="display:none; margin-top:14px; text-align:center;"></div>
           </div>
         </div>
 
@@ -349,6 +398,21 @@
       <div class="modal-footer">
         <button class="btn-save" onclick="closeReceiptModal()">Chiudi</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Update Notification Toast (Bottom-Right) -->
+  <div id="update-toast-banner" class="update-toast">
+    <div class="update-toast-content">
+      <span class="material-symbols-rounded update-toast-icon">system_update</span>
+      <div class="update-toast-info">
+        <div class="update-toast-title">Aggiornamento Disponibile</div>
+        <div class="update-toast-sub">Nuova versione <b id="update-toast-ver">v2.0.5</b> pronta.</div>
+      </div>
+    </div>
+    <div class="update-toast-actions">
+      <button type="button" class="btn-update-now" id="update-toast-btn">Aggiorna Ora</button>
+      <button type="button" class="btn-update-close" onclick="dismissUpdateToast()">&times;</button>
     </div>
   </div>
 

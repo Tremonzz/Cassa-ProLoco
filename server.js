@@ -3,6 +3,7 @@ const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const https = require('https');
 const { exec } = require('child_process');
 const { generateReceiptBuffer: generateCompactReceipt } = require('./templates/receipt_compact');
 const { generateSplitReceipt } = require('./templates/receipt_split');
@@ -271,6 +272,18 @@ app.put('/api/sagras/:id/unarchive', async (req, res) => {
   }
 });
 
+// RENAME Sagra
+app.put('/api/sagras/:id/rename', async (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).send("Nome richiesto");
+  try {
+    await dbRun("UPDATE sagras SET name = ? WHERE id = ?", [name.trim(), req.params.id]);
+    res.send("Renamed");
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
+});
+
 // DELETE Sagra
 app.delete('/api/sagras/:id', async (req, res) => {
   const id = req.params.id;
@@ -284,7 +297,42 @@ app.delete('/api/sagras/:id', async (req, res) => {
     await dbRun("COMMIT");
     res.send("Deleted");
   } catch (e) {
-    await dbRun("ROLLBACK");
+    await dbRun("ROLLBACK").catch(() => {});
+    console.error(e);
+    res.status(500).send(e.message);
+  }
+});
+
+// DUPLICATE Sagra
+app.post('/api/sagras/:id/duplicate', async (req, res) => {
+  const sourceId = req.params.id;
+  try {
+    const sagras = await dbAll("SELECT * FROM sagras WHERE id = ?", [sourceId]);
+    if (!sagras || sagras.length === 0) return res.status(404).send("Evento non trovato");
+
+    const sourceSagra = sagras[0];
+    const newName = `${sourceSagra.name} (Copia)`;
+
+    await dbRun("BEGIN TRANSACTION");
+
+    const result = await dbRun("INSERT INTO sagras (name, status) VALUES (?, 'active')", [newName]);
+    const newSagraId = result.lastID;
+
+    const categories = await dbAll("SELECT * FROM categories WHERE sagra_id = ?", [sourceId]);
+    for (const cat of categories) {
+      const catResult = await dbRun("INSERT INTO categories (name, is_hidden, sagra_id) VALUES (?, ?, ?)", [cat.name, cat.is_hidden, newSagraId]);
+      const newCatId = catResult.lastID;
+
+      const products = await dbAll("SELECT * FROM products WHERE category_id = ?", [cat.id]);
+      for (const prod of products) {
+        await dbRun("INSERT INTO products (name, price, quantity, category_id) VALUES (?, ?, ?, ?)", [prod.name, prod.price, prod.quantity, newCatId]);
+      }
+    }
+
+    await dbRun("COMMIT");
+    res.json({ id: newSagraId, name: newName, status: 'active' });
+  } catch (e) {
+    await dbRun("ROLLBACK").catch(() => {});
     console.error(e);
     res.status(500).send(e.message);
   }
@@ -593,6 +641,148 @@ app.get('/api/export', (req, res) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=evento_${sagraId}_export.csv`);
     res.send(csv);
+  });
+});
+
+// GET Dynamic App Version from package.json
+app.get('/api/version', (req, res) => {
+  const pkg = require('./package.json');
+  res.json({ version: pkg.version });
+});
+
+// CHECK UPDATE API (GitHub Public Releases)
+app.get('/api/check-update', (req, res) => {
+  const owner = req.query.owner || 'Tremonzz';
+  const repo = req.query.repo || 'Cassa-ProLoco';
+  const pkg = require('./package.json');
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+
+  const options = {
+    headers: {
+      'User-Agent': 'SagraManager-App'
+    }
+  };
+
+  https.get(url, options, (apiRes) => {
+    let body = '';
+    apiRes.on('data', chunk => body += chunk);
+    apiRes.on('end', () => {
+      try {
+        if (apiRes.statusCode !== 200) {
+          return res.json({ hasUpdate: false, currentVersion: pkg.version, status: 'no_release', message: 'Nessuna release pubblicata trovata su GitHub' });
+        }
+
+        const data = JSON.parse(body);
+        const latestTag = (data.tag_name || '').replace(/^v/, '');
+        const releaseNotes = data.body || '';
+
+        // Find .exe asset if available
+        let exeAsset = (data.assets || []).find(a => a.name && a.name.endsWith('.exe'));
+        let downloadUrl = exeAsset ? exeAsset.browser_download_url : data.html_url;
+
+        const semverCompare = (v1, v2) => {
+          const p1 = (v1 || '').split('.').map(Number);
+          const p2 = (v2 || '').split('.').map(Number);
+          for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+            const num1 = p1[i] || 0;
+            const num2 = p2[i] || 0;
+            if (num1 > num2) return 1;
+            if (num1 < num2) return -1;
+          }
+          return 0;
+        };
+
+        const hasUpdate = semverCompare(latestTag, pkg.version) > 0;
+
+        res.json({
+          hasUpdate,
+          currentVersion: pkg.version,
+          latestVersion: latestTag,
+          releaseNotes,
+          downloadUrl,
+          releaseUrl: data.html_url
+        });
+
+      } catch (e) {
+        res.status(500).json({ error: 'Errore durante la lettura delle informazioni di aggiornamento' });
+      }
+    });
+  }).on('error', (err) => {
+    res.status(500).json({ error: 'Impossibile connettersi a GitHub: ' + err.message });
+  });
+});
+
+// DOWNLOAD & AUTO-INSTALL UPDATE API
+app.post('/api/download-and-install', (req, res) => {
+  const { downloadUrl } = req.body;
+  if (!downloadUrl) return res.status(400).json({ error: 'URL di download non fornito' });
+
+  // If it's not a direct .exe URL (e.g. webpage URL), notify client
+  if (!downloadUrl.endsWith('.exe')) {
+    return res.json({ success: false, redirectUrl: downloadUrl, message: 'Reindirizzamento alla pagina di release' });
+  }
+
+  const tempDir = os.tmpdir();
+  const destPath = path.join(tempDir, `GestioneOrdini_Update_${Date.now()}.exe`);
+
+  const downloadFile = (url, dest, callback) => {
+    const file = fs.createWriteStream(dest);
+    const request = https.get(url, { headers: { 'User-Agent': 'SagraManager-App' } }, (response) => {
+      // Handle HTTP redirects (GitHub Releases redirect to S3 storage)
+      if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
+        file.close();
+        fs.unlink(dest, () => {});
+        return downloadFile(response.headers.location, dest, callback);
+      }
+
+      if (response.statusCode !== 200) {
+        file.close();
+        fs.unlink(dest, () => {});
+        return callback(new Error(`Download fallito con codice di stato: ${response.statusCode}`));
+      }
+
+      response.pipe(file);
+      file.on('finish', () => {
+        file.close(() => callback(null, dest));
+      });
+    });
+
+    request.on('error', (err) => {
+      fs.unlink(dest, () => {});
+      callback(err);
+    });
+  };
+
+  downloadFile(downloadUrl, destPath, (err, filePath) => {
+    if (err) {
+      console.error("Errore download installer:", err);
+      return res.status(500).json({ error: 'Impossibile scaricare l\'aggiornamento: ' + err.message });
+    }
+
+    res.json({ success: true, message: 'Download completato. Avvio dell\'installatore...' });
+
+    // Launch downloaded installer & close application
+    setTimeout(() => {
+      try {
+        const { spawn } = require('child_process');
+        const child = spawn(filePath, [], {
+          detached: true,
+          stdio: 'ignore'
+        });
+        child.unref();
+
+        // Close Electron app
+        try {
+          const { app: electronApp } = require('electron');
+          if (electronApp) electronApp.quit();
+          else process.exit(0);
+        } catch (e) {
+          process.exit(0);
+        }
+      } catch (e) {
+        console.error("Errore avvio installer:", e);
+      }
+    }, 800);
   });
 });
 

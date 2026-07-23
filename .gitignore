@@ -1,22 +1,56 @@
 # Dependency directories
 node_modules/
 
-# Build outputs
+# Build and distribution outputs
 dist/
+build/
+out/
+*.exe
+*.msi
+*.zip
 
-# Local databases & SQLite temp files (prevent overwriting local data or leaking database)
+# Local database & SQLite runtime files (prevents pushing local test DB data)
 *.db
+*.sqlite
+*.sqlite3
 *.db-journal
 *.db-shm
 *.db-wal
 
-# Temporary / test outputs
+# Local launch scripts and dev batch files
+start_app.bat
+*.bat
+*.cmd
+
+# Temporary print jobs & resized image caches
 printer-output.bin
 temp_print_job.bin
 temp_receipt.bin
 public/receipt_header_resized.png
 
-# OS generated files
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs & Code Editor files
+.vscode/
+.idea/
+*.suo
+*.ntvsopt
+*.njsproj
+*.sln
+*.swp
+*.swo
+
+# OS system files
 .DS_Store
 Thumbs.db
 Desktop.ini
