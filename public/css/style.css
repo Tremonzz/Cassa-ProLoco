@@ -1105,6 +1105,11 @@ select.hidden-native-select {
   to { transform: rotate(360deg); }
 }
 
+.spinning-icon {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
 .btn-small {
   padding: 8px 16px;
   border-radius: 8px;
@@ -2777,6 +2782,23 @@ input:checked + .slider:before {
 .btn-update-close:hover {
   background: #f1f5f9;
   color: var(--danger);
+}
+
+/* Progress Bar Styles */
+.update-progress-track {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.update-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+  border-radius: 6px;
+  transition: width 0.2s ease;
 }
 
 .toast-message {

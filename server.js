@@ -713,6 +713,12 @@ app.get('/api/check-update', (req, res) => {
 });
 
 // DOWNLOAD & AUTO-INSTALL UPDATE API
+let updateProgress = { status: 'idle', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
+
+app.get('/api/update-progress', (req, res) => {
+  res.json(updateProgress);
+});
+
 app.post('/api/download-and-install', (req, res) => {
   const { downloadUrl } = req.body;
   if (!downloadUrl) return res.status(400).json({ error: 'URL di download non fornito' });
@@ -724,6 +730,8 @@ app.post('/api/download-and-install', (req, res) => {
 
   const tempDir = os.tmpdir();
   const destPath = path.join(tempDir, `GestioneOrdini_Update_${Date.now()}.exe`);
+
+  updateProgress = { status: 'downloading', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
 
   const downloadFile = (url, dest, callback) => {
     const file = fs.createWriteStream(dest);
@@ -738,17 +746,42 @@ app.post('/api/download-and-install', (req, res) => {
       if (response.statusCode !== 200) {
         file.close();
         fs.unlink(dest, () => {});
-        return callback(new Error(`Download fallito con codice di stato: ${response.statusCode}`));
+        const err = new Error(`Download fallito (status: ${response.statusCode})`);
+        updateProgress = { status: 'error', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: err.message };
+        return callback(err);
       }
 
+      const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
+      let downloadedBytes = 0;
+
+      response.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+        const percent = totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+        const downloadedMb = (downloadedBytes / (1024 * 1024)).toFixed(1);
+        const totalMb = totalBytes > 0 ? (totalBytes / (1024 * 1024)).toFixed(1) : '?';
+
+        updateProgress = {
+          status: 'downloading',
+          percent: percent,
+          downloadedMb: downloadedMb,
+          totalMb: totalMb,
+          error: null
+        };
+      });
+
       response.pipe(file);
+
       file.on('finish', () => {
-        file.close(() => callback(null, dest));
+        file.close(() => {
+          updateProgress = { status: 'completed', percent: 100, downloadedMb: updateProgress.downloadedMb, totalMb: updateProgress.totalMb, error: null };
+          callback(null, dest);
+        });
       });
     });
 
     request.on('error', (err) => {
       fs.unlink(dest, () => {});
+      updateProgress = { status: 'error', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: err.message };
       callback(err);
     });
   };

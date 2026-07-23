@@ -1,8 +1,8 @@
 {
   "name": "sagra-manager",
-  "version": "2.0.4",
+  "version": "2.0.1",
   "description": "Gestione ordini eventi",
-  "author": "Proloco Lorenzago",
+  "author": "Tommaso Tremonti",
   "main": "main.js",
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,20 @@
     "productName": "Gestione Ordini",
     "win": {
       "target": "nsis",
-      "icon": "public/images/icon.png"
+      "icon": "public/images/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gestione Ordini",
+      "installerIcon": "public/images/icon.ico",
+      "uninstallerIcon": "public/images/icon.ico",
+      "installerHeaderIcon": "public/images/icon.ico",
+      "installerSidebar": "public/images/installer_sidebar.bmp",
+      "uninstallerSidebar": "public/images/installer_sidebar.bmp",
+      "deleteAppDataOnUninstall": false
     },
     "files": [
       "**/*",

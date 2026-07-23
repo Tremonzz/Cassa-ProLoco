@@ -1736,16 +1736,60 @@ async function checkAppUpdate() {
 window.checkAppUpdate = checkAppUpdate;
 
 async function startAutoUpdate(downloadUrl) {
-    const banner = document.getElementById('update-result-banner');
-    if (banner) {
-        banner.className = 'status-banner status-info';
-        banner.innerHTML = `
-            <div style="display:flex; align-items:center; justify-content:center; gap:10px; padding:4px;">
-                <span class="material-symbols-rounded" style="animation: spin 1s linear infinite;">sync</span>
-                <span><b>Download dell'aggiornamento in corso...</b> Si prega di non chiudere l'applicazione.</span>
+    const settingsBanner = document.getElementById('update-result-banner');
+    const toastBanner = document.getElementById('update-toast-banner');
+
+    const renderProgressUI = (percent, downloadedMb, totalMb, statusText) => {
+        const progressHtml = `
+            <div style="display:flex; flex-direction:column; gap:6px; width:100%; text-align:left; padding:4px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; font-weight:700;">
+                    <span>${statusText}</span>
+                    <span style="color:var(--primary);">${percent}%</span>
+                </div>
+                <div class="update-progress-track">
+                    <div class="update-progress-bar" style="width: ${percent}%;"></div>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-light); text-align:right;">
+                    ${downloadedMb} MB / ${totalMb} MB
+                </div>
             </div>
         `;
-    }
+
+        if (settingsBanner && settingsBanner.style.display !== 'none') {
+            settingsBanner.className = 'status-banner status-info';
+            settingsBanner.innerHTML = progressHtml;
+        }
+
+        if (toastBanner && toastBanner.classList.contains('visible')) {
+            toastBanner.innerHTML = `
+                <div class="update-toast-content" style="width:100%;">
+                    <div class="update-toast-icon">
+                        <span class="material-symbols-rounded spinning-icon">sync</span>
+                    </div>
+                    ${progressHtml}
+                </div>
+            `;
+        }
+    };
+
+    renderProgressUI(0, '0.0', '...', 'Avvio download...');
+
+    const pollInterval = setInterval(async () => {
+        try {
+            const pRes = await fetch('/api/update-progress');
+            if (pRes.ok) {
+                const pData = await pRes.json();
+                if (pData.status === 'downloading') {
+                    renderProgressUI(pData.percent, pData.downloadedMb, pData.totalMb, 'Download in corso...');
+                } else if (pData.status === 'completed') {
+                    renderProgressUI(100, pData.totalMb, pData.totalMb, 'Download completato! Avvio installazione...');
+                    clearInterval(pollInterval);
+                } else if (pData.status === 'error') {
+                    clearInterval(pollInterval);
+                }
+            }
+        } catch (e) {}
+    }, 250);
 
     try {
         const res = await fetch('/api/download-and-install', {
@@ -1754,24 +1798,23 @@ async function startAutoUpdate(downloadUrl) {
             body: JSON.stringify({ downloadUrl })
         });
         const data = await res.json();
+        clearInterval(pollInterval);
 
         if (res.ok && data.success) {
-            if (banner) {
-                banner.className = 'status-banner status-success';
-                banner.innerText = 'Download completato! Avvio dell\'installatore e chiusura dell\'applicazione...';
-            }
+            renderProgressUI(100, '', '', 'Avvio installatore e chiusura app...');
         } else if (data.redirectUrl) {
             window.open(data.redirectUrl, '_blank');
         } else {
-            if (banner) {
-                banner.className = 'status-banner status-error';
-                banner.innerText = data.error || 'Errore durante il download.';
+            if (settingsBanner) {
+                settingsBanner.className = 'status-banner status-error';
+                settingsBanner.innerText = data.error || 'Errore durante il download.';
             }
         }
     } catch (e) {
-        if (banner) {
-            banner.className = 'status-banner status-error';
-            banner.innerText = 'Errore di rete durante il download dell\'aggiornamento.';
+        clearInterval(pollInterval);
+        if (settingsBanner) {
+            settingsBanner.className = 'status-banner status-error';
+            settingsBanner.innerText = 'Errore di rete durante il download dell\'aggiornamento.';
         }
     }
 }
