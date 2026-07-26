@@ -1050,7 +1050,8 @@ async function printOrder() {
             total: total,
             printerName: printerName,
             template: template,
-            testMode: (localStorage.getItem('appTestMode') === 'true')
+            testMode: (localStorage.getItem('appTestMode') === 'true'),
+            printEventName: (localStorage.getItem('appPrintEventName') !== 'false')
         };
 
         try {
@@ -1105,7 +1106,8 @@ async function reprintOrderFromHistory(orderId) {
         printerName: printerName,
         template: template,
         isReprint: true,
-        testMode: (localStorage.getItem('appTestMode') === 'true')
+        testMode: (localStorage.getItem('appTestMode') === 'true'),
+        printEventName: (localStorage.getItem('appPrintEventName') !== 'false')
     };
 
     try {
@@ -1436,10 +1438,11 @@ window.openSettings = async function () {
         console.error("Errore caricamento versione:", e);
     }
 
-    // Load Password, Template & Test Mode
+    // Load Password, Template, Test Mode & Print Event Name
     settingsPasswordInput.value = localStorage.getItem('appPassword') || "";
     document.getElementById('template-select').value = localStorage.getItem('receiptTemplate') || 'compact';
     document.getElementById('test-mode-toggle').checked = (localStorage.getItem('appTestMode') === 'true');
+    document.getElementById('print-event-name-toggle').checked = (localStorage.getItem('appPrintEventName') !== 'false');
 
     syncCustomSelect('template-select');
 
@@ -1511,15 +1514,17 @@ window.saveSettings = function () {
     const newPassword = settingsPasswordInput.value.trim();
     const selectedTemplate = document.getElementById('template-select').value;
     const isTestMode = document.getElementById('test-mode-toggle').checked;
+    const printEventName = document.getElementById('print-event-name-toggle').checked;
 
     if (selectedPrinter) {
         localStorage.setItem('thermalPrinterName', selectedPrinter);
     }
 
-    // Save Password, Template & Test Mode
+    // Save Password, Template, Test Mode & Print Event Name
     localStorage.setItem('appPassword', newPassword);
     localStorage.setItem('receiptTemplate', selectedTemplate);
     localStorage.setItem('appTestMode', isTestMode ? 'true' : 'false');
+    localStorage.setItem('appPrintEventName', printEventName ? 'true' : 'false');
 
     showToast("Impostazioni salvate con successo!", "success");
     closeSettings();

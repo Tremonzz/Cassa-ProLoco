@@ -47,7 +47,9 @@ async function printReceiptHeader(printer, sagraName) {
     printer.bold(true);
     printer.println("SCONTRINO NON FISCALE");
     printer.bold(false);
-    printer.println(`Evento: ${sagraName || 'Sagra'}`);
+    if (sagraName && sagraName.trim()) {
+        printer.println(`Evento: ${sagraName.trim()}`);
+    }
     printer.newLine();
     printer.drawLine();
 
@@ -56,7 +58,7 @@ async function printReceiptHeader(printer, sagraName) {
         "Via Faureana 117 - Lorenzago (BL)",
         "P.IVA 01089600256",
         "SCONTRINO NON FISCALE",
-        `Evento: ${sagraName || 'Sagra'}`
+        ...(sagraName && sagraName.trim() ? [`Evento: ${sagraName.trim()}`] : [])
     ];
 
     return {

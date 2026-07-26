@@ -403,7 +403,7 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
 
 // Create Order (SEQ LOGIC + THERMAL PRINT + INVENTORY)
 app.post('/api/orders', async (req, res) => {
-  const { items, total, sagraId, printerName, template, testMode } = req.body;
+  const { items, total, sagraId, printerName, template, testMode, printEventName } = req.body;
   if (!items || items.length === 0) return res.status(400).send('Empty order');
   const targetSagra = sagraId || 1;
 
@@ -446,10 +446,18 @@ app.post('/api/orders', async (req, res) => {
 
     // 5. Printing / Test Mode Logic
     try {
+      // Fetch event name from DB (only if enabled)
+      let sagraName = '';
+      if (printEventName !== false) {
+        const sagraRows = await dbAll("SELECT name FROM sagras WHERE id = ?", [targetSagra]);
+        if (sagraRows.length > 0) sagraName = sagraRows[0].name;
+      }
+
       const receiptData = {
         seq: seq,
         items: items,
         total: total,
+        sagraName: sagraName,
         date: new Date().toLocaleString('it-IT')
       };
 

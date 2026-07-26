@@ -2244,12 +2244,12 @@ select.hidden-native-select {
 }
 
 .settings-body {
-  padding: 24px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   background: var(--bg);
-  max-height: 75vh;
+  max-height: 80vh;
   overflow-y: auto;
 }
 
@@ -2257,11 +2257,16 @@ select.hidden-native-select {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: var(--radius);
-  padding: 18px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   box-shadow: var(--shadow-sm);
+}
+
+.settings-section .form-group {
+  margin-bottom: 0;
+  gap: 6px;
 }
 
 .settings-section-advanced {
@@ -2270,20 +2275,20 @@ select.hidden-native-select {
 }
 
 .settings-section-title {
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--primary);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #e2e8f0;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .settings-section-title .material-symbols-rounded {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   color: var(--primary-light);
 }
 
@@ -2295,7 +2300,7 @@ select.hidden-native-select {
 
 .printer-select-row .input-field {
   flex: 1;
-  height: 44px;
+  height: 40px;
 }
 
 .status-msg {
@@ -2310,7 +2315,7 @@ select.hidden-native-select {
   align-items: center;
   justify-content: space-between;
   background: #ffffff;
-  padding: 14px 16px;
+  padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
 }

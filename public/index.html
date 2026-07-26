@@ -289,11 +289,11 @@
       </div>
       <div class="modal-body settings-body">
 
-        <!-- SECTION 1: STAMPA E SICUREZZA -->
+        <!-- SECTION 1: STAMPA -->
         <div class="settings-section">
           <div class="settings-section-title">
             <span class="material-symbols-rounded">print</span>
-            Stampa & Sicurezza
+            Stampa
           </div>
 
           <div class="form-group">
@@ -317,9 +317,15 @@
             </select>
           </div>
 
-          <div class="form-group">
-            <label for="settings-password">Password Accesso</label>
-            <input type="password" id="settings-password" class="input-field" placeholder="Lascia vuoto per disattivare">
+          <div class="settings-card-row">
+            <div class="settings-card-info">
+              <label for="print-event-name-toggle" class="clickable-label">Stampa nome evento</label>
+              <span class="settings-card-sub">Mostra il nome dell'evento sull'intestazione dello scontrino</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="print-event-name-toggle">
+              <span class="slider round"></span>
+            </label>
           </div>
         </div>
 
@@ -328,6 +334,11 @@
           <div class="settings-section-title">
             <span class="material-symbols-rounded">tune</span>
             Avanzate
+          </div>
+
+          <div class="form-group">
+            <label for="settings-password">Password Accesso</label>
+            <input type="password" id="settings-password" class="input-field" placeholder="Lascia vuoto per disattivare">
           </div>
 
           <div class="settings-card-row">
@@ -341,7 +352,7 @@
             </label>
           </div>
 
-          <div class="form-group" style="margin-top: 5px;">
+          <div class="form-group">
             <label style="margin: 0; font-size: 0.95rem;">Gestione Database</label>
             <span class="settings-card-sub">Backup ed esportazione/importazione dati</span>
             <div class="db-actions-row">
