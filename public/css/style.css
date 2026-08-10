@@ -2961,3 +2961,71 @@ input:checked + .slider:before {
   border-radius: 12px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
+/* Product Reorder Modal & Buttons */
+.btn-reorder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  color: var(--text-main);
+  border: 1px solid #cbd5e1;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-reorder:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+}
+
+.reorder-cat-section {
+  margin-bottom: 20px;
+}
+
+.reorder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  min-height: 80px;
+}
+
+.reorder-btn {
+  position: relative;
+  cursor: grab !important;
+  user-select: none;
+  touch-action: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.reorder-btn:active {
+  cursor: grabbing !important;
+}
+
+.reorder-btn.dragging {
+  opacity: 0.35;
+  border: 2px dashed var(--primary);
+  background: #eff6ff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.reorder-handle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 1.1rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.reorder-btn:hover .reorder-handle {
+  color: var(--primary);
+}

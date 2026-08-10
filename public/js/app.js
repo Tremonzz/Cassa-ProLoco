@@ -764,21 +764,21 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
     const selProducts = products.filter(p => p.is_selection === 1);
 
     if (stdProducts.length > 0) {
-        stdProducts.forEach(p => addProductUI(stdList, p.name, p.price, p.quantity, false, false));
+        stdProducts.forEach(p => addProductUI(stdList, p.name, p.price, p.quantity, false, false, [], p.position));
     } else {
         addProductUI(stdList);
     }
 
     if (compProducts.length > 0) {
         compHeader.style.display = 'flex';
-        compProducts.forEach(p => addProductUI(compList, p.name, p.price, p.quantity, true, false, p.components || []));
+        compProducts.forEach(p => addProductUI(compList, p.name, p.price, p.quantity, true, false, p.components || [], p.position));
     } else {
         compHeader.style.display = 'none';
     }
 
     if (selProducts.length > 0) {
         selHeader.style.display = 'flex';
-        selProducts.forEach(p => addProductUI(selList, p.name, p.price, p.quantity, false, true, p.components || []));
+        selProducts.forEach(p => addProductUI(selList, p.name, p.price, p.quantity, false, true, p.components || [], p.position));
     } else {
         selHeader.style.display = 'none';
     }
@@ -1114,11 +1114,209 @@ window.openPosSelectionModal = openPosSelectionModal;
 window.closePosSelectionModal = closePosSelectionModal;
 window.confirmPosSelection = confirmPosSelection;
 
-function addProductUI(container, name = '', price = '', quantity = '', isComposite = false, isSelection = false, linkedProducts = []) {
+// --- PRODUCT REORDER FUNCTIONS ---
+function openProductReorderModal() {
+    const container = document.getElementById('reorder-categories-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const sections = document.querySelectorAll('.editor-section');
+    if (sections.length === 0) {
+        return showToast("Nessuna categoria presente nel menu", "error");
+    }
+
+    let hasProducts = false;
+
+    sections.forEach((sec, secIdx) => {
+        let catName = '';
+        const nameInput = sec.querySelector('.cat-name-input');
+        if (nameInput) {
+            catName = nameInput.value.trim();
+        } else {
+            const titleEl = sec.querySelector('.fixed-cat-title-text');
+            if (titleEl) catName = titleEl.innerText.trim();
+        }
+        if (!catName) return;
+
+        const productRows = Array.from(sec.querySelectorAll('.product-row'));
+        if (productRows.length === 0) return;
+
+        const stateProds = STATE.products ? STATE.products[catName] : null;
+        const prods = [];
+
+        function getRowId(row) {
+            if (!row.id) {
+                row.id = `prow-${secIdx}-${Math.random().toString(36).substr(2, 9)}`;
+            }
+            return row.id;
+        }
+
+        if (Array.isArray(stateProds) && stateProds.length > 0) {
+            stateProds.forEach(sp => {
+                const matchingRow = productRows.find(row => {
+                    const isComp = row.dataset.isComposite === "1" || row.classList.contains('is-composite-row');
+                    const isSel = row.dataset.isSelection === "1";
+                    const nameInput = row.querySelector('.col-name input') || row.querySelector('input[type="text"]');
+                    const pName = nameInput ? nameInput.value.trim() : '';
+                    return pName === sp.name && (isComp === (sp.is_composite === 1)) && (isSel === (sp.is_selection === 1));
+                });
+
+                if (matchingRow) {
+                    prods.push({
+                        rowId: getRowId(matchingRow),
+                        name: sp.name,
+                        price: sp.price,
+                        isComp: sp.is_composite === 1,
+                        isSel: sp.is_selection === 1
+                    });
+                }
+            });
+        }
+
+        productRows.forEach(row => {
+            const nameInput = row.querySelector('.col-name input') || row.querySelector('input[type="text"]');
+            const priceInput = row.querySelector('input.col-price') || row.querySelectorAll('input')[1];
+            const pName = nameInput ? nameInput.value.trim() : '';
+            const pPrice = priceInput ? parseFloat(priceInput.value) : 0;
+            const isComp = row.dataset.isComposite === "1" || row.classList.contains('is-composite-row');
+            const isSel = row.dataset.isSelection === "1";
+
+            if (pName && !prods.some(p => p.name === pName)) {
+                prods.push({
+                    rowId: getRowId(row),
+                    name: pName,
+                    price: isNaN(pPrice) ? 0 : pPrice,
+                    isComp,
+                    isSel
+                });
+            }
+        });
+
+        if (prods.length > 0) {
+            hasProducts = true;
+
+            const trimmedName = catName.trim();
+            let catIcon = 'category';
+            if (trimmedName === 'Cibo') catIcon = 'restaurant';
+            if (trimmedName === 'Bevande') catIcon = 'local_bar';
+
+            const catSec = document.createElement('div');
+            catSec.className = 'category-section reorder-cat-section';
+            catSec.dataset.catName = catName;
+
+            const gridHTML = prods.map(p => {
+                let typeIcon = '';
+                if (p.isSel) {
+                    typeIcon = `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;">checklist</span>`;
+                } else if (p.isComp) {
+                    typeIcon = `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;">link</span>`;
+                }
+
+                return `
+                    <div class="product-btn reorder-btn" draggable="true" data-row-id="${p.rowId}">
+                        <span class="material-symbols-rounded reorder-handle">drag_indicator</span>
+                        <span class="product-name">${typeIcon}${p.name}</span>
+                        <span class="product-price">€ ${p.price.toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            catSec.innerHTML = `
+                <div class="category-title">
+                    <span class="material-symbols-rounded" style="font-size: 1.3rem;">${catIcon}</span>
+                    ${catName}
+                </div>
+                <div class="reorder-grid" data-cat-name="${catName}">
+                    ${gridHTML}
+                </div>
+            `;
+
+            container.appendChild(catSec);
+        }
+    });
+
+    if (!hasProducts) {
+        return showToast("Nessun prodotto presente da riordinare", "error");
+    }
+
+    setupReorderDragAndDrop();
+    const modal = document.getElementById('product-reorder-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeProductReorderModal() {
+    const modal = document.getElementById('product-reorder-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+let reorderDraggedBtn = null;
+
+function setupReorderDragAndDrop() {
+    const btnList = document.querySelectorAll('.reorder-btn');
+    btnList.forEach(btn => {
+        btn.addEventListener('dragstart', (e) => {
+            reorderDraggedBtn = btn;
+            btn.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', btn.dataset.rowId);
+        });
+
+        btn.addEventListener('dragend', () => {
+            btn.classList.remove('dragging');
+            reorderDraggedBtn = null;
+        });
+
+        btn.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!reorderDraggedBtn) return;
+
+            const targetBtn = e.target.closest('.reorder-btn');
+            if (targetBtn && targetBtn !== reorderDraggedBtn && targetBtn.parentNode === reorderDraggedBtn.parentNode) {
+                const rect = targetBtn.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                const midY = rect.top + rect.height / 2;
+                const isAfter = (e.clientX > midX && e.clientY >= rect.top && e.clientY <= rect.bottom) || e.clientY > midY;
+                if (isAfter) {
+                    targetBtn.parentNode.insertBefore(reorderDraggedBtn, targetBtn.nextSibling);
+                } else {
+                    targetBtn.parentNode.insertBefore(reorderDraggedBtn, targetBtn);
+                }
+            }
+        });
+    });
+}
+
+async function saveProductReorder() {
+    const grids = document.querySelectorAll('#reorder-categories-container .reorder-grid');
+
+    grids.forEach(grid => {
+        const reorderedBtns = grid.querySelectorAll('.reorder-btn');
+        reorderedBtns.forEach((btn, idx) => {
+            const rowId = btn.dataset.rowId;
+            const rowEl = document.getElementById(rowId);
+            if (rowEl) {
+                rowEl.dataset.position = idx;
+            }
+        });
+    });
+
+    closeProductReorderModal();
+    await saveMenu(true, "Ordine prodotti salvato con successo!");
+}
+
+window.openProductReorderModal = openProductReorderModal;
+window.closeProductReorderModal = closeProductReorderModal;
+window.saveProductReorder = saveProductReorder;
+
+function addProductUI(container, name = '', price = '', quantity = '', isComposite = false, isSelection = false, linkedProducts = [], position = null) {
     const row = document.createElement('div');
     const isComp = !!isComposite;
     const isSel = !!isSelection;
     row.className = 'product-row';
+    if (position !== null && position !== undefined) {
+        row.dataset.position = position;
+    }
 
     if (isComp) {
         row.dataset.isComposite = "1";
@@ -1179,7 +1377,7 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
     container.appendChild(row);
 }
 
-async function saveMenu() {
+async function saveMenu(stayInEditor = false, customToastMsg = null) {
     if (!STATE.currentSagra) return;
 
     const sections = document.querySelectorAll('.editor-section');
@@ -1201,6 +1399,7 @@ async function saveMenu() {
         const products = [];
 
         // Always preserve and save products even when category is hidden
+        let prodIdx = 0;
         sec.querySelectorAll('.product-row').forEach(row => {
             const isComp = row.dataset.isComposite === "1" || row.classList.contains('is-composite-row');
             const isSel = row.dataset.isSelection === "1";
@@ -1224,9 +1423,15 @@ async function saveMenu() {
                 if ((isComp || isSel) && row.dataset.linkedProducts) {
                     try { components = JSON.parse(row.dataset.linkedProducts); } catch(e){}
                 }
-                products.push({ name: pName, price: pPrice, quantity: pQty, is_composite: isComp ? 1 : 0, is_selection: isSel ? 1 : 0, components });
+                const pType = isSel ? 'selection' : (isComp ? 'composite' : 'simple');
+                const posVal = (row.dataset.position !== undefined && row.dataset.position !== "") ? parseInt(row.dataset.position) : prodIdx;
+                prodIdx++;
+                products.push({ name: pName, price: pPrice, quantity: pQty, type: pType, is_composite: isComp ? 1 : 0, is_selection: isSel ? 1 : 0, components, position: posVal });
             }
         });
+
+        // Sort products by position before saving so backend writes them in position order
+        products.sort((a, b) => (a.position !== undefined ? a.position : 0) - (b.position !== undefined ? b.position : 0));
 
         payload.categories.push({ name: catName, is_hidden: isHidden, products });
     });
@@ -1239,9 +1444,12 @@ async function saveMenu() {
         });
 
         if (res.ok) {
-            showToast("Menu salvato con successo!", "success");
+            const toastMsg = customToastMsg || "Menu salvato con successo!";
+            showToast(toastMsg, "success");
             await loadSagraResources();
-            showView('pos');
+            if (!stayInEditor) {
+                showView('pos');
+            }
         } else {
             showToast("Errore durante il salvataggio del menu", "error");
         }

@@ -135,6 +135,16 @@ function runMigrations() {
       db.run("ALTER TABLE products ADD COLUMN is_selection INTEGER DEFAULT 0", (e) => {
         if (!e) console.log("Migration: Added 'is_selection' column to products.");
       });
+      db.run("ALTER TABLE products ADD COLUMN position INTEGER DEFAULT 0", (e) => {
+        if (!e) console.log("Migration: Added 'position' column to products.");
+      });
+      db.run("ALTER TABLE products ADD COLUMN type TEXT DEFAULT 'simple'", (e) => {
+        if (!e) {
+          console.log("Migration: Added 'type' column to products.");
+          db.run("UPDATE products SET type = 'composite' WHERE is_composite = 1");
+          db.run("UPDATE products SET type = 'selection' WHERE is_selection = 1");
+        }
+      });
     });
 
     // Orders
@@ -353,11 +363,11 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 app.get('/api/sagras/:id/products', (req, res) => {
   const sagraId = req.params.id;
   const sql = `
-      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.is_composite, p.is_selection, p.components
+      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.type, p.is_composite, p.is_selection, p.components, p.position
       FROM categories c
       LEFT JOIN products p ON c.id = p.category_id
       WHERE c.sagra_id = ?
-      ORDER BY c.id, p.name
+      ORDER BY c.id, p.position ASC, p.id ASC
     `;
 
   db.all(sql, [sagraId], (err, rows) => {
@@ -376,8 +386,12 @@ app.get('/api/sagras/:id/products', (req, res) => {
         if (curr.components) {
           try { parsedComponents = JSON.parse(curr.components); } catch (e) {}
         }
+        const pType = curr.type || (curr.is_selection === 1 ? 'selection' : (curr.is_composite === 1 ? 'composite' : 'simple'));
         grouped[curr.category].push({
           ...curr,
+          type: pType,
+          is_composite: pType === 'composite' ? 1 : 0,
+          is_selection: pType === 'selection' ? 1 : 0,
           components: parsedComponents
         });
       }
@@ -403,12 +417,17 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
       const result = await dbRun("INSERT INTO categories (name, sagra_id, is_hidden) VALUES (?, ?, ?)", [cat.name, sagraId, isHidden]);
       const catId = result.lastID;
       if (cat.products && cat.products.length > 0) {
+        let pIdx = 0;
         for (const p of cat.products) {
-          const isComp = p.is_composite ? 1 : 0;
-          const isSel = p.is_selection ? 1 : 0;
-          const qty = (!isComp && !isSel && p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
-          const compsStr = ((isComp || isSel) && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
-          await dbRun("INSERT INTO products (name, price, quantity, is_composite, is_selection, components, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)", [p.name, p.price, qty, isComp, isSel, compsStr, catId]);
+          const pType = p.type || (p.is_selection ? 'selection' : (p.is_composite ? 'composite' : 'simple'));
+          const isComp = pType === 'composite' ? 1 : 0;
+          const isSel = pType === 'selection' ? 1 : 0;
+          const qty = (pType === 'simple' && p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
+          const compsStr = (pType !== 'simple' && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
+          const pos = (p.position !== undefined && p.position !== null) ? parseInt(p.position) : pIdx;
+          pIdx++;
+
+          await dbRun("INSERT INTO products (name, price, quantity, type, is_composite, is_selection, components, category_id, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [p.name, p.price, qty, pType, isComp, isSel, compsStr, catId, pos]);
         }
       }
     }
@@ -552,9 +571,11 @@ app.post('/api/orders', async (req, res) => {
 
         if (prodRows.length > 0) {
           const prod = prodRows[0];
+          const pType = prod.type || (prod.is_selection === 1 ? 'selection' : (prod.is_composite === 1 ? 'composite' : 'simple'));
           itemCopy.category = itemCopy.category || prod.category_name;
-          itemCopy.is_composite = prod.is_composite;
-          itemCopy.is_selection = prod.is_selection;
+          itemCopy.type = pType;
+          itemCopy.is_composite = pType === 'composite' ? 1 : 0;
+          itemCopy.is_selection = pType === 'selection' ? 1 : 0;
 
           let comps = [];
           if (Array.isArray(item.components) && item.components.length > 0) {

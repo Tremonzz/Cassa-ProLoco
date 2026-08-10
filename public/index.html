@@ -90,6 +90,9 @@
         </h2>
       </div>
       <div class="editor-actions">
+        <button type="button" class="btn-reorder" onclick="openProductReorderModal()" title="Riordina il posizionamento dei prodotti">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">reorder</span> Riordina Prodotti
+        </button>
         <button class="btn-editor-cancel" onclick="showView('pos')">
           <span class="material-symbols-rounded" style="font-size: 1.1rem;">close</span> Annulla
         </button>
@@ -408,6 +411,35 @@
       </div>
       <div class="modal-footer">
         <button class="btn-save" onclick="closeReceiptModal()">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Reorder Modal -->
+  <div id="product-reorder-modal" class="modal">
+    <div class="modal-content" style="max-width: 850px; width: 92%;">
+      <div class="modal-header">
+        <h2>
+          <span class="material-symbols-rounded">reorder</span>
+          Riordina Prodotti
+        </h2>
+        <span class="close-modal" onclick="closeProductReorderModal()">&times;</span>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding: 20px;">
+        <p style="margin-bottom: 16px; color: var(--text-light); font-size: 0.95rem; line-height: 1.4;">
+          Trascina le tessere dei prodotti per riordinarli. L'ordine impostato verrà riflesso nella schermata della cassa.
+        </p>
+        <div id="reorder-categories-container">
+          <!-- Injected JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-editor-cancel" onclick="closeProductReorderModal()">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">close</span> Annulla
+        </button>
+        <button type="button" class="btn-save" onclick="saveProductReorder()">
+          <span class="material-symbols-rounded" style="vertical-align: middle; margin-right: 4px;">save</span> Conferma Riordino
+        </button>
       </div>
     </div>
   </div>
