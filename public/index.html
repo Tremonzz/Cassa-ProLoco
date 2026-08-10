@@ -376,7 +376,56 @@
           </div>
         </div>
 
-        <!-- SECTION 2: AVANZATE -->
+        <!-- SECTION 2: ASPETTO -->
+        <div class="settings-section">
+          <div class="settings-section-title">
+            <span class="material-symbols-rounded">palette</span>
+            Aspetto
+          </div>
+
+          <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+            <div class="settings-card-info">
+              <label class="clickable-label">Tema Interfaccia</label>
+              <span class="settings-card-sub">Seleziona l'aspetto visivo dell'applicazione</span>
+            </div>
+            <div class="theme-selector-group">
+              <div class="theme-selector-pill" id="theme-selector-pill"></div>
+              <button type="button" class="theme-option-btn" id="theme-btn-light" onclick="selectTheme('light')">
+                <span class="material-symbols-rounded">light_mode</span>
+                <span>Chiaro</span>
+              </button>
+              <button type="button" class="theme-option-btn" id="theme-btn-dark" onclick="selectTheme('dark')">
+                <span class="material-symbols-rounded">dark_mode</span>
+                <span>Scuro</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div class="settings-card-info">
+                <label for="dark-mode-schedule-toggle" class="clickable-label">Modalità Scura Programmata</label>
+                <span class="settings-card-sub">Attiva automaticamente il tema scuro negli orari stabiliti</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="dark-mode-schedule-toggle" onchange="toggleThemeSchedule(this.checked)">
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div id="schedule-time-container" style="display: flex; gap: 12px; align-items: center; padding-top: 8px; border-top: 1px solid var(--border-color);">
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label for="dark-mode-start-time" style="font-size: 0.82rem; font-weight: 600; color: var(--text-light);">Ora Inizio</label>
+                <input type="time" id="dark-mode-start-time" class="input-field" value="20:00" style="height: 38px; font-size: 0.9rem;">
+              </div>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                <label for="dark-mode-end-time" style="font-size: 0.82rem; font-weight: 600; color: var(--text-light);">Ora Fine</label>
+                <input type="time" id="dark-mode-end-time" class="input-field" value="07:00" style="height: 38px; font-size: 0.9rem;">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: AVANZATE -->
         <div class="settings-section settings-section-advanced">
           <div class="settings-section-title">
             <span class="material-symbols-rounded">tune</span>

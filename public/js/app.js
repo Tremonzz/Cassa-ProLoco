@@ -217,8 +217,122 @@ function closeApp() {
 }
 window.closeApp = closeApp;
 
+function isTimeInSchedule(startTimeStr, endTimeStr) {
+    if (!startTimeStr || !endTimeStr) return false;
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const [startH, startM] = startTimeStr.split(':').map(Number);
+    const [endH, endM] = endTimeStr.split(':').map(Number);
+
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    if (isNaN(startMinutes) || isNaN(endMinutes) || startMinutes === endMinutes) return false;
+
+    if (startMinutes < endMinutes) {
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+    } else {
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    }
+}
+
+let lastEvaluatedScheduleState = null;
+
+function checkThemeSchedule() {
+    const isScheduleEnabled = localStorage.getItem('themeScheduleEnabled') === 'true';
+    if (!isScheduleEnabled) {
+        lastEvaluatedScheduleState = null;
+        return;
+    }
+
+    const startTime = localStorage.getItem('themeScheduleStart') || '20:00';
+    const endTime = localStorage.getItem('themeScheduleEnd') || '07:00';
+
+    const shouldBeDark = isTimeInSchedule(startTime, endTime);
+    const targetState = shouldBeDark ? 'dark' : 'light';
+
+    if (lastEvaluatedScheduleState === null) {
+        lastEvaluatedScheduleState = targetState;
+        toggleTheme(shouldBeDark);
+        const darkToggle = document.getElementById('dark-mode-toggle');
+        if (darkToggle) darkToggle.checked = shouldBeDark;
+    } else if (lastEvaluatedScheduleState !== targetState) {
+        // Threshold crossed: auto-switch theme at boundary time
+        lastEvaluatedScheduleState = targetState;
+        toggleTheme(shouldBeDark);
+        const darkToggle = document.getElementById('dark-mode-toggle');
+        if (darkToggle) darkToggle.checked = shouldBeDark;
+    }
+}
+
+function initTheme() {
+    const isScheduleEnabled = localStorage.getItem('themeScheduleEnabled') === 'true';
+    if (isScheduleEnabled) {
+        checkThemeSchedule();
+    } else {
+        const savedTheme = localStorage.getItem('appTheme') || 'light';
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+    }
+}
+
+function updateThemeSelectorButtons(theme) {
+    const btnLight = document.getElementById('theme-btn-light');
+    const btnDark = document.getElementById('theme-btn-dark');
+    const pill = document.getElementById('theme-selector-pill');
+
+    const currentTheme = theme || (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+
+    if (btnLight && btnDark) {
+        if (currentTheme === 'dark') {
+            btnDark.classList.add('active');
+            btnLight.classList.remove('active');
+            if (pill) pill.style.transform = 'translateX(100%)';
+        } else {
+            btnLight.classList.add('active');
+            btnDark.classList.remove('active');
+            if (pill) pill.style.transform = 'translateX(0%)';
+        }
+    }
+}
+window.updateThemeSelectorButtons = updateThemeSelectorButtons;
+
+function selectTheme(theme) {
+    const isDark = (theme === 'dark');
+    toggleTheme(isDark);
+}
+window.selectTheme = selectTheme;
+
+function toggleTheme(isDark) {
+    if (isDark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('appTheme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('appTheme', 'light');
+    }
+    updateThemeSelectorButtons(isDark ? 'dark' : 'light');
+}
+window.toggleTheme = toggleTheme;
+
+function toggleThemeSchedule(isEnabled) {
+    const timeContainer = document.getElementById('schedule-time-container');
+    if (timeContainer) {
+        timeContainer.style.opacity = isEnabled ? '1' : '0.5';
+        timeContainer.style.pointerEvents = isEnabled ? 'auto' : 'none';
+    }
+}
+window.toggleThemeSchedule = toggleThemeSchedule;
+
+setInterval(checkThemeSchedule, 30000);
+
 // --- APP INIT ---
 async function init() {
+    initTheme();
     // Check password existence
     const savedPassword = localStorage.getItem('appPassword');
     const authContainer = document.getElementById('auth-input-container');
@@ -417,6 +531,7 @@ async function loadSagras() {
         html += `
       <div class="archived-section">
         <button class="btn-toggle-archive" onclick="toggleArchived()">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">${showArchivedState ? 'unfold_less' : 'archive'}</span>
           ${showArchivedState ? 'Nascondi Archiviate' : 'Mostra Archiviate'} (${archivedSagras.length})
         </button>
         <div class="archived-list ${showArchivedState ? 'visible' : ''}">
@@ -927,7 +1042,7 @@ function openLinkedProductsModal(btn) {
         menuCategories.forEach(cat => {
             html += `
                 <div style="margin-bottom: 16px;">
-                    <div style="font-weight: 700; color: var(--primary); font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; text-transform: uppercase;">
+                    <div style="font-weight: 700; color: var(--primary); font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; text-transform: uppercase;">
                         ${cat.category}
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
@@ -1985,6 +2100,9 @@ function renderCart() {
     });
 
     totalEl.innerText = `€ ${total.toFixed(2)}`;
+    totalEl.classList.remove('total-amount-bump');
+    void totalEl.offsetWidth;
+    totalEl.classList.add('total-amount-bump');
     updateChange();
 }
 
@@ -2006,6 +2124,9 @@ function updateChange() {
     const change = cashReceived - total;
     if (change >= 0) {
         changeEl.innerText = `€ ${change.toFixed(2)}`;
+        changeEl.classList.remove('change-amount-bump');
+        void changeEl.offsetWidth;
+        changeEl.classList.add('change-amount-bump');
         if (changeRow) changeRow.classList.add('has-change');
     } else {
         changeEl.innerText = '€ 0.00';
@@ -2424,24 +2545,37 @@ function showTestStatus(type, text) {
 }
 
 window.openSettings = async function () {
+    const testToggle = document.getElementById('test-mode-toggle');
+    const printEventToggle = document.getElementById('print-event-name-toggle');
+    const darkToggle = document.getElementById('dark-mode-toggle');
+    const scheduleToggle = document.getElementById('dark-mode-schedule-toggle');
+
+    // Reset switches before displaying so CSS transition animates smoothly
+    if (testToggle) testToggle.checked = false;
+    if (printEventToggle) printEventToggle.checked = false;
+    if (darkToggle) darkToggle.checked = false;
+    if (scheduleToggle) scheduleToggle.checked = false;
+
     settingsModal.style.display = 'flex';
     showTestStatus(null);
 
-    // Dynamic Version Fetch
-    try {
-        const verRes = await fetch('/api/version');
-        const verData = await verRes.json();
-        const verEl = document.getElementById('current-app-version');
-        if (verEl && verData.version) verEl.innerText = verData.version;
-    } catch (e) {
-        console.error("Errore caricamento versione:", e);
-    }
+    updateThemeSelectorButtons(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
 
-    // Load Password, Template, Test Mode & Print Event Name
-    settingsPasswordInput.value = localStorage.getItem('appPassword') || "";
-    document.getElementById('template-select').value = localStorage.getItem('receiptTemplate') || 'compact';
-    document.getElementById('test-mode-toggle').checked = (localStorage.getItem('appTestMode') === 'true');
-    document.getElementById('print-event-name-toggle').checked = (localStorage.getItem('appPrintEventName') !== 'false');
+    // Animate switches into their actual saved state after modal layout is active
+    setTimeout(() => {
+        if (testToggle) testToggle.checked = (localStorage.getItem('appTestMode') === 'true');
+        if (printEventToggle) printEventToggle.checked = (localStorage.getItem('appPrintEventName') !== 'false');
+
+        const isScheduleEnabled = (localStorage.getItem('themeScheduleEnabled') === 'true');
+        if (scheduleToggle) scheduleToggle.checked = isScheduleEnabled;
+        toggleThemeSchedule(isScheduleEnabled);
+    }, 60);
+
+    const startTimeInput = document.getElementById('dark-mode-start-time');
+    if (startTimeInput) startTimeInput.value = localStorage.getItem('themeScheduleStart') || '20:00';
+
+    const endTimeInput = document.getElementById('dark-mode-end-time');
+    if (endTimeInput) endTimeInput.value = localStorage.getItem('themeScheduleEnd') || '07:00';
 
     syncCustomSelect('template-select');
 
@@ -2503,7 +2637,7 @@ function showToast(message, type = 'success', duration = 3000) {
             if (toast.parentNode) {
                 toast.parentNode.removeChild(toast);
             }
-        }, 300);
+        }, 400);
     }, duration);
 }
 window.showToast = showToast;
@@ -2515,6 +2649,10 @@ window.saveSettings = function () {
     const isTestMode = document.getElementById('test-mode-toggle').checked;
     const printEventName = document.getElementById('print-event-name-toggle').checked;
 
+    const isScheduleEnabled = document.getElementById('dark-mode-schedule-toggle').checked;
+    const scheduleStart = document.getElementById('dark-mode-start-time').value;
+    const scheduleEnd = document.getElementById('dark-mode-end-time').value;
+
     if (selectedPrinter) {
         localStorage.setItem('thermalPrinterName', selectedPrinter);
     }
@@ -2524,6 +2662,19 @@ window.saveSettings = function () {
     localStorage.setItem('receiptTemplate', selectedTemplate);
     localStorage.setItem('appTestMode', isTestMode ? 'true' : 'false');
     localStorage.setItem('appPrintEventName', printEventName ? 'true' : 'false');
+
+    // Save Scheduled Dark Mode
+    localStorage.setItem('themeScheduleEnabled', isScheduleEnabled ? 'true' : 'false');
+    if (scheduleStart) localStorage.setItem('themeScheduleStart', scheduleStart);
+    if (scheduleEnd) localStorage.setItem('themeScheduleEnd', scheduleEnd);
+
+    if (isScheduleEnabled) {
+        const start = scheduleStart || localStorage.getItem('themeScheduleStart') || '20:00';
+        const end = scheduleEnd || localStorage.getItem('themeScheduleEnd') || '07:00';
+        lastEvaluatedScheduleState = isTimeInSchedule(start, end) ? 'dark' : 'light';
+    } else {
+        lastEvaluatedScheduleState = null;
+    }
 
     showToast("Impostazioni salvate con successo!", "success");
     closeSettings();
