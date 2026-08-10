@@ -719,33 +719,226 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
         <span class="col-action"></span>
       </div>
 
-      <div class="products-list"></div>
+      <div class="products-list products-list-standard"></div>
 
-      <div class="editor-card-footer">
-        <button type="button" class="btn-add-product" onclick="addProductUI(this.parentElement.previousElementSibling)">
+      <div class="product-table-header composite-table-header">
+        <span class="col-name">Nome Prodotto Composto</span>
+        <span class="col-price">Prezzo (€)</span>
+        <span class="col-qty">Prodotti Collegati</span>
+        <span class="col-action"></span>
+      </div>
+
+      <div class="products-list products-list-composite"></div>
+
+      <div class="editor-card-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="button" class="btn-add-product" onclick="addProductUI(this.closest('.editor-section').querySelector('.products-list-standard'))">
           <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto
+        </button>
+        <button type="button" class="btn-add-product" onclick="addProductUI(this.closest('.editor-section').querySelector('.products-list-composite'), '', '', '', true)">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto Composto
         </button>
       </div>
     `;
     listEl.appendChild(div);
 
-    const pList = div.querySelector('.products-list');
-    if (products.length > 0) {
-        products.forEach(p => addProductUI(pList, p.name, p.price, p.quantity));
+    const stdList = div.querySelector('.products-list-standard');
+    const compList = div.querySelector('.products-list-composite');
+    const compHeader = div.querySelector('.composite-table-header');
+
+    const stdProducts = products.filter(p => p.is_composite !== 1);
+    const compProducts = products.filter(p => p.is_composite === 1);
+
+    if (stdProducts.length > 0) {
+        stdProducts.forEach(p => addProductUI(stdList, p.name, p.price, p.quantity, false));
     } else {
-        addProductUI(pList);
+        addProductUI(stdList);
+    }
+
+    if (compProducts.length > 0) {
+        compHeader.style.display = 'flex';
+        compProducts.forEach(p => addProductUI(compList, p.name, p.price, p.quantity, true, p.components || []));
+    } else {
+        compHeader.style.display = 'none';
     }
 }
 
-function addProductUI(container, name = '', price = '', quantity = '') {
+function deleteProductRow(btn) {
+    const row = btn.closest('.product-row');
+    if (!row) return;
+    const container = row.parentElement;
+    row.remove();
+    if (container && container.classList.contains('products-list-composite')) {
+        if (container.querySelectorAll('.product-row').length === 0) {
+            const section = container.closest('.editor-section');
+            if (section) {
+                const header = section.querySelector('.composite-table-header');
+                if (header) header.style.display = 'none';
+            }
+        }
+    }
+}
+window.deleteProductRow = deleteProductRow;
+
+let currentEditingCompositeRow = null;
+
+function openLinkedProductsModal(btn) {
+    currentEditingCompositeRow = btn.closest('.product-row');
+    if (!currentEditingCompositeRow) return;
+
+    const nameInput = currentEditingCompositeRow.querySelector('.col-name') || currentEditingCompositeRow.querySelector('input[type="text"]');
+    const compName = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : 'Prodotto Composto';
+
+    const subtitleEl = document.getElementById('linked-products-subtitle');
+    if (subtitleEl) {
+        subtitleEl.innerHTML = `Seleziona i prodotti del menu collegati a <b>${compName}</b>:`;
+    }
+
+    let linkedArray = [];
+    if (currentEditingCompositeRow.dataset.linkedProducts) {
+        try {
+            linkedArray = JSON.parse(currentEditingCompositeRow.dataset.linkedProducts);
+        } catch (e) {}
+    }
+
+    const listEl = document.getElementById('linked-products-list');
+    listEl.innerHTML = '';
+
+    const menuCategories = [];
+    document.querySelectorAll('.editor-section').forEach(sec => {
+        let catName = '';
+        const nameInput = sec.querySelector('.cat-name-input');
+        if (nameInput) catName = nameInput.value.trim();
+        else {
+            const titleEl = sec.querySelector('.fixed-cat-title-text');
+            if (titleEl) catName = titleEl.innerText.trim();
+        }
+        if (!catName) catName = 'Categoria';
+
+        const prods = [];
+        sec.querySelectorAll('.products-list-standard .product-row').forEach(row => {
+            const pInput = row.querySelector('.col-name') || row.querySelector('input[type="text"]');
+            const priceInput = row.querySelector('.col-price') || row.querySelectorAll('input')[1];
+            const pName = pInput ? pInput.value.trim() : '';
+            const pPrice = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
+            if (pName) {
+                prods.push({ name: pName, price: pPrice });
+            }
+        });
+
+        if (prods.length > 0) {
+            menuCategories.push({ category: catName, products: prods });
+        }
+    });
+
+    if (menuCategories.length === 0) {
+        listEl.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-light);">Nessun prodotto standard trovato nel menu. Aggiungi prima dei prodotti standard per poterli collegare.</div>';
+    } else {
+        let html = '';
+        menuCategories.forEach(cat => {
+            html += `
+                <div style="margin-bottom: 16px;">
+                    <div style="font-weight: 700; color: var(--primary); font-size: 0.9rem; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; text-transform: uppercase;">
+                        ${cat.category}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
+                        ${cat.products.map(p => {
+                            const isChecked = linkedArray.includes(p.name);
+                            return `
+                                <label class="linked-prod-item">
+                                    <input type="checkbox" class="linked-prod-checkbox" value="${p.name}" ${isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+                                    <span style="font-weight: 600; font-size: 0.9rem;">${p.name}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+    }
+
+    const modal = document.getElementById('linked-products-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeLinkedProductsModal() {
+    const modal = document.getElementById('linked-products-modal');
+    if (modal) modal.style.display = 'none';
+    currentEditingCompositeRow = null;
+}
+
+function saveLinkedProductsSelection() {
+    if (!currentEditingCompositeRow) return;
+
+    const selectedNames = [];
+    document.querySelectorAll('#linked-products-list .linked-prod-checkbox:checked').forEach(cb => {
+        selectedNames.push(cb.value);
+    });
+
+    currentEditingCompositeRow.dataset.linkedProducts = JSON.stringify(selectedNames);
+
+    const btn = currentEditingCompositeRow.querySelector('.btn-linked-products');
+    if (btn) {
+        if (selectedNames.length > 0) {
+            btn.classList.add('has-links');
+            btn.querySelector('span:last-child').innerText = `Prodotti Collegati (${selectedNames.length})`;
+        } else {
+            btn.classList.remove('has-links');
+            btn.querySelector('span:last-child').innerText = `Prodotti Collegati`;
+        }
+    }
+
+    closeLinkedProductsModal();
+}
+
+window.openLinkedProductsModal = openLinkedProductsModal;
+window.closeLinkedProductsModal = closeLinkedProductsModal;
+window.saveLinkedProductsSelection = saveLinkedProductsSelection;
+
+function addProductUI(container, name = '', price = '', quantity = '', isComposite = false, linkedProducts = []) {
     const row = document.createElement('div');
+    const isComp = !!isComposite;
     row.className = 'product-row';
+    if (isComp) {
+        row.dataset.isComposite = "1";
+        const section = container.closest('.editor-section');
+        if (section) {
+            const compHeader = section.querySelector('.composite-table-header');
+            if (compHeader) compHeader.style.display = 'flex';
+        }
+        if (Array.isArray(linkedProducts) && linkedProducts.length > 0) {
+            row.dataset.linkedProducts = JSON.stringify(linkedProducts);
+        }
+    }
     const qtyVal = (quantity !== null && quantity !== undefined) ? quantity : '';
+
+    let qtyFieldHTML = '';
+    if (isComp) {
+        let linksCount = 0;
+        if (row.dataset.linkedProducts) {
+            try { linksCount = JSON.parse(row.dataset.linkedProducts).length; } catch(e){}
+        }
+        const hasLinks = linksCount > 0;
+        const btnLabel = hasLinks ? `Prodotti Collegati (${linksCount})` : `Prodotti Collegati`;
+        qtyFieldHTML = `
+          <button type="button" class="btn-linked-products col-qty ${hasLinks ? 'has-links' : ''}" onclick="openLinkedProductsModal(this)" title="Seleziona i prodotti del menu collegati">
+            <span class="material-symbols-rounded" style="font-size: 1.1rem;">link</span>
+            <span>${btnLabel}</span>
+          </button>
+        `;
+    } else {
+        qtyFieldHTML = `
+          <input type="number" class="input-field col-qty" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
+        `;
+    }
+
+    const namePlaceholder = isComp ? "es. Menu Grigliata" : "es. Panino con salsiccia";
+
     row.innerHTML = `
-      <input type="text" class="input-field col-name" placeholder="es. Panino con salsiccia" value="${name}">
+      <input type="text" class="input-field col-name" placeholder="${namePlaceholder}" value="${name}">
       <input type="number" class="input-field col-price" placeholder="0.00" value="${price}" step="0.10" min="0">
-      <input type="number" class="input-field col-qty" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
-      <button type="button" class="btn-del-product" title="Elimina Prodotto" onclick="this.parentElement.remove()">
+      ${qtyFieldHTML}
+      <button type="button" class="btn-del-product" title="Elimina Prodotto" onclick="deleteProductRow(this)">
         <span class="material-symbols-rounded" style="font-size: 1.2rem;">delete_outline</span>
       </button>
     `;
@@ -775,18 +968,28 @@ async function saveMenu() {
 
         // Always preserve and save products even when category is hidden
         sec.querySelectorAll('.product-row').forEach(row => {
-            const inputs = row.querySelectorAll('input');
-            const pName = inputs[0].value.trim();
-            const pPrice = parseFloat(inputs[1].value);
-            const pQtyStr = inputs[2].value.trim();
+            const isComp = row.dataset.isComposite === "1" || row.classList.contains('is-composite-row');
+            const nameInput = row.querySelector('.col-name input') || row.querySelector('input[type="text"]');
+            const priceInput = row.querySelector('input.col-price') || row.querySelectorAll('input')[1];
+            const qtyInput = row.querySelector('input.col-qty');
+
+            const pName = nameInput ? nameInput.value.trim() : '';
+            const pPrice = priceInput ? parseFloat(priceInput.value) : NaN;
 
             if (pName && !isNaN(pPrice)) {
                 let pQty = null;
-                if (pQtyStr && !isNaN(parseInt(pQtyStr))) {
-                    const parsed = parseInt(pQtyStr);
-                    if (parsed > 0) pQty = parsed;
+                let components = [];
+                if (!isComp && qtyInput && qtyInput.type === 'number') {
+                    const pQtyStr = qtyInput.value.trim();
+                    if (pQtyStr && !isNaN(parseInt(pQtyStr))) {
+                        const parsed = parseInt(pQtyStr);
+                        if (parsed > 0) pQty = parsed;
+                    }
                 }
-                products.push({ name: pName, price: pPrice, quantity: pQty });
+                if (isComp && row.dataset.linkedProducts) {
+                    try { components = JSON.parse(row.dataset.linkedProducts); } catch(e){}
+                }
+                products.push({ name: pName, price: pPrice, quantity: pQty, is_composite: isComp ? 1 : 0, components });
             }
         });
 
@@ -866,21 +1069,70 @@ function renderProducts() {
       </div>
       <div class="product-grid">
         ${products.map(p => {
-            const hasLimit = (p.quantity !== null && p.quantity !== undefined);
+            const isComp = p.is_composite === 1;
+            let remainingStock = null;
+            let hasLimit = false;
 
-            // Calculate current quantity of this product already in cart
-            const inCartItem = STATE.cart.find(item => item.id === p.id || item.name === p.name);
-            const inCartQty = inCartItem ? inCartItem.quantity : 0;
+            if (isComp) {
+                // Check stock of linked components
+                let comps = p.components || [];
+                if (typeof comps === 'string') {
+                    try { comps = JSON.parse(comps); } catch(e){}
+                }
 
-            // Real-time remaining available stock
-            const remainingStock = hasLimit ? (p.quantity - inCartQty) : null;
+                if (Array.isArray(comps) && comps.length > 0) {
+                    let minRemaining = Infinity;
+                    let foundLimit = false;
+
+                    for (const compName of comps) {
+                        let compProd = null;
+                        for (const catProds of Object.values(STATE.products)) {
+                            compProd = catProds.find(item => item.name === compName);
+                            if (compProd) break;
+                        }
+
+                        if (compProd && compProd.quantity !== null && compProd.quantity !== undefined) {
+                            foundLimit = true;
+                            let totalUsedInCart = 0;
+                            STATE.cart.forEach(cartItem => {
+                                if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                                    totalUsedInCart += cartItem.quantity;
+                                } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                                    totalUsedInCart += cartItem.quantity;
+                                }
+                            });
+
+                            const compRem = compProd.quantity - totalUsedInCart;
+                            if (compRem < minRemaining) minRemaining = compRem;
+                        }
+                    }
+
+                    if (foundLimit && minRemaining !== Infinity) {
+                        hasLimit = true;
+                        remainingStock = minRemaining;
+                    }
+                }
+            } else {
+                hasLimit = (p.quantity !== null && p.quantity !== undefined);
+                let totalUsedInCart = 0;
+                STATE.cart.forEach(cartItem => {
+                    if (cartItem.id === p.id || cartItem.name === p.name) {
+                        totalUsedInCart += cartItem.quantity;
+                    } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(p.name)) {
+                        totalUsedInCart += cartItem.quantity;
+                    }
+                });
+                remainingStock = hasLimit ? (p.quantity - totalUsedInCart) : null;
+            }
+
             const isOOS = hasLimit && remainingStock <= 0;
             const qtyLabel = hasLimit ? `<span class="qty-badge ${isOOS ? 'oos' : ''}">${Math.max(0, remainingStock)}</span>` : '';
+            const linkIcon = isComp ? `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;" title="Prodotto Composto">link</span>` : '';
 
             return `
           <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id})">
             ${qtyLabel}
-            <span class="product-name">${p.name}</span>
+            <span class="product-name">${linkIcon}${p.name}</span>
             <span class="product-price">€ ${p.price.toFixed(2)}</span>
           </button>
         `}).join('')}
@@ -909,15 +1161,58 @@ function addToCart(productId) {
 
     if (!foundProduct) return;
 
-    const maxQty = foundProduct.quantity;
-    const existing = STATE.cart.find(i => i.id === productId || i.name === foundProduct.name);
-    let currentCartQty = existing ? existing.quantity : 0;
+    if (foundProduct.is_composite === 1) {
+        // Check components limits
+        let comps = foundProduct.components || [];
+        if (typeof comps === 'string') {
+            try { comps = JSON.parse(comps); } catch(e){}
+        }
 
-    // Check Limit against original DB stock
-    if (maxQty !== null && maxQty !== undefined && (currentCartQty + 1) > maxQty) {
-        showToast(`Scorte esaurite per: ${foundProduct.name}`, "error");
-        return;
+        if (Array.isArray(comps)) {
+            for (const compName of comps) {
+                let compProd = null;
+                for (const catProds of Object.values(STATE.products)) {
+                    compProd = catProds.find(item => item.name === compName);
+                    if (compProd) break;
+                }
+
+                if (compProd && compProd.quantity !== null && compProd.quantity !== undefined) {
+                    let totalUsedInCart = 0;
+                    STATE.cart.forEach(cartItem => {
+                        if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                            totalUsedInCart += cartItem.quantity;
+                        } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                            totalUsedInCart += cartItem.quantity;
+                        }
+                    });
+
+                    if ((totalUsedInCart + 1) > compProd.quantity) {
+                        showToast(`Scorte esaurite per il componente: ${compProd.name}`, "error");
+                        return;
+                    }
+                }
+            }
+        }
+    } else {
+        // Standard product check
+        if (foundProduct.quantity !== null && foundProduct.quantity !== undefined) {
+            let totalUsedInCart = 0;
+            STATE.cart.forEach(cartItem => {
+                if (cartItem.id === foundProduct.id || cartItem.name === foundProduct.name) {
+                    totalUsedInCart += cartItem.quantity;
+                } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(foundProduct.name)) {
+                    totalUsedInCart += cartItem.quantity;
+                }
+            });
+
+            if ((totalUsedInCart + 1) > foundProduct.quantity) {
+                showToast(`Scorte esaurite per: ${foundProduct.name}`, "error");
+                return;
+            }
+        }
     }
+
+    const existing = STATE.cart.find(i => i.id === productId || i.name === foundProduct.name);
 
     if (existing) {
         existing.id = foundProduct.id; // Ensure ID is present
@@ -928,7 +1223,9 @@ function addToCart(productId) {
             name: foundProduct.name,
             price: foundProduct.price,
             quantity: 1,
-            category: foundCategory
+            category: foundCategory,
+            is_composite: foundProduct.is_composite || 0,
+            components: foundProduct.components || []
         });
     }
 
@@ -966,6 +1263,9 @@ function renderCart() {
         const div = document.createElement('div');
         div.className = 'order-item';
 
+        const isComp = item.is_composite === 1;
+        const linkIcon = isComp ? `<span class="material-symbols-rounded" style="font-size: 0.95rem; vertical-align: middle; margin-right: 3px; color: var(--primary);" title="Prodotto Composto">link</span>` : '';
+
         div.innerHTML = `
           <div class="order-item-controls">
             <button type="button" class="btn-cart-action btn-cart-remove" title="Rimuovi dal carrello" onclick="removeFromCart(${idx})">
@@ -977,7 +1277,7 @@ function renderCart() {
             <span class="order-item-qty">${item.quantity}</span>
           </div>
           <div class="order-item-info">
-            <span class="order-item-name">${item.name}</span>
+            <span class="order-item-name">${linkIcon}${item.name}</span>
             <span class="order-item-unit-price">€ ${item.price.toFixed(2)} cad.</span>
           </div>
           <span class="order-item-total">€${itemTotal.toFixed(2)}</span>

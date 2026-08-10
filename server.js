@@ -117,6 +117,7 @@ function runMigrations() {
         name TEXT NOT NULL,
         price REAL NOT NULL,
         quantity INTEGER DEFAULT NULL,
+        is_composite INTEGER DEFAULT 0,
         category_id INTEGER,
         FOREIGN KEY(category_id) REFERENCES categories(id)
       )
@@ -124,6 +125,12 @@ function runMigrations() {
       // Migration for existing tables
       db.run("ALTER TABLE products ADD COLUMN quantity INTEGER DEFAULT NULL", (e) => {
         if (!e) console.log("Migration: Added 'quantity' column to products.");
+      });
+      db.run("ALTER TABLE products ADD COLUMN is_composite INTEGER DEFAULT 0", (e) => {
+        if (!e) console.log("Migration: Added 'is_composite' column to products.");
+      });
+      db.run("ALTER TABLE products ADD COLUMN components TEXT DEFAULT NULL", (e) => {
+        if (!e) console.log("Migration: Added 'components' column to products.");
       });
     });
 
@@ -325,7 +332,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 
       const products = await dbAll("SELECT * FROM products WHERE category_id = ?", [cat.id]);
       for (const prod of products) {
-        await dbRun("INSERT INTO products (name, price, quantity, category_id) VALUES (?, ?, ?, ?)", [prod.name, prod.price, prod.quantity, newCatId]);
+        await dbRun("INSERT INTO products (name, price, quantity, is_composite, components, category_id) VALUES (?, ?, ?, ?, ?, ?)", [prod.name, prod.price, prod.quantity, prod.is_composite || 0, prod.components || null, newCatId]);
       }
     }
 
@@ -343,7 +350,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 app.get('/api/sagras/:id/products', (req, res) => {
   const sagraId = req.params.id;
   const sql = `
-      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity
+      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.is_composite, p.components
       FROM categories c
       LEFT JOIN products p ON c.id = p.category_id
       WHERE c.sagra_id = ?
@@ -362,7 +369,14 @@ app.get('/api/sagras/:id/products', (req, res) => {
         meta[curr.category] = { is_hidden: curr.category_is_hidden || 0 };
       }
       if (curr.id) {
-        grouped[curr.category].push(curr);
+        let parsedComponents = [];
+        if (curr.components) {
+          try { parsedComponents = JSON.parse(curr.components); } catch (e) {}
+        }
+        grouped[curr.category].push({
+          ...curr,
+          components: parsedComponents
+        });
       }
     });
 
@@ -387,8 +401,10 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
       const catId = result.lastID;
       if (cat.products && cat.products.length > 0) {
         for (const p of cat.products) {
-          const qty = (p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
-          await dbRun("INSERT INTO products (name, price, quantity, category_id) VALUES (?, ?, ?, ?)", [p.name, p.price, qty, catId]);
+          const isComp = p.is_composite ? 1 : 0;
+          const qty = (!isComp && p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
+          const compsStr = (isComp && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
+          await dbRun("INSERT INTO products (name, price, quantity, is_composite, components, category_id) VALUES (?, ?, ?, ?, ?, ?)", [p.name, p.price, qty, isComp, compsStr, catId]);
         }
       }
     }
@@ -403,48 +419,100 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
 
 // Create Order (SEQ LOGIC + THERMAL PRINT + INVENTORY)
 app.post('/api/orders', async (req, res) => {
-  const { items, total, sagraId, printerName, template, testMode, printEventName } = req.body;
+  const { items, total, sagraId, printerName, template, testMode, printEventName, isReprint, orderId: reqOrderId } = req.body;
   if (!items || items.length === 0) return res.status(400).send('Empty order');
   const targetSagra = sagraId || 1;
 
   try {
-    await dbRun("BEGIN TRANSACTION");
+    let seq = reqOrderId;
 
-    // 1. Inventory Check & Update
-    for (const item of items) {
-      if (item.id) {
-        const rows = await dbAll("SELECT quantity FROM products WHERE id = ?", [item.id]);
-        if (rows.length > 0) {
-          const currentQty = rows[0].quantity;
-          if (currentQty !== null) {
-            if (currentQty < item.quantity) {
-              throw new Error(`Scorte insufficienti per: ${item.name} (Rimasti: ${currentQty})`);
+    if (!isReprint) {
+      await dbRun("BEGIN TRANSACTION");
+
+      // 1. Inventory Check & Aggregated Update
+      const stockDeductions = {};
+
+      for (const item of items) {
+        if (item.id) {
+          const prodRows = await dbAll("SELECT id, name, quantity, is_composite, components FROM products WHERE id = ?", [item.id]);
+          if (prodRows.length > 0) {
+            const prod = prodRows[0];
+            const isComp = prod.is_composite === 1;
+
+            if (isComp) {
+              // Composite product: deduct linked components
+              let comps = [];
+              if (prod.components) {
+                try { comps = JSON.parse(prod.components); } catch (e) {}
+              } else if (Array.isArray(item.components)) {
+                comps = item.components;
+              }
+
+              for (const compName of comps) {
+                const compRows = await dbAll(`
+                  SELECT p.id, p.name, p.quantity 
+                  FROM products p 
+                  JOIN categories c ON p.category_id = c.id 
+                  WHERE c.sagra_id = ? AND p.name = ?
+                `, [targetSagra, compName]);
+
+                if (compRows.length > 0) {
+                  const comp = compRows[0];
+                  if (comp.quantity !== null) {
+                    if (!stockDeductions[comp.id]) {
+                      stockDeductions[comp.id] = { id: comp.id, name: comp.name, currentQty: comp.quantity, requiredQty: 0 };
+                    }
+                    stockDeductions[comp.id].requiredQty += item.quantity;
+                  }
+                }
+              }
+            } else {
+              // Standard product
+              if (prod.quantity !== null) {
+                if (!stockDeductions[prod.id]) {
+                  stockDeductions[prod.id] = { id: prod.id, name: prod.name, currentQty: prod.quantity, requiredQty: 0 };
+                }
+                stockDeductions[prod.id].requiredQty += item.quantity;
+              }
             }
-            await dbRun("UPDATE products SET quantity = quantity - ? WHERE id = ?", [item.quantity, item.id]);
           }
         }
       }
+
+      // Verify sufficiency
+      for (const prodId in stockDeductions) {
+        const d = stockDeductions[prodId];
+        if (d.currentQty < d.requiredQty) {
+          throw new Error(`Scorte insufficienti per il componente: ${d.name} (Rimasti: ${d.currentQty})`);
+        }
+      }
+
+      // Apply updates
+      for (const prodId in stockDeductions) {
+        const d = stockDeductions[prodId];
+        await dbRun("UPDATE products SET quantity = quantity - ? WHERE id = ?", [d.requiredQty, d.id]);
+      }
+
+      // 2. Insert Order
+      const result = await dbRun("INSERT INTO orders (total, sagra_id) VALUES (?, ?)", [total, targetSagra]);
+      const newOrderId = result.lastID;
+
+      // 3. Get Sequence Number
+      const row = await dbAll("SELECT COUNT(*) as count FROM orders WHERE sagra_id = ?", [targetSagra]);
+      seq = row[0].count;
+      await dbRun("UPDATE orders SET seq = ? WHERE id = ?", [seq, newOrderId]);
+
+      // 4. Insert Items
+      const stmt = db.prepare("INSERT INTO order_items (order_id, product_name, quantity, price) VALUES (?, ?, ?, ?)");
+      for (const item of items) {
+        stmt.run(newOrderId, item.name, item.quantity, item.price);
+      }
+      stmt.finalize();
+
+      await dbRun("COMMIT");
     }
 
-    // 2. Insert Order
-    const result = await dbRun("INSERT INTO orders (total, sagra_id) VALUES (?, ?)", [total, targetSagra]);
-    const orderId = result.lastID;
-
-    // 3. Get Sequence Number
-    const row = await dbAll("SELECT COUNT(*) as count FROM orders WHERE sagra_id = ?", [targetSagra]);
-    const seq = row[0].count;
-    await dbRun("UPDATE orders SET seq = ? WHERE id = ?", [seq, orderId]);
-
-    // 4. Insert Items
-    const stmt = db.prepare("INSERT INTO order_items (order_id, product_name, quantity, price) VALUES (?, ?, ?, ?)");
-    for (const item of items) {
-      stmt.run(orderId, item.name, item.quantity, item.price);
-    }
-    stmt.finalize();
-
-    await dbRun("COMMIT");
-
-    // 5. Printing / Test Mode Logic
+    // 5. Printing / Test Mode Logic (Applies to both New Orders and Reprints)
     try {
       // Fetch event name from DB (only if enabled)
       let sagraName = '';
@@ -453,9 +521,62 @@ app.post('/api/orders', async (req, res) => {
         if (sagraRows.length > 0) sagraName = sagraRows[0].name;
       }
 
+      // Enrich items with category, is_composite & linkedDrinks
+      const enrichedItems = [];
+      for (const item of items) {
+        let itemCopy = { ...item };
+
+        let prodRows = [];
+        if (item.id) {
+          prodRows = await dbAll(`
+            SELECT p.id, p.name, p.is_composite, p.components, c.name as category_name
+            FROM products p
+            JOIN categories c ON p.category_id = c.id
+            WHERE p.id = ?
+          `, [item.id]);
+        }
+        if (prodRows.length === 0 && item.name) {
+          prodRows = await dbAll(`
+            SELECT p.id, p.name, p.is_composite, p.components, c.name as category_name
+            FROM products p
+            JOIN categories c ON p.category_id = c.id
+            WHERE c.sagra_id = ? AND p.name = ?
+          `, [targetSagra, item.name]);
+        }
+
+        if (prodRows.length > 0) {
+          const prod = prodRows[0];
+          itemCopy.category = itemCopy.category || prod.category_name;
+          itemCopy.is_composite = prod.is_composite;
+
+          let comps = prod.components;
+          if (typeof comps === 'string') {
+            try { comps = JSON.parse(comps); } catch (e) {}
+          }
+          if (Array.isArray(comps) && comps.length > 0) {
+            const drinkComps = [];
+            for (const compName of comps) {
+              const compRows = await dbAll(`
+                SELECT p.name, c.name as category_name
+                FROM products p
+                JOIN categories c ON p.category_id = c.id
+                WHERE c.sagra_id = ? AND p.name = ?
+              `, [targetSagra, compName]);
+
+              if (compRows.length > 0 && compRows[0].category_name && compRows[0].category_name.toLowerCase() === 'bevande') {
+                drinkComps.push(compName);
+              }
+            }
+            itemCopy.linkedDrinks = drinkComps;
+          }
+        }
+
+        enrichedItems.push(itemCopy);
+      }
+
       const receiptData = {
         seq: seq,
-        items: items,
+        items: enrichedItems,
         total: total,
         sagraName: sagraName,
         date: new Date().toLocaleString('it-IT')
@@ -469,13 +590,13 @@ app.post('/api/orders', async (req, res) => {
       }
 
       if (testMode) {
-        console.log(`[TEST MODE] Order #${seq} saved. Skipping physical printer output.`);
+        console.log(`[TEST MODE] ${isReprint ? 'Reprint' : 'New Order'} #${seq}.`);
         return res.json({ success: true, orderId: seq, testMode: true, preview: printResult.preview });
       }
 
       if (printerName) {
         const targetPrinter = printerName || "POS-80";
-        console.log(`Printing Order #${seq} to "${targetPrinter}"...`);
+        console.log(`Printing ${isReprint ? 'Reprint' : 'New Order'} #${seq} to "${targetPrinter}"...`);
         await printRawBuffer(printResult.buffer, targetPrinter);
       }
 
@@ -483,12 +604,12 @@ app.post('/api/orders', async (req, res) => {
 
     } catch (printErr) {
       console.error("Printing Error:", printErr);
-      res.json({ success: true, orderId: seq, warning: "Ordine salvato ma errore stampa: " + printErr.message });
+      res.json({ success: true, orderId: seq, warning: "Errore stampa: " + printErr.message });
       return;
     }
 
   } catch (err) {
-    await dbRun("ROLLBACK");
+    if (!isReprint) await dbRun("ROLLBACK").catch(() => {});
     console.error("Order Error:", err);
     res.status(500).json({ success: false, error: err.message });
   }

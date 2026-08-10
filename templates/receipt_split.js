@@ -17,11 +17,28 @@ const { printReceiptFooter } = require("./receipt_footer");
 async function generateSplitReceipt(data) {
     console.log("Splitting order items...", data.items);
 
-    const drinks = data.items.filter(i => (i.category && i.category.toLowerCase() === 'bevande'));
+    const standardDrinks = data.items.filter(i => (i.category && i.category.toLowerCase() === 'bevande'));
     const food = data.items.filter(i => !(i.category && i.category.toLowerCase() === 'bevande'));
 
+    // Extract menu drinks from composite items
+    const menuDrinks = [];
+    data.items.forEach(item => {
+        if (Array.isArray(item.linkedDrinks) && item.linkedDrinks.length > 0) {
+            item.linkedDrinks.forEach(drinkName => {
+                menuDrinks.push({
+                    name: drinkName,
+                    quantity: item.quantity,
+                    isMenu: true
+                });
+            });
+        }
+    });
+
+    const hasDrinks = standardDrinks.length > 0 || menuDrinks.length > 0;
+    const hasFood = food.length > 0;
+
     // Single category fallback: print single compact receipt
-    if (food.length === 0 || drinks.length === 0) {
+    if (!hasFood || !hasDrinks) {
         console.log("Order contains single category. Printing single compact receipt.");
         return await generateReceiptBuffer(data);
     }
@@ -36,7 +53,7 @@ async function generateSplitReceipt(data) {
     });
 
     const dateStr = new Date().toLocaleString('it-IT');
-    const totalDrinks = drinks.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+    const totalDrinks = standardDrinks.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
     const printRow = (left, right) => {
         const width = 48;
@@ -45,29 +62,23 @@ async function generateSplitReceipt(data) {
         printer.println(left + " ".repeat(space) + right);
     };
 
-    const printItems = (itemsList) => {
+    // --- RECEIPT 1: FOOD + AGGREGATED DRINKS ---
+    let receipt1HeaderInfo = { hasHeaderImage: false, headerLines: [] };
+    let receipt1FooterInfo = { footerLines: [] };
+
+    if (food.length > 0) {
+        receipt1HeaderInfo = await printReceiptHeader(printer, data.sagraName);
+
         printer.raw(Buffer.from([0x1B, 0x33, 60]));
-        itemsList.forEach(item => {
+        food.forEach(item => {
             const linePrice = (item.price * item.quantity).toFixed(2);
             const left = `${item.quantity}x ${item.name}`;
             printRow(left, `EUR ${linePrice}`);
         });
         printer.raw(Buffer.from([0x1B, 0x32]));
-    };
-
-    // --- RECEIPT 1: FOOD + AGGREGATED DRINKS ---
-    let receipt1HeaderInfo = { hasHeaderImage: false, headerLines: [] };
-    let receipt1FooterInfo = { footerLines: [] };
-
-    if (food.length > 0 || drinks.length > 0) {
-        receipt1HeaderInfo = await printReceiptHeader(printer, data.sagraName);
-
-        if (food.length > 0) {
-            printItems(food);
-        }
 
         if (totalDrinks > 0) {
-            if (food.length > 0) printer.newLine();
+            printer.newLine();
             printer.bold(true);
             printRow("BEVANDE (Totale)", "EUR " + totalDrinks.toFixed(2));
             printer.bold(false);
@@ -82,10 +93,10 @@ async function generateSplitReceipt(data) {
         receipt1FooterInfo = printReceiptFooter(printer, { includeThanks: true, dateStr });
     }
 
-    // --- RECEIPT 2: DRINKS (Detailed for Bar) ---
+    // --- RECEIPT 2: DRINKS (Standard + Menu Drinks for Bar) ---
     let receipt2FooterInfo = { footerLines: [] };
 
-    if (drinks.length > 0) {
+    if (hasDrinks) {
         printer.alignCenter();
         printer.bold(true);
         printer.setTextSize(1, 1);
@@ -97,7 +108,22 @@ async function generateSplitReceipt(data) {
         printer.alignCenter();
         printer.newLine();
 
-        printItems(drinks);
+        printer.raw(Buffer.from([0x1B, 0x33, 60]));
+
+        // Print standard paid drinks
+        standardDrinks.forEach(item => {
+            const linePrice = (item.price * item.quantity).toFixed(2);
+            const left = `${item.quantity}x ${item.name}`;
+            printRow(left, `EUR ${linePrice}`);
+        });
+
+        // Print menu drinks with "MENU" label
+        menuDrinks.forEach(item => {
+            const left = `${item.quantity}x ${item.name}`;
+            printRow(left, "MENU");
+        });
+
+        printer.raw(Buffer.from([0x1B, 0x32]));
 
         printer.drawLine();
         printer.bold(true);
@@ -131,10 +157,16 @@ async function generateSplitReceipt(data) {
         footerLines: receipt1FooterInfo.footerLines
     };
 
-    const drinksItemsPreview = drinks.map(item => ({
-        left: `${item.quantity}x ${item.name}`,
-        right: `€ ${(item.price * item.quantity).toFixed(2)}`
-    }));
+    const drinksItemsPreview = [
+        ...standardDrinks.map(item => ({
+            left: `${item.quantity}x ${item.name}`,
+            right: `€ ${(item.price * item.quantity).toFixed(2)}`
+        })),
+        ...menuDrinks.map(item => ({
+            left: `${item.quantity}x ${item.name}`,
+            right: "MENU"
+        }))
+    ];
 
     const receipt2Preview = {
         hasHeaderImage: false,
