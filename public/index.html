@@ -57,11 +57,17 @@
     <div class="bg-shape shape-3"></div>
     <div class="bg-shape shape-4"></div>
 
-    <!-- Top Right Settings Button -->
-    <button class="btn-top-settings" onclick="openSettings()">
-      <span class="material-symbols-rounded">settings</span>
-      <span>Impostazioni</span>
-    </button>
+    <!-- Top Right Header Buttons -->
+    <div class="top-header-buttons">
+      <button class="btn-top-settings" onclick="openSettings()">
+        <span class="material-symbols-rounded">settings</span>
+        <span>Impostazioni</span>
+      </button>
+      <button class="btn-top-exit" onclick="closeApp()" title="Chiudi applicazione">
+        <span class="material-symbols-rounded">door_open</span>
+        <span>Chiudi</span>
+      </button>
+    </div>
 
     <div class="login-container">
       <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo">
@@ -81,6 +87,44 @@
 
   <!-- VIEW 2: MENU EDITOR -->
   <div id="view-editor" class="view">
+    <!-- Connected Notch Side Panel for Menu Editor -->
+    <div id="base-products-drawer" class="base-products-panel">
+      <!-- Dynamic Notch Handle -->
+      <div class="editor-side-notch" onclick="toggleBaseProductsDrawer(event)" title="Prodotti Base">
+        <span class="notch-icon material-symbols-rounded">inventory_2</span>
+        <span class="notch-text">Prodotti Base</span>
+      </div>
+
+      <!-- Panel Inner Layout -->
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div class="panel-header-top">
+            <div class="panel-title-group">
+              <span class="material-symbols-rounded panel-title-icon">inventory_2</span>
+              <h3 class="panel-title">Prodotti Base</h3>
+            </div>
+            <button type="button" class="close-panel-btn" onclick="closeBaseProductsDrawer(event)" title="Chiudi">
+              <span class="material-symbols-rounded" style="font-size: 1.2rem;">close</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-body">
+          <div class="base-product-table-header">
+            <span class="col-name">Nome</span>
+            <span class="col-qty">Scorta</span>
+            <span class="col-action"></span>
+          </div>
+
+          <div id="base-products-list" class="base-products-list"></div>
+
+          <button type="button" class="btn-add-base-product" onclick="addBaseProductRowUI()">
+            <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto Base
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="editor-header">
       <div style="display:flex; align-items:center; gap: 15px;">
         <img src="images/logo.png" class="editor-logo" alt="Logo">
@@ -504,6 +548,8 @@
       <button type="button" class="btn-update-close" onclick="dismissUpdateToast()">&times;</button>
     </div>
   </div>
+
+
 
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container"></div>

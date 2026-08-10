@@ -174,11 +174,18 @@ button:active {
 /* Remove old pseudo-element if I'm replacing it with html elements, 
    but wait, I am replacing content in style.css, not html here. */
 
-.btn-top-settings {
+.top-header-buttons {
   position: absolute;
   top: 24px;
   right: 24px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-top-settings,
+.btn-top-exit {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -196,6 +203,18 @@ button:active {
 
 .btn-top-settings:hover {
   background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-top-exit {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+}
+
+.btn-top-exit:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #ffffff;
   transform: translateY(-1px);
 }
 
@@ -3028,4 +3047,236 @@ input:checked + .slider:before {
 
 .reorder-btn:hover .reorder-handle {
   color: var(--primary);
+}
+
+/* --- BASE PRODUCTS SIDE PANEL (MATCHING CATEGORY BOX STYLES) --- */
+.base-products-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 82vw;
+  background: #ffffff;
+  z-index: 100;
+  border-right: 1px solid #cbd5e1;
+  box-shadow: 8px 0 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
+}
+
+/* Hover Peek Effect: when hovering panel/notch while closed */
+.base-products-panel:not(.open) {
+  cursor: pointer;
+}
+
+.base-products-panel:not(.open):hover {
+  transform: translateX(-344px);
+}
+
+.base-products-panel.open {
+  transform: translateX(0) !important;
+  /* Darker deep shadow when open for sharp separation from content underneath */
+  box-shadow: 25px 0 60px rgba(0, 0, 0, 0.45), 8px 0 24px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Seamless Natural Extension Notch */
+.editor-side-notch {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 105;
+  background: #ffffff;
+  color: var(--primary);
+  padding: 16px 10px 18px 10px;
+  border-top-right-radius: 16px;
+  border-bottom-right-radius: 16px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: 6px 2px 14px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #cbd5e1;
+  border-left: none !important;
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.editor-side-notch:hover {
+  background: #f8fafc;
+  box-shadow: 8px 3px 18px rgba(0, 0, 0, 0.12);
+  border-color: #cbd5e1;
+  border-left: none !important;
+}
+
+.editor-side-notch .notch-icon {
+  font-size: 1.45rem;
+  color: var(--primary);
+  transform: none; /* Upright / horizontal */
+}
+
+.editor-side-notch .notch-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+/* Panel Header matching category header (.cat-row style) */
+.base-products-panel .panel-header {
+  padding: 16px 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  color: var(--primary);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-title-icon {
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+.base-products-panel .close-panel-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.base-products-panel .close-panel-btn:hover {
+  background: #f1f5f9;
+  color: var(--danger);
+}
+
+/* Button Aggiungi Prodotto Base */
+.btn-add-base-product {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 14px;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 6px rgba(30, 42, 74, 0.15);
+}
+
+.btn-add-base-product:hover {
+  background: var(--primary-dark, #151d33);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(30, 42, 74, 0.2);
+}
+
+/* Panel Body */
+.base-products-panel .panel-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Base Product Table Header & Input Rows (Strict 70% Name, 30% Stock) */
+.base-product-table-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 4px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  color: var(--primary) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  margin-bottom: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.base-product-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.base-product-table-header .col-name,
+.base-product-row input.base-name-input {
+  flex: 7 1 70% !important;
+  width: 70% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  font-size: 0.88rem !important;
+}
+
+.base-product-table-header .col-qty,
+.base-product-row input.base-qty-input {
+  flex: 3 1 30% !important;
+  width: 30% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  font-size: 0.88rem !important;
+}
+
+.base-product-table-header .col-action,
+.base-product-row .btn-del-product {
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  box-sizing: border-box !important;
+}
+
+.base-products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
 }

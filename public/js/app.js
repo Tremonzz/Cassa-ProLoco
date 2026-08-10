@@ -176,6 +176,47 @@ function showAlert(message) {
 }
 
 
+function requestAppFullscreen() {
+    if (!document.fullscreenElement) {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+            docEl.requestFullscreen().catch(() => {});
+        } else if (docEl.webkitRequestFullscreen) {
+            docEl.webkitRequestFullscreen();
+        } else if (docEl.msRequestFullscreen) {
+            docEl.msRequestFullscreen();
+        }
+    }
+}
+
+// Request fullscreen on first user interaction if deferred by browser policy
+window.addEventListener('click', function enterFsOnce() {
+    requestAppFullscreen();
+}, { once: true });
+
+function closeApp() {
+    showDialog({ title: "Conferma Uscita", message: "Sei sicuro di voler uscire dall'applicazione?", icon: "door_open" }).then(confirmed => {
+        if (confirmed) {
+            try {
+                window.close();
+            } catch (e) {}
+
+            if (window.electronAPI && typeof window.electronAPI.closeApp === 'function') {
+                window.electronAPI.closeApp();
+            }
+
+            if (document.fullscreenElement) {
+                try { document.exitFullscreen(); } catch (e) {}
+            }
+
+            setTimeout(() => {
+                showToast("L'applicazione è pronta per essere chiusa.", "info");
+            }, 300);
+        }
+    });
+}
+window.closeApp = closeApp;
+
 // --- APP INIT ---
 async function init() {
     // Check password existence
@@ -197,6 +238,8 @@ async function init() {
     }
 
     initKeyboardShortcuts();
+    requestAppFullscreen();
+    await loadSagras();
     showView('auth');
     checkAppUpdateSilent();
 }
@@ -596,9 +639,11 @@ async function loadSagraResources() {
     if (data && data.products) {
         STATE.products = data.products;
         STATE.categoryMeta = data.meta || {};
+        STATE.base_products = data.base_products || [];
     } else {
         STATE.products = data;
         STATE.categoryMeta = {};
+        STATE.base_products = [];
     }
     STATE.cart = [];
     const cashInput = document.getElementById('cash-received');
@@ -638,7 +683,7 @@ function renderEditor() {
     const listEl = document.getElementById('editor-sections-list') || editorContainer;
     listEl.innerHTML = '';
 
-    const categories = Object.keys(STATE.products);
+    const categories = Object.keys(STATE.products).filter(c => c !== 'Prodotti Base');
 
     // Guarantee Cibo and Bevande always exist at top
     if (!categories.includes('Cibo')) categories.unshift('Cibo');
@@ -658,6 +703,8 @@ function renderEditor() {
         }
         addCategoryUI(catName, prods, isHidden);
     });
+
+    renderBaseProductsUI();
 }
 
 function addCategoryUI(name = '', products = [], isHidden = false) {
@@ -860,6 +907,19 @@ function openLinkedProductsModal(btn) {
         }
     });
 
+    // Also include Base Products in linkable components selection list
+    const baseProds = [];
+    document.querySelectorAll('#base-products-list .base-product-row').forEach(row => {
+        const pInput = row.querySelector('.base-name-input');
+        const pName = pInput ? pInput.value.trim() : '';
+        if (pName) {
+            baseProds.push({ name: pName, price: 0 });
+        }
+    });
+    if (baseProds.length > 0) {
+        menuCategories.push({ category: 'Prodotti Base', products: baseProds });
+    }
+
     if (menuCategories.length === 0) {
         listEl.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-light);">Nessun prodotto standard trovato nel menu. Aggiungi prima dei prodotti standard per poterli collegare.</div>';
     } else {
@@ -911,10 +971,10 @@ function saveLinkedProductsSelection() {
     if (btn) {
         if (selectedNames.length > 0) {
             btn.classList.add('has-links');
-            btn.querySelector('span:last-child').innerText = `Prodotti Collegati (${selectedNames.length})`;
+            btn.querySelector('span:last-child').innerText = `${selectedNames.length} collegati`;
         } else {
             btn.classList.remove('has-links');
-            btn.querySelector('span:last-child').innerText = `Prodotti Collegati`;
+            btn.querySelector('span:last-child').innerText = `Collega`;
         }
     }
 
@@ -971,6 +1031,11 @@ function openPosSelectionModal(foundProduct, foundCategory) {
                     compCat = catName;
                     break;
                 }
+            }
+
+            // Base products (type === 'base' or category === 'Prodotti Base') must NOT appear in the POS choice modal
+            if (compCat === 'Prodotti Base' || (compProd && compProd.type === 'base')) {
+                return;
             }
 
             const hasLimit = compProd && (compProd.quantity !== null && compProd.quantity !== undefined);
@@ -1309,6 +1374,111 @@ window.openProductReorderModal = openProductReorderModal;
 window.closeProductReorderModal = closeProductReorderModal;
 window.saveProductReorder = saveProductReorder;
 
+// --- BASE PRODUCTS SIDE PANEL ---
+function toggleBaseProductsDrawer(e) {
+    if (e && typeof e.stopPropagation === 'function') {
+        e.stopPropagation();
+    }
+    const panel = document.getElementById('base-products-drawer');
+    if (!panel) return;
+    if (panel.classList.contains('open')) {
+        closeBaseProductsDrawer(e);
+    } else {
+        openBaseProductsDrawer(e);
+    }
+}
+
+function openBaseProductsDrawer(e) {
+    if (e && typeof e.stopPropagation === 'function') {
+        e.stopPropagation();
+    }
+    const drawer = document.getElementById('base-products-drawer');
+    if (!drawer) return;
+    drawer.classList.add('open');
+}
+
+function closeBaseProductsDrawer(e) {
+    if (e && typeof e.stopPropagation === 'function') {
+        e.stopPropagation();
+    }
+    const drawer = document.getElementById('base-products-drawer');
+    if (drawer) drawer.classList.remove('open');
+}
+
+// Global click handler: Click on peeking panel opens panel, click outside open panel closes panel
+document.addEventListener('click', function(e) {
+    const drawer = document.getElementById('base-products-drawer');
+    if (!drawer) return;
+
+    if (drawer.classList.contains('open')) {
+        if (!drawer.contains(e.target)) {
+            closeBaseProductsDrawer(e);
+        }
+    } else {
+        if (drawer.contains(e.target)) {
+            openBaseProductsDrawer(e);
+        }
+    }
+});
+
+function addBaseProductRowUI(name = '', quantity = '') {
+    const list = document.getElementById('base-products-list');
+    if (!list) return;
+
+    const row = document.createElement('div');
+    row.className = 'base-product-row';
+
+    const qtyVal = (quantity !== null && quantity !== undefined) ? quantity : '';
+
+    row.innerHTML = `
+      <input type="text" class="input-field col-name base-name-input" placeholder="es. Pane" value="${name}">
+      <input type="number" class="input-field col-qty base-qty-input" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
+      <button type="button" class="btn-del-product" title="Elimina Prodotto Base" onclick="this.closest('.base-product-row').remove()">
+        <span class="material-symbols-rounded" style="font-size: 1.2rem;">delete_outline</span>
+      </button>
+    `;
+
+    list.appendChild(row);
+
+    if (!name) {
+        const nameInput = row.querySelector('.base-name-input');
+        if (nameInput) nameInput.focus();
+    }
+}
+
+function renderBaseProductsUI() {
+    const list = document.getElementById('base-products-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const baseProds = [];
+    if (STATE.products) {
+        Object.values(STATE.products).forEach(prods => {
+            if (Array.isArray(prods)) {
+                prods.forEach(p => {
+                    if (p.type === 'base') {
+                        baseProds.push(p);
+                    }
+                });
+            }
+        });
+    }
+
+    if (baseProds.length > 0) {
+        baseProds.forEach(bp => {
+            addBaseProductRowUI(bp.name, bp.quantity);
+        });
+    } else {
+        addBaseProductRowUI();
+    }
+}
+
+window.toggleBaseProductsDrawer = toggleBaseProductsDrawer;
+window.openBaseProductsDrawer = openBaseProductsDrawer;
+window.closeBaseProductsDrawer = closeBaseProductsDrawer;
+window.addBaseProductRowUI = addBaseProductRowUI;
+window.renderBaseProductsUI = renderBaseProductsUI;
+
 function addProductUI(container, name = '', price = '', quantity = '', isComposite = false, isSelection = false, linkedProducts = [], position = null) {
     const row = document.createElement('div');
     const isComp = !!isComposite;
@@ -1349,7 +1519,7 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
             try { linksCount = JSON.parse(row.dataset.linkedProducts).length; } catch(e){}
         }
         const hasLinks = linksCount > 0;
-        const btnLabel = hasLinks ? `Prodotti Collegati (${linksCount})` : `Prodotti Collegati`;
+        const btnLabel = hasLinks ? `${linksCount} collegati` : `Collega`;
         qtyFieldHTML = `
           <button type="button" class="btn-linked-products col-qty ${hasLinks ? 'has-links' : ''}" onclick="openLinkedProductsModal(this)" title="Seleziona i prodotti del menu collegati">
             <span class="material-symbols-rounded" style="font-size: 1.1rem;">link</span>
@@ -1436,6 +1606,26 @@ async function saveMenu(stayInEditor = false, customToastMsg = null) {
         payload.categories.push({ name: catName, is_hidden: isHidden, products });
     });
 
+    // Gather Base Products for system category 'Prodotti Base' with type = 'base'
+    const baseProducts = [];
+    document.querySelectorAll('#base-products-list .base-product-row').forEach(row => {
+        const nameInput = row.querySelector('.base-name-input');
+        const qtyInput = row.querySelector('.base-qty-input');
+        const name = nameInput ? nameInput.value.trim() : '';
+        if (name) {
+            let qty = null;
+            if (qtyInput && qtyInput.value.trim() !== '') {
+                const parsed = parseInt(qtyInput.value.trim());
+                if (!isNaN(parsed) && parsed >= 0) qty = parsed;
+            }
+            baseProducts.push({ name, price: 0, quantity: qty, type: 'base' });
+        }
+    });
+
+    if (baseProducts.length > 0) {
+        payload.categories.push({ name: 'Prodotti Base', is_hidden: 1, products: baseProducts });
+    }
+
     try {
         const res = await fetch(`/api/sagras/${STATE.currentSagra.id}/menu`, {
             method: 'PUT',
@@ -1487,9 +1677,9 @@ function renderProducts() {
     let renderedCount = 0;
 
     for (const [category, products] of categories) {
-        // Skip hidden category in POS Cassa view
+        // Skip hidden category or Prodotti Base in POS Cassa view
         const meta = STATE.categoryMeta ? STATE.categoryMeta[category] : null;
-        const isCatHidden = (meta && meta.is_hidden === 1) || (products.length > 0 && products[0].category_is_hidden === 1);
+        const isCatHidden = (meta && meta.is_hidden === 1) || (products.length > 0 && products[0].category_is_hidden === 1) || category === 'Prodotti Base';
         if (isCatHidden) continue;
 
         // Skip empty category (0 products) in POS Cassa view

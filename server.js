@@ -171,6 +171,16 @@ function runMigrations() {
       )
     `);
 
+    // Base Products Table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS base_products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        quantity INTEGER DEFAULT NULL,
+        sagra_id INTEGER DEFAULT 1
+      )
+    `);
+
     // Ensure default Sagra exists
     db.get("SELECT count(*) as count FROM sagras", (err, row) => {
       if (row && row.count === 0) {
@@ -360,7 +370,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 
 
 // GET Menu for specific Sagra
-app.get('/api/sagras/:id/products', (req, res) => {
+app.get('/api/sagras/:id/products', async (req, res) => {
   const sagraId = req.params.id;
   const sql = `
       SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.type, p.is_composite, p.is_selection, p.components, p.position
@@ -370,9 +380,8 @@ app.get('/api/sagras/:id/products', (req, res) => {
       ORDER BY c.id, p.position ASC, p.id ASC
     `;
 
-  db.all(sql, [sagraId], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-
+  try {
+    const rows = await dbAll(sql, [sagraId]);
     const grouped = {};
     const meta = {};
 
@@ -398,7 +407,9 @@ app.get('/api/sagras/:id/products', (req, res) => {
     });
 
     res.json({ products: grouped, meta });
-  });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // UPDATE Menu
@@ -422,12 +433,13 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
           const pType = p.type || (p.is_selection ? 'selection' : (p.is_composite ? 'composite' : 'simple'));
           const isComp = pType === 'composite' ? 1 : 0;
           const isSel = pType === 'selection' ? 1 : 0;
-          const qty = (pType === 'simple' && p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
-          const compsStr = (pType !== 'simple' && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
+          const pPrice = pType === 'base' ? 0 : (parseFloat(p.price) || 0);
+          const qty = ((pType === 'simple' || pType === 'base') && p.quantity !== undefined && p.quantity !== null && p.quantity !== '') ? parseInt(p.quantity) : null;
+          const compsStr = (pType !== 'simple' && pType !== 'base' && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
           const pos = (p.position !== undefined && p.position !== null) ? parseInt(p.position) : pIdx;
           pIdx++;
 
-          await dbRun("INSERT INTO products (name, price, quantity, type, is_composite, is_selection, components, category_id, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [p.name, p.price, qty, pType, isComp, isSel, compsStr, catId, pos]);
+          await dbRun("INSERT INTO products (name, price, quantity, type, is_composite, is_selection, components, category_id, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [p.name, pPrice, qty, pType, isComp, isSel, compsStr, catId, pos]);
         }
       }
     }
@@ -590,16 +602,23 @@ app.post('/api/orders', async (req, res) => {
             const foodComps = [];
             for (const compName of comps) {
               const compRows = await dbAll(`
-                SELECT p.name, c.name as category_name
+                SELECT p.name, p.type, c.name as category_name
                 FROM products p
                 JOIN categories c ON p.category_id = c.id
                 WHERE c.sagra_id = ? AND p.name = ?
               `, [targetSagra, compName]);
 
-              if (compRows.length > 0 && compRows[0].category_name && compRows[0].category_name.toLowerCase() === 'bevande') {
-                drinkComps.push(compName);
-              } else if (prod.is_selection === 1) {
-                foodComps.push(compName);
+              if (compRows.length > 0) {
+                const comp = compRows[0];
+                // Base products (type === 'base' or category === 'Prodotti Base') MUST NOT be printed on receipts
+                if (comp.type === 'base' || comp.category_name === 'Prodotti Base') {
+                  continue;
+                }
+                if (comp.category_name && comp.category_name.toLowerCase() === 'bevande') {
+                  drinkComps.push(compName);
+                } else if (prod.is_selection === 1) {
+                  foodComps.push(compName);
+                }
               }
             }
             itemCopy.linkedDrinks = drinkComps;
