@@ -2,8 +2,14 @@ let STATE = {
     currentSagra: null,
     products: {}, // grouped by category
     cart: [],
-    history: []
+    history: [],
+    isMenuDirty: false
 };
+
+function markMenuDirty() {
+    STATE.isMenuDirty = true;
+}
+window.markMenuDirty = markMenuDirty;
 
 // DOM Elements
 const views = {
@@ -18,6 +24,31 @@ const editorContainer = document.getElementById('editor-container');
 const productsEl = document.getElementById('products-container');
 const cartEl = document.getElementById('cart-items');
 const totalEl = document.getElementById('total-amount');
+
+// --- VIEW NAVIGATION ---
+async function showView(viewName) {
+    // Check if attempting to leave editor with unsaved changes
+    if (views.editor && views.editor.classList.contains('active') && viewName !== 'editor' && STATE.isMenuDirty) {
+        const confirmed = await showDialog({
+            title: "Modifiche Non Salvate",
+            message: "Hai effettuato delle modifiche al menu che non sono ancora state salvate. Vuoi davvero uscire senza salvare?",
+            icon: "warning",
+            isDanger: true,
+            okText: "Esci Senza Salvare",
+            cancelText: "Rimani nell'Editor"
+        });
+        if (!confirmed) return false;
+        STATE.isMenuDirty = false;
+    }
+
+    Object.values(views).forEach(el => el.classList.remove('active'));
+    if (views[viewName]) {
+        views[viewName].classList.add('active');
+    }
+    return true;
+}
+window.showView = showView;
+
 const modalEl = document.getElementById('history-modal');
 const historyListEl = document.getElementById('history-list');
 
@@ -490,13 +521,7 @@ function checkLogin() {
     }
 }
 
-// --- VIEW NAVIGATION ---
-function showView(viewName) {
-    Object.values(views).forEach(el => el.classList.remove('active'));
-    if (views[viewName]) {
-        views[viewName].classList.add('active');
-    }
-}
+
 
 function showLogin() {
     STATE.currentSagra = null;
@@ -773,6 +798,16 @@ function switchToEditor() {
         document.getElementById('editor-title').innerText = `Modifica Menù ${STATE.currentSagra.name}`;
     }
     renderEditor();
+    STATE.isMenuDirty = false;
+
+    const editorView = document.getElementById('view-editor');
+    if (editorView) {
+        editorView.removeEventListener('input', markMenuDirty);
+        editorView.removeEventListener('change', markMenuDirty);
+        editorView.addEventListener('input', markMenuDirty);
+        editorView.addEventListener('change', markMenuDirty);
+    }
+
     showView('editor');
 }
 
@@ -780,6 +815,7 @@ function toggleHideCategory(btn) {
     const sec = btn.closest('.editor-section');
     if (!sec) return;
 
+    markMenuDirty();
     const isHidden = sec.classList.toggle('is-hidden-category');
     const iconEl = btn.querySelector('.material-symbols-rounded');
     const textEl = btn.querySelector('.hide-text');
@@ -2338,6 +2374,142 @@ function exportData() {
 
 const statsModalEl = document.getElementById('stats-modal');
 
+function showChartTooltip(e, hourSlot, orderText) {
+    const tooltip = document.getElementById('chart-tooltip');
+    if (!tooltip) return;
+
+    tooltip.innerHTML = `
+        <div class="tooltip-time">Ore ${hourSlot}</div>
+        <div class="tooltip-val">
+            <span class="material-symbols-rounded">receipt_long</span>
+            <span>${orderText}</span>
+        </div>
+    `;
+
+    const dot = e.target;
+    const card = tooltip.closest('.stats-chart-card');
+    if (dot && card) {
+        const dotRect = dot.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+
+        const left = dotRect.left - cardRect.left + (dotRect.width / 2);
+        const top = dotRect.top - cardRect.top;
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+    }
+
+    tooltip.classList.add('visible');
+}
+window.showChartTooltip = showChartTooltip;
+
+function hideChartTooltip() {
+    const tooltip = document.getElementById('chart-tooltip');
+    if (tooltip) tooltip.classList.remove('visible');
+}
+window.hideChartTooltip = hideChartTooltip;
+
+function renderHourlyChart(hourlySales) {
+    const chartContainer = document.getElementById('hourly-chart-container');
+    if (!chartContainer) return;
+
+    hideChartTooltip();
+
+    if (!hourlySales || hourlySales.length === 0) {
+        chartContainer.innerHTML = '<div class="empty-chart-text">Nessun ordine registrato nelle ultime ore</div>';
+        return;
+    }
+
+    let maxOrders = 0;
+    let peakSlot = '';
+
+    hourlySales.forEach(slot => {
+        if (slot.orders_count > maxOrders) {
+            maxOrders = slot.orders_count;
+            peakSlot = slot.hour_slot;
+        }
+    });
+
+    const svgWidth = 600;
+    const svgHeight = 120;
+    const paddingX = 35;
+    const paddingTop = 22;
+    const paddingBottom = 20;
+
+    const count = hourlySales.length;
+    const usableWidth = svgWidth - (paddingX * 2);
+    const usableHeight = svgHeight - paddingTop - paddingBottom;
+
+    // Compute (x, y) coordinates based strictly on orders count
+    const points = hourlySales.map((slot, i) => {
+        const x = count === 1 ? svgWidth / 2 : paddingX + (i * (usableWidth / (count - 1)));
+        const ratio = maxOrders > 0 ? (slot.orders_count / maxOrders) : 0;
+        const y = (svgHeight - paddingBottom) - (ratio * usableHeight);
+        return { x, y, slot };
+    });
+
+    // Build smooth cubic Bezier path
+    let linePath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+    if (points.length === 1) {
+        linePath += ` L ${(points[0].x + 1).toFixed(1)} ${points[0].y.toFixed(1)}`;
+    } else {
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[i === 0 ? i : i - 1];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+            const cp1x = p1.x + (p2.x - p0.x) * 0.18;
+            const cp1y = p1.y + (p2.y - p0.y) * 0.18;
+            const cp2x = p2.x - (p3.x - p1.x) * 0.18;
+            const cp2y = p2.y - (p3.y - p1.y) * 0.18;
+
+            linePath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+        }
+    }
+
+    const firstX = points[0].x;
+    const lastX = points[points.length - 1].x;
+    const bottomY = svgHeight - paddingBottom + 8;
+    const areaPath = `${linePath} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+
+    const dotsHtml = points.map(pt => {
+        const isPeak = (pt.slot.hour_slot === peakSlot && maxOrders > 0);
+        const orderText = pt.slot.orders_count === 1 ? '1 Ordine' : `${pt.slot.orders_count} Ordini`;
+        return `
+            <circle class="wave-dot ${isPeak ? 'peak-dot' : ''}" 
+                    cx="${pt.x.toFixed(1)}" 
+                    cy="${pt.y.toFixed(1)}"
+                    onmouseenter="showChartTooltip(event, '${pt.slot.hour_slot}', '${orderText}')"
+                    onmouseleave="hideChartTooltip()">
+            </circle>
+        `;
+    }).join('');
+
+    const labelsHtml = points.map(pt => `
+        <span class="wave-time-label" style="position: absolute; left: ${(pt.x / svgWidth * 100).toFixed(2)}%; transform: translateX(-50%);">
+            ${pt.slot.hour_slot}
+        </span>
+    `).join('');
+
+    chartContainer.innerHTML = `
+        <svg class="wave-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none">
+            <defs>
+                <linearGradient id="waveGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--btn-bg)" stop-opacity="0.32" />
+                    <stop offset="100%" stop-color="var(--btn-bg)" stop-opacity="0.0" />
+                </linearGradient>
+            </defs>
+            <path class="wave-area-path" d="${areaPath}" />
+            <path class="wave-line-path" d="${linePath}" />
+            ${dotsHtml}
+        </svg>
+        <div style="position: relative; width: 100%; height: 22px; margin-top: 6px;">
+            ${labelsHtml}
+        </div>
+    `;
+}
+
 async function showStats() {
     if (!STATE.currentSagra) return;
 
@@ -2354,6 +2526,9 @@ async function showStats() {
 
         const avgOrder = data.ordersCount > 0 ? (data.totalRevenue / data.ordersCount) : 0;
         if (avgEl) avgEl.innerText = `€ ${avgOrder.toFixed(2)}`;
+
+        // Render Hourly Sales Chart
+        renderHourlyChart(data.hourlySales);
 
         const topContainer = document.getElementById('top-products');
         if (!topContainer) return;

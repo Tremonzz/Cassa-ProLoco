@@ -739,10 +739,27 @@ app.get('/api/stats', async (req, res) => {
       });
     });
 
+    const hourlySales = await new Promise((resolve, reject) => {
+      db.all(`
+            SELECT 
+              strftime('%H:00', created_at) as hour_slot, 
+              COUNT(id) as orders_count, 
+              SUM(total) as revenue,
+              MIN(created_at) as min_time
+            FROM orders 
+            WHERE sagra_id = ? 
+            GROUP BY strftime('%Y-%m-%d %H:00', created_at) 
+            ORDER BY min_time ASC
+        `, [sagraId], (err, rows) => {
+        if (err) reject(err); else resolve(rows);
+      });
+    });
+
     res.json({
       ordersCount: totalRow.count || 0,
       totalRevenue: totalRow.revenue || 0,
-      topItems: topItems || []
+      topItems: topItems || [],
+      hourlySales: hourlySales || []
     });
 
   } catch (e) {

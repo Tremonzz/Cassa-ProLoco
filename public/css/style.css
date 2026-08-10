@@ -2256,6 +2256,147 @@ select.hidden-native-select {
   margin-bottom: 24px;
 }
 
+/* --- HOURLY WAVE CHART STYLING --- */
+.stats-chart-card {
+  position: relative;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.stats-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.stats-chart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-main);
+}
+
+.stats-chart-title .material-symbols-rounded {
+  font-size: 1.25rem;
+  color: var(--btn-bg);
+}
+
+/* --- CUSTOM FLOATING HTML TOOLTIP --- */
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -100%) scale(0.92);
+  transition: opacity 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  padding: 10px 14px;
+  z-index: 100;
+  white-space: nowrap;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+  transform: translate(-50%, -125%) scale(1);
+}
+
+.tooltip-time {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tooltip-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tooltip-val .material-symbols-rounded {
+  font-size: 1.15rem;
+  color: var(--btn-bg);
+}
+
+.stats-chart-container {
+  width: 100%;
+  position: relative;
+  padding-top: 6px;
+}
+
+.wave-svg {
+  width: 100%;
+  height: 140px;
+  overflow: visible;
+}
+
+.wave-area-path {
+  fill: url(#waveGradient);
+}
+
+.wave-line-path {
+  fill: none;
+  stroke: var(--btn-bg);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 4px 8px rgba(37, 99, 235, 0.25));
+}
+
+[data-theme="dark"] .wave-line-path {
+  stroke: #60a5fa;
+  filter: drop-shadow(0 4px 12px rgba(96, 165, 250, 0.35));
+}
+
+.wave-dot {
+  fill: var(--card-bg);
+  stroke: var(--btn-bg);
+  stroke-width: 3;
+  r: 5;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-theme="dark"] .wave-dot {
+  stroke: #60a5fa;
+}
+
+.wave-dot:hover {
+  r: 8;
+  stroke-width: 4;
+}
+
+.wave-dot.peak-dot {
+  stroke: #ef4444 !important;
+  fill: #ef4444 !important;
+  r: 6;
+}
+
+.wave-dot.peak-dot:hover {
+  r: 9;
+}
+
+.wave-time-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
 .stat-card {
   background: var(--card-bg);
   padding: 16px;
