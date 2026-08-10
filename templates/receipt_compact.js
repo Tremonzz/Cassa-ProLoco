@@ -43,6 +43,39 @@ async function generateReceiptBuffer(data) {
         const left = `${item.quantity}x ${item.name}`;
         printRow(left, linePrice);
         itemsPreview.push({ left: left, right: `€ ${linePrice}` });
+
+        if (item.is_selection === 1 && Array.isArray(item.foodComponents) && item.foodComponents.length > 0) {
+            item.foodComponents.forEach(compName => {
+                const compLine = `    - ${compName}`;
+                printer.println(compLine);
+                itemsPreview.push({
+                    left: compLine,
+                    right: "",
+                    isSubitem: true
+                });
+            });
+        }
+    });
+
+    // Extract & aggregate menu drinks from composite items & selection items
+    const menuDrinksMap = {};
+    data.items.forEach(item => {
+        if (Array.isArray(item.linkedDrinks) && item.linkedDrinks.length > 0) {
+            const itemQty = item.quantity || 1;
+            item.linkedDrinks.forEach(drinkName => {
+                menuDrinksMap[drinkName] = (menuDrinksMap[drinkName] || 0) + itemQty;
+            });
+        }
+    });
+
+    // Print menu drinks with "MENU" label
+    Object.entries(menuDrinksMap).forEach(([drinkName, totalQty]) => {
+        const left = `${totalQty}x ${drinkName}`;
+        printRow(left, "MENU");
+        itemsPreview.push({
+            left: left,
+            right: "MENU"
+        });
     });
 
     printer.raw(Buffer.from([0x1B, 0x32]));

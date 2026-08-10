@@ -132,6 +132,9 @@ function runMigrations() {
       db.run("ALTER TABLE products ADD COLUMN components TEXT DEFAULT NULL", (e) => {
         if (!e) console.log("Migration: Added 'components' column to products.");
       });
+      db.run("ALTER TABLE products ADD COLUMN is_selection INTEGER DEFAULT 0", (e) => {
+        if (!e) console.log("Migration: Added 'is_selection' column to products.");
+      });
     });
 
     // Orders
@@ -332,7 +335,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 
       const products = await dbAll("SELECT * FROM products WHERE category_id = ?", [cat.id]);
       for (const prod of products) {
-        await dbRun("INSERT INTO products (name, price, quantity, is_composite, components, category_id) VALUES (?, ?, ?, ?, ?, ?)", [prod.name, prod.price, prod.quantity, prod.is_composite || 0, prod.components || null, newCatId]);
+        await dbRun("INSERT INTO products (name, price, quantity, is_composite, is_selection, components, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)", [prod.name, prod.price, prod.quantity, prod.is_composite || 0, prod.is_selection || 0, prod.components || null, newCatId]);
       }
     }
 
@@ -350,7 +353,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 app.get('/api/sagras/:id/products', (req, res) => {
   const sagraId = req.params.id;
   const sql = `
-      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.is_composite, p.components
+      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.is_composite, p.is_selection, p.components
       FROM categories c
       LEFT JOIN products p ON c.id = p.category_id
       WHERE c.sagra_id = ?
@@ -402,9 +405,10 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
       if (cat.products && cat.products.length > 0) {
         for (const p of cat.products) {
           const isComp = p.is_composite ? 1 : 0;
-          const qty = (!isComp && p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
-          const compsStr = (isComp && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
-          await dbRun("INSERT INTO products (name, price, quantity, is_composite, components, category_id) VALUES (?, ?, ?, ?, ?, ?)", [p.name, p.price, qty, isComp, compsStr, catId]);
+          const isSel = p.is_selection ? 1 : 0;
+          const qty = (!isComp && !isSel && p.quantity && p.quantity > 0) ? parseInt(p.quantity) : null;
+          const compsStr = ((isComp || isSel) && p.components && p.components.length > 0) ? JSON.stringify(p.components) : null;
+          await dbRun("INSERT INTO products (name, price, quantity, is_composite, is_selection, components, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)", [p.name, p.price, qty, isComp, isSel, compsStr, catId]);
         }
       }
     }
@@ -434,18 +438,20 @@ app.post('/api/orders', async (req, res) => {
 
       for (const item of items) {
         if (item.id) {
-          const prodRows = await dbAll("SELECT id, name, quantity, is_composite, components FROM products WHERE id = ?", [item.id]);
+          const prodRows = await dbAll("SELECT id, name, quantity, is_composite, is_selection, components FROM products WHERE id = ?", [item.id]);
           if (prodRows.length > 0) {
             const prod = prodRows[0];
-            const isComp = prod.is_composite === 1;
+            const isComp = prod.is_composite === 1 || prod.is_selection === 1;
 
             if (isComp) {
-              // Composite product: deduct linked components
+              // Composite or Selection product: priority to cashier's selected components
               let comps = [];
-              if (prod.components) {
-                try { comps = JSON.parse(prod.components); } catch (e) {}
-              } else if (Array.isArray(item.components)) {
+              if (Array.isArray(item.components) && item.components.length > 0) {
                 comps = item.components;
+              } else if (Array.isArray(item.selectedComponents) && item.selectedComponents.length > 0) {
+                comps = item.selectedComponents;
+              } else if (prod.components) {
+                try { comps = JSON.parse(prod.components); } catch (e) {}
               }
 
               for (const compName of comps) {
@@ -529,7 +535,7 @@ app.post('/api/orders', async (req, res) => {
         let prodRows = [];
         if (item.id) {
           prodRows = await dbAll(`
-            SELECT p.id, p.name, p.is_composite, p.components, c.name as category_name
+            SELECT p.id, p.name, p.is_composite, p.is_selection, p.components, c.name as category_name
             FROM products p
             JOIN categories c ON p.category_id = c.id
             WHERE p.id = ?
@@ -537,7 +543,7 @@ app.post('/api/orders', async (req, res) => {
         }
         if (prodRows.length === 0 && item.name) {
           prodRows = await dbAll(`
-            SELECT p.id, p.name, p.is_composite, p.components, c.name as category_name
+            SELECT p.id, p.name, p.is_composite, p.is_selection, p.components, c.name as category_name
             FROM products p
             JOIN categories c ON p.category_id = c.id
             WHERE c.sagra_id = ? AND p.name = ?
@@ -548,13 +554,19 @@ app.post('/api/orders', async (req, res) => {
           const prod = prodRows[0];
           itemCopy.category = itemCopy.category || prod.category_name;
           itemCopy.is_composite = prod.is_composite;
+          itemCopy.is_selection = prod.is_selection;
 
-          let comps = prod.components;
-          if (typeof comps === 'string') {
-            try { comps = JSON.parse(comps); } catch (e) {}
+          let comps = [];
+          if (Array.isArray(item.components) && item.components.length > 0) {
+            comps = item.components;
+          } else if (Array.isArray(item.selectedComponents) && item.selectedComponents.length > 0) {
+            comps = item.selectedComponents;
+          } else if (prod.components) {
+            try { comps = JSON.parse(prod.components); } catch (e) {}
           }
           if (Array.isArray(comps) && comps.length > 0) {
             const drinkComps = [];
+            const foodComps = [];
             for (const compName of comps) {
               const compRows = await dbAll(`
                 SELECT p.name, c.name as category_name
@@ -565,9 +577,14 @@ app.post('/api/orders', async (req, res) => {
 
               if (compRows.length > 0 && compRows[0].category_name && compRows[0].category_name.toLowerCase() === 'bevande') {
                 drinkComps.push(compName);
+              } else if (prod.is_selection === 1) {
+                foodComps.push(compName);
               }
             }
             itemCopy.linkedDrinks = drinkComps;
+            if (prod.is_selection === 1) {
+              itemCopy.foodComponents = foodComps;
+            }
           }
         }
 

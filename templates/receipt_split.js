@@ -20,19 +20,22 @@ async function generateSplitReceipt(data) {
     const standardDrinks = data.items.filter(i => (i.category && i.category.toLowerCase() === 'bevande'));
     const food = data.items.filter(i => !(i.category && i.category.toLowerCase() === 'bevande'));
 
-    // Extract menu drinks from composite items
-    const menuDrinks = [];
+    // Extract & aggregate menu drinks from composite items & selection items
+    const menuDrinksMap = {};
     data.items.forEach(item => {
         if (Array.isArray(item.linkedDrinks) && item.linkedDrinks.length > 0) {
+            const itemQty = item.quantity || 1;
             item.linkedDrinks.forEach(drinkName => {
-                menuDrinks.push({
-                    name: drinkName,
-                    quantity: item.quantity,
-                    isMenu: true
-                });
+                menuDrinksMap[drinkName] = (menuDrinksMap[drinkName] || 0) + itemQty;
             });
         }
     });
+
+    const menuDrinks = Object.entries(menuDrinksMap).map(([drinkName, totalQty]) => ({
+        name: drinkName,
+        quantity: totalQty,
+        isMenu: true
+    }));
 
     const hasDrinks = standardDrinks.length > 0 || menuDrinks.length > 0;
     const hasFood = food.length > 0;
@@ -66,6 +69,8 @@ async function generateSplitReceipt(data) {
     let receipt1HeaderInfo = { hasHeaderImage: false, headerLines: [] };
     let receipt1FooterInfo = { footerLines: [] };
 
+    const foodItemsPreview = [];
+
     if (food.length > 0) {
         receipt1HeaderInfo = await printReceiptHeader(printer, data.sagraName);
 
@@ -74,6 +79,22 @@ async function generateSplitReceipt(data) {
             const linePrice = (item.price * item.quantity).toFixed(2);
             const left = `${item.quantity}x ${item.name}`;
             printRow(left, `EUR ${linePrice}`);
+            foodItemsPreview.push({
+                left: left,
+                right: `€ ${linePrice}`
+            });
+
+            if (item.is_selection === 1 && Array.isArray(item.foodComponents) && item.foodComponents.length > 0) {
+                item.foodComponents.forEach(compName => {
+                    const compLine = `    - ${compName}`;
+                    printer.println(compLine);
+                    foodItemsPreview.push({
+                        left: compLine,
+                        right: "",
+                        isSubitem: true
+                    });
+                });
+            }
         });
         printer.raw(Buffer.from([0x1B, 0x32]));
 
@@ -133,12 +154,6 @@ async function generateSplitReceipt(data) {
 
         receipt2FooterInfo = printReceiptFooter(printer, { includeThanks: false, dateStr });
     }
-
-    // Build Preview Object
-    const foodItemsPreview = food.map(item => ({
-        left: `${item.quantity}x ${item.name}`,
-        right: `€ ${(item.price * item.quantity).toFixed(2)}`
-    }));
 
     if (totalDrinks > 0) {
         foodItemsPreview.push({

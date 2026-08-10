@@ -730,12 +730,24 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
 
       <div class="products-list products-list-composite"></div>
 
+      <div class="product-table-header selection-table-header">
+        <span class="col-name">Nome Prodotto con Selezione</span>
+        <span class="col-price">Prezzo (€)</span>
+        <span class="col-qty">Prodotti Collegati</span>
+        <span class="col-action"></span>
+      </div>
+
+      <div class="products-list products-list-selection"></div>
+
       <div class="editor-card-footer" style="display:flex; gap:10px; flex-wrap:wrap;">
         <button type="button" class="btn-add-product" onclick="addProductUI(this.closest('.editor-section').querySelector('.products-list-standard'))">
           <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto
         </button>
         <button type="button" class="btn-add-product" onclick="addProductUI(this.closest('.editor-section').querySelector('.products-list-composite'), '', '', '', true)">
           <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto Composto
+        </button>
+        <button type="button" class="btn-add-product" onclick="addProductUI(this.closest('.editor-section').querySelector('.products-list-selection'), '', '', '', false, true)">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">add</span> Aggiungi Prodotto con Selezione
         </button>
       </div>
     `;
@@ -744,21 +756,31 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
     const stdList = div.querySelector('.products-list-standard');
     const compList = div.querySelector('.products-list-composite');
     const compHeader = div.querySelector('.composite-table-header');
+    const selList = div.querySelector('.products-list-selection');
+    const selHeader = div.querySelector('.selection-table-header');
 
-    const stdProducts = products.filter(p => p.is_composite !== 1);
+    const stdProducts = products.filter(p => p.is_composite !== 1 && p.is_selection !== 1);
     const compProducts = products.filter(p => p.is_composite === 1);
+    const selProducts = products.filter(p => p.is_selection === 1);
 
     if (stdProducts.length > 0) {
-        stdProducts.forEach(p => addProductUI(stdList, p.name, p.price, p.quantity, false));
+        stdProducts.forEach(p => addProductUI(stdList, p.name, p.price, p.quantity, false, false));
     } else {
         addProductUI(stdList);
     }
 
     if (compProducts.length > 0) {
         compHeader.style.display = 'flex';
-        compProducts.forEach(p => addProductUI(compList, p.name, p.price, p.quantity, true, p.components || []));
+        compProducts.forEach(p => addProductUI(compList, p.name, p.price, p.quantity, true, false, p.components || []));
     } else {
         compHeader.style.display = 'none';
+    }
+
+    if (selProducts.length > 0) {
+        selHeader.style.display = 'flex';
+        selProducts.forEach(p => addProductUI(selList, p.name, p.price, p.quantity, false, true, p.components || []));
+    } else {
+        selHeader.style.display = 'none';
     }
 }
 
@@ -772,6 +794,14 @@ function deleteProductRow(btn) {
             const section = container.closest('.editor-section');
             if (section) {
                 const header = section.querySelector('.composite-table-header');
+                if (header) header.style.display = 'none';
+            }
+        }
+    } else if (container && container.classList.contains('products-list-selection')) {
+        if (container.querySelectorAll('.product-row').length === 0) {
+            const section = container.closest('.editor-section');
+            if (section) {
+                const header = section.querySelector('.selection-table-header');
                 if (header) header.style.display = 'none';
             }
         }
@@ -895,10 +925,201 @@ window.openLinkedProductsModal = openLinkedProductsModal;
 window.closeLinkedProductsModal = closeLinkedProductsModal;
 window.saveLinkedProductsSelection = saveLinkedProductsSelection;
 
-function addProductUI(container, name = '', price = '', quantity = '', isComposite = false, linkedProducts = []) {
+let currentPosSelectionProduct = null;
+let currentPosSelectionCategory = '';
+
+function areArraysEqual(arr1, arr2) {
+    if (!Array.isArray(arr1) || !Array.isArray(arr2)) return false;
+    if (arr1.length !== arr2.length) return false;
+    const s1 = [...arr1].sort();
+    const s2 = [...arr2].sort();
+    return s1.every((val, index) => val === s2[index]);
+}
+
+function openPosSelectionModal(foundProduct, foundCategory) {
+    currentPosSelectionProduct = foundProduct;
+    currentPosSelectionCategory = foundCategory;
+
+    const titleEl = document.getElementById('pos-selection-title');
+    if (titleEl) titleEl.innerText = foundProduct.name;
+
+    const subtitleEl = document.getElementById('pos-selection-subtitle');
+    if (subtitleEl) subtitleEl.innerText = `Scegli i componenti per "${foundProduct.name}":`;
+
+    const listEl = document.getElementById('pos-selection-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    let comps = foundProduct.components || [];
+    if (typeof comps === 'string') {
+        try { comps = JSON.parse(comps); } catch(e){}
+    }
+
+    if (!Array.isArray(comps) || comps.length === 0) {
+        listEl.innerHTML = '<div style="color:var(--text-light); text-align:center; padding:12px;">Nessun prodotto collegato a questo elemento.</div>';
+    } else {
+        // Group components by Category
+        const grouped = {};
+
+        comps.forEach(compName => {
+            let compProd = null;
+            let compCat = 'Altro';
+            for (const [catName, catProds] of Object.entries(STATE.products)) {
+                const found = catProds.find(item => item.name === compName);
+                if (found) {
+                    compProd = found;
+                    compCat = catName;
+                    break;
+                }
+            }
+
+            const hasLimit = compProd && (compProd.quantity !== null && compProd.quantity !== undefined);
+            let totalUsedInCart = 0;
+            if (compProd && hasLimit) {
+                STATE.cart.forEach(cartItem => {
+                    if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                        totalUsedInCart += cartItem.quantity;
+                    } else if (Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                        totalUsedInCart += cartItem.quantity;
+                    }
+                });
+            }
+
+            const remStock = hasLimit ? (compProd.quantity - totalUsedInCart) : null;
+            const isOOS = hasLimit && remStock <= 0;
+
+            if (!grouped[compCat]) grouped[compCat] = [];
+            grouped[compCat].push({
+                compName,
+                hasLimit,
+                remStock,
+                isOOS
+            });
+        });
+
+        // Render categories
+        for (const [catName, items] of Object.entries(grouped)) {
+            const catHeader = document.createElement('div');
+            catHeader.style.cssText = 'font-weight: 700; color: var(--primary); font-size: 0.85rem; margin: 12px 0 6px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; text-transform: uppercase;';
+            catHeader.innerText = catName;
+            listEl.appendChild(catHeader);
+
+            const grid = document.createElement('div');
+            grid.className = 'pos-select-grid';
+
+            const isSingleInCat = items.length === 1;
+
+            items.forEach(item => {
+                const isPreselected = isSingleInCat && !item.isOOS;
+
+                const card = document.createElement('div');
+                card.className = `pos-select-card ${item.isOOS ? 'is-oos' : (isPreselected ? 'selected' : '')}`;
+                card.dataset.value = item.compName;
+                card.onclick = function() { togglePosCardSelection(this); };
+
+                const badgeHTML = item.hasLimit ? `<span class="qty-badge ${item.isOOS ? 'oos' : ''}">${Math.max(0, item.remStock)}</span>` : '';
+
+                card.innerHTML = `
+                    ${badgeHTML}
+                    <span class="pos-select-card-name">${item.compName}</span>
+                `;
+                grid.appendChild(card);
+            });
+
+            listEl.appendChild(grid);
+        }
+    }
+
+    const modal = document.getElementById('pos-selection-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function togglePosCardSelection(card) {
+    if (card.classList.contains('is-oos')) return;
+    card.classList.toggle('selected');
+}
+window.togglePosCardSelection = togglePosCardSelection;
+
+function closePosSelectionModal() {
+    const modal = document.getElementById('pos-selection-modal');
+    if (modal) modal.style.display = 'none';
+    currentPosSelectionProduct = null;
+    currentPosSelectionCategory = '';
+}
+
+function confirmPosSelection() {
+    if (!currentPosSelectionProduct) return closePosSelectionModal();
+
+    const selectedCards = document.querySelectorAll('#pos-selection-list .pos-select-card.selected');
+    const selectedComps = Array.from(selectedCards).map(card => card.dataset.value);
+
+    if (selectedComps.length === 0) {
+        return showToast("Seleziona almeno un componente", "error");
+    }
+
+    // Check stock for each selected component
+    for (const compName of selectedComps) {
+        let compProd = null;
+        for (const catProds of Object.values(STATE.products)) {
+            compProd = catProds.find(item => item.name === compName);
+            if (compProd) break;
+        }
+
+        if (compProd && compProd.quantity !== null && compProd.quantity !== undefined) {
+            let totalUsedInCart = 0;
+            STATE.cart.forEach(cartItem => {
+                if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                    totalUsedInCart += cartItem.quantity;
+                } else if (Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                    totalUsedInCart += cartItem.quantity;
+                }
+            });
+
+            if ((totalUsedInCart + 1) > compProd.quantity) {
+                showToast(`Scorte esaurite per: ${compProd.name}`, "error");
+                return;
+            }
+        }
+    }
+
+    // Check if an item with exact same product ID and exact same selected components already exists in cart
+    const existingInCart = STATE.cart.find(item => 
+        item.id === currentPosSelectionProduct.id && 
+        item.is_selection === 1 && 
+        areArraysEqual(item.components, selectedComps)
+    );
+
+    if (existingInCart) {
+        existingInCart.quantity++;
+    } else {
+        STATE.cart.push({
+            id: currentPosSelectionProduct.id,
+            name: currentPosSelectionProduct.name,
+            price: currentPosSelectionProduct.price,
+            quantity: 1,
+            category: currentPosSelectionCategory,
+            is_selection: 1,
+            is_composite: 0,
+            components: selectedComps,
+            selectedComponents: selectedComps
+        });
+    }
+
+    closePosSelectionModal();
+    renderCart();
+    renderProducts();
+}
+
+window.openPosSelectionModal = openPosSelectionModal;
+window.closePosSelectionModal = closePosSelectionModal;
+window.confirmPosSelection = confirmPosSelection;
+
+function addProductUI(container, name = '', price = '', quantity = '', isComposite = false, isSelection = false, linkedProducts = []) {
     const row = document.createElement('div');
     const isComp = !!isComposite;
+    const isSel = !!isSelection;
     row.className = 'product-row';
+
     if (isComp) {
         row.dataset.isComposite = "1";
         const section = container.closest('.editor-section');
@@ -909,11 +1130,22 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
         if (Array.isArray(linkedProducts) && linkedProducts.length > 0) {
             row.dataset.linkedProducts = JSON.stringify(linkedProducts);
         }
+    } else if (isSel) {
+        row.dataset.isSelection = "1";
+        const section = container.closest('.editor-section');
+        if (section) {
+            const selHeader = section.querySelector('.selection-table-header');
+            if (selHeader) selHeader.style.display = 'flex';
+        }
+        if (Array.isArray(linkedProducts) && linkedProducts.length > 0) {
+            row.dataset.linkedProducts = JSON.stringify(linkedProducts);
+        }
     }
+
     const qtyVal = (quantity !== null && quantity !== undefined) ? quantity : '';
 
     let qtyFieldHTML = '';
-    if (isComp) {
+    if (isComp || isSel) {
         let linksCount = 0;
         if (row.dataset.linkedProducts) {
             try { linksCount = JSON.parse(row.dataset.linkedProducts).length; } catch(e){}
@@ -932,7 +1164,9 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
         `;
     }
 
-    const namePlaceholder = isComp ? "es. Menu Grigliata" : "es. Panino con salsiccia";
+    let namePlaceholder = "es. Panino con salsiccia";
+    if (isComp) namePlaceholder = "es. Menu Grigliata";
+    if (isSel) namePlaceholder = "es. Piatto con Selezione";
 
     row.innerHTML = `
       <input type="text" class="input-field col-name" placeholder="${namePlaceholder}" value="${name}">
@@ -969,6 +1203,7 @@ async function saveMenu() {
         // Always preserve and save products even when category is hidden
         sec.querySelectorAll('.product-row').forEach(row => {
             const isComp = row.dataset.isComposite === "1" || row.classList.contains('is-composite-row');
+            const isSel = row.dataset.isSelection === "1";
             const nameInput = row.querySelector('.col-name input') || row.querySelector('input[type="text"]');
             const priceInput = row.querySelector('input.col-price') || row.querySelectorAll('input')[1];
             const qtyInput = row.querySelector('input.col-qty');
@@ -979,17 +1214,17 @@ async function saveMenu() {
             if (pName && !isNaN(pPrice)) {
                 let pQty = null;
                 let components = [];
-                if (!isComp && qtyInput && qtyInput.type === 'number') {
+                if (!isComp && !isSel && qtyInput && qtyInput.type === 'number') {
                     const pQtyStr = qtyInput.value.trim();
                     if (pQtyStr && !isNaN(parseInt(pQtyStr))) {
                         const parsed = parseInt(pQtyStr);
                         if (parsed > 0) pQty = parsed;
                     }
                 }
-                if (isComp && row.dataset.linkedProducts) {
+                if ((isComp || isSel) && row.dataset.linkedProducts) {
                     try { components = JSON.parse(row.dataset.linkedProducts); } catch(e){}
                 }
-                products.push({ name: pName, price: pPrice, quantity: pQty, is_composite: isComp ? 1 : 0, components });
+                products.push({ name: pName, price: pPrice, quantity: pQty, is_composite: isComp ? 1 : 0, is_selection: isSel ? 1 : 0, components });
             }
         });
 
@@ -1070,11 +1305,13 @@ function renderProducts() {
       <div class="product-grid">
         ${products.map(p => {
             const isComp = p.is_composite === 1;
+            const isSel = p.is_selection === 1;
             let remainingStock = null;
             let hasLimit = false;
+            let isOOS = false;
 
             if (isComp) {
-                // Check stock of linked components
+                // Composite product: min remaining stock of components
                 let comps = p.components || [];
                 if (typeof comps === 'string') {
                     try { comps = JSON.parse(comps); } catch(e){}
@@ -1097,7 +1334,7 @@ function renderProducts() {
                             STATE.cart.forEach(cartItem => {
                                 if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
                                     totalUsedInCart += cartItem.quantity;
-                                } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                                } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
                                     totalUsedInCart += cartItem.quantity;
                                 }
                             });
@@ -1112,27 +1349,73 @@ function renderProducts() {
                         remainingStock = minRemaining;
                     }
                 }
+                isOOS = hasLimit && remainingStock <= 0;
+            } else if (isSel) {
+                // Prodotto con Selezione: no stock badge on main button
+                // Disabled ONLY if ALL linked components are out of stock
+                let comps = p.components || [];
+                if (typeof comps === 'string') {
+                    try { comps = JSON.parse(comps); } catch(e){}
+                }
+
+                if (Array.isArray(comps) && comps.length > 0) {
+                    let hasAtLeastOneAvailable = false;
+                    for (const compName of comps) {
+                        let compProd = null;
+                        for (const catProds of Object.values(STATE.products)) {
+                            compProd = catProds.find(item => item.name === compName);
+                            if (compProd) break;
+                        }
+
+                        if (!compProd || compProd.quantity === null || compProd.quantity === undefined) {
+                            hasAtLeastOneAvailable = true;
+                            break;
+                        } else {
+                            let totalUsedInCart = 0;
+                            STATE.cart.forEach(cartItem => {
+                                if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                                    totalUsedInCart += cartItem.quantity;
+                                } else if (Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                                    totalUsedInCart += cartItem.quantity;
+                                }
+                            });
+                            if ((compProd.quantity - totalUsedInCart) > 0) {
+                                hasAtLeastOneAvailable = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!hasAtLeastOneAvailable) {
+                        isOOS = true;
+                    }
+                }
+                hasLimit = false; // No badge for selection product
             } else {
                 hasLimit = (p.quantity !== null && p.quantity !== undefined);
                 let totalUsedInCart = 0;
                 STATE.cart.forEach(cartItem => {
                     if (cartItem.id === p.id || cartItem.name === p.name) {
                         totalUsedInCart += cartItem.quantity;
-                    } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(p.name)) {
+                    } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(p.name)) {
                         totalUsedInCart += cartItem.quantity;
                     }
                 });
                 remainingStock = hasLimit ? (p.quantity - totalUsedInCart) : null;
+                isOOS = hasLimit && remainingStock <= 0;
             }
 
-            const isOOS = hasLimit && remainingStock <= 0;
             const qtyLabel = hasLimit ? `<span class="qty-badge ${isOOS ? 'oos' : ''}">${Math.max(0, remainingStock)}</span>` : '';
-            const linkIcon = isComp ? `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;" title="Prodotto Composto">link</span>` : '';
+            let typeIcon = '';
+            if (isSel) {
+                typeIcon = `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;" title="Prodotto con Selezione">checklist</span>`;
+            } else if (isComp) {
+                typeIcon = `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;" title="Prodotto Composto">link</span>`;
+            }
 
             return `
           <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id})">
             ${qtyLabel}
-            <span class="product-name">${linkIcon}${p.name}</span>
+            <span class="product-name">${typeIcon}${p.name}</span>
             <span class="product-price">€ ${p.price.toFixed(2)}</span>
           </button>
         `}).join('')}
@@ -1161,6 +1444,11 @@ function addToCart(productId) {
 
     if (!foundProduct) return;
 
+    if (foundProduct.is_selection === 1) {
+        openPosSelectionModal(foundProduct, foundCategory);
+        return;
+    }
+
     if (foundProduct.is_composite === 1) {
         // Check components limits
         let comps = foundProduct.components || [];
@@ -1181,7 +1469,7 @@ function addToCart(productId) {
                     STATE.cart.forEach(cartItem => {
                         if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
                             totalUsedInCart += cartItem.quantity;
-                        } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                        } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
                             totalUsedInCart += cartItem.quantity;
                         }
                     });
@@ -1200,7 +1488,7 @@ function addToCart(productId) {
             STATE.cart.forEach(cartItem => {
                 if (cartItem.id === foundProduct.id || cartItem.name === foundProduct.name) {
                     totalUsedInCart += cartItem.quantity;
-                } else if (cartItem.is_composite === 1 && Array.isArray(cartItem.components) && cartItem.components.includes(foundProduct.name)) {
+                } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(foundProduct.name)) {
                     totalUsedInCart += cartItem.quantity;
                 }
             });
@@ -1225,6 +1513,7 @@ function addToCart(productId) {
             quantity: 1,
             category: foundCategory,
             is_composite: foundProduct.is_composite || 0,
+            is_selection: foundProduct.is_selection || 0,
             components: foundProduct.components || []
         });
     }
@@ -1264,7 +1553,18 @@ function renderCart() {
         div.className = 'order-item';
 
         const isComp = item.is_composite === 1;
-        const linkIcon = isComp ? `<span class="material-symbols-rounded" style="font-size: 0.95rem; vertical-align: middle; margin-right: 3px; color: var(--primary);" title="Prodotto Composto">link</span>` : '';
+        const isSel = item.is_selection === 1;
+        let typeIcon = '';
+        if (isSel) {
+            typeIcon = `<span class="material-symbols-rounded" style="font-size: 0.95rem; vertical-align: middle; margin-right: 3px; color: var(--primary);" title="Prodotto con Selezione">checklist</span>`;
+        } else if (isComp) {
+            typeIcon = `<span class="material-symbols-rounded" style="font-size: 0.95rem; vertical-align: middle; margin-right: 3px; color: var(--primary);" title="Prodotto Composto">link</span>`;
+        }
+
+        let selectionSubtext = '';
+        if (isSel && Array.isArray(item.components) && item.components.length > 0) {
+            selectionSubtext = `<small style="display:block; font-size:0.75rem; color:var(--text-light); margin-top:2px;">Scelti: ${item.components.join(', ')}</small>`;
+        }
 
         div.innerHTML = `
           <div class="order-item-controls">
@@ -1277,7 +1577,8 @@ function renderCart() {
             <span class="order-item-qty">${item.quantity}</span>
           </div>
           <div class="order-item-info">
-            <span class="order-item-name">${linkIcon}${item.name}</span>
+            <span class="order-item-name">${typeIcon}${item.name}</span>
+            ${selectionSubtext}
             <span class="order-item-unit-price">€ ${item.price.toFixed(2)} cad.</span>
           </div>
           <span class="order-item-total">€${itemTotal.toFixed(2)}</span>
@@ -1868,7 +2169,7 @@ function showReceiptPreviewModal(preview) {
     const container = document.getElementById('receipt-preview-container');
     if (!container || !preview || !preview.receipts) return;
 
-    let html = '<div class="thermal-paper-wrapper" style="width:100%; display:flex; flex-direction:column; align-items:center;">';
+    let html = '<div class="thermal-paper-wrapper">';
     html += '<div class="thermal-paper">';
 
     preview.receipts.forEach((receipt, index) => {
@@ -1900,11 +2201,14 @@ function showReceiptPreviewModal(preview) {
 
         if (receipt.items && receipt.items.length > 0) {
             receipt.items.forEach(item => {
-                const boldStyle = item.isBold ? 'thermal-bold' : '';
+                const boldClass = item.isBold ? 'thermal-bold' : '';
+                const isSub = item.isSubitem || (item.left && item.left.trim().startsWith('-'));
+                const subClass = isSub ? 'thermal-row-subitem' : '';
+                const formattedLeft = isSub ? item.left.trim() : (item.left ? item.left.replace(/^ +/, (match) => '&nbsp;'.repeat(match.length)) : '');
                 html += `
-                    <div class="thermal-row ${boldStyle}">
-                        <span>${item.left}</span>
-                        <span>${item.right}</span>
+                    <div class="thermal-row ${boldClass} ${subClass}">
+                        <span>${formattedLeft}</span>
+                        <span>${item.right || ''}</span>
                     </div>
                 `;
             });
