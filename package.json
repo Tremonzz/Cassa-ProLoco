@@ -1,6 +1,6 @@
 {
   "name": "sagra-manager",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Gestione ordini eventi",
   "author": "Tommaso Tremonti",
   "main": "main.js",

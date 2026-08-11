@@ -8,6 +8,9 @@ out/
 *.exe
 *.msi
 *.zip
+*.7z
+*.rar
+*.tar.gz
 
 # Local database & SQLite runtime files (prevents pushing local test DB data)
 *.db
@@ -17,15 +20,11 @@ out/
 *.db-shm
 *.db-wal
 
-# Local launch scripts and dev batch files
+# Local launch scripts and temp binary files
 start_app.bat
 *.bat
 *.cmd
-
-# Temporary print jobs & resized image caches
-printer-output.bin
-temp_print_job.bin
-temp_receipt.bin
+*.bin
 public/receipt_header_resized.png
 
 # Environment variables & secrets

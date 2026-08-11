@@ -249,6 +249,19 @@ function closeApp() {
 }
 window.closeApp = closeApp;
 
+function forceCloseApp() {
+    try {
+        if (window.electronAPI && typeof window.electronAPI.closeApp === 'function') {
+            window.electronAPI.closeApp();
+        } else {
+            window.close();
+        }
+    } catch (e) {
+        window.close();
+    }
+}
+window.forceCloseApp = forceCloseApp;
+
 function isTimeInSchedule(startTimeStr, endTimeStr) {
     if (!startTimeStr || !endTimeStr) return false;
     const now = new Date();
@@ -272,7 +285,7 @@ function isTimeInSchedule(startTimeStr, endTimeStr) {
 let lastEvaluatedScheduleState = null;
 
 function checkThemeSchedule() {
-    const isScheduleEnabled = localStorage.getItem('themeScheduleEnabled') === 'true';
+    const isScheduleEnabled = localStorage.getItem('themeScheduleEnabled') !== 'false';
     if (!isScheduleEnabled) {
         lastEvaluatedScheduleState = null;
         return;
@@ -299,7 +312,7 @@ function checkThemeSchedule() {
 }
 
 function initTheme() {
-    const isScheduleEnabled = localStorage.getItem('themeScheduleEnabled') === 'true';
+    const isScheduleEnabled = localStorage.getItem('themeScheduleEnabled') !== 'false';
     if (isScheduleEnabled) {
         checkThemeSchedule();
     } else {
@@ -2959,7 +2972,7 @@ window.openSettings = async function () {
         if (testToggle) testToggle.checked = (localStorage.getItem('appTestMode') === 'true');
         if (printEventToggle) printEventToggle.checked = (localStorage.getItem('appPrintEventName') !== 'false');
 
-        const isScheduleEnabled = (localStorage.getItem('themeScheduleEnabled') === 'true');
+        const isScheduleEnabled = (localStorage.getItem('themeScheduleEnabled') !== 'false');
         if (scheduleToggle) scheduleToggle.checked = isScheduleEnabled;
         toggleThemeSchedule(isScheduleEnabled);
     }, 60);

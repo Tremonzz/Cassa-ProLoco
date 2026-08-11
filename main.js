@@ -8,10 +8,11 @@ let mainWindow = null;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 520,
-        height: 650,
+        width: 850,
+        height: 540,
         center: true,
         resizable: true,
+        frame: false,
         title: "Gestione Ordini",
         icon: path.join(__dirname, 'public/images/logo.png'),
         webPreferences: {
@@ -37,9 +38,7 @@ ipcMain.on('close-app', () => {
 
 ipcMain.on('maximize-app', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-        if (!mainWindow.isMaximized()) {
-            mainWindow.maximize();
-        }
+        mainWindow.setFullScreen(true);
     }
 });
 
