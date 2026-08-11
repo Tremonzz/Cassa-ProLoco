@@ -3084,7 +3084,7 @@ async function testPrinter() {
         return;
     }
 
-    showTestStatus('loading', 'Stampa di prova in corso...');
+    showTestStatus('loading', 'Verifica connessione e invio stampa di prova...');
 
     try {
         const res = await fetch('/api/print-test', {
@@ -3095,12 +3095,12 @@ async function testPrinter() {
         const data = await res.json();
 
         if (res.ok && data.success) {
-            showTestStatus('success', 'Stampa di prova inviata con successo');
+            showTestStatus('success', `✓ Stampante collegata ed in linea! Scontrino di prova inviato.`);
         } else {
-            throw new Error(data.error || 'Errore durante la stampa');
+            showTestStatus('error', data.error || 'Errore durante la verifica della stampante');
         }
     } catch (e) {
-        showTestStatus('error', e.message);
+        showTestStatus('error', 'Impossibile comunicare con il server di stampa');
     }
 }
 window.testPrinter = testPrinter;

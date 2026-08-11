@@ -791,11 +791,74 @@ app.get('/api/printers', (req, res) => {
   });
 });
 
+function checkPrinterConnected(printerName) {
+  return new Promise((resolve) => {
+    const cmd = `powershell "Get-CimInstance Win32_Printer | Select-Object Name, PrinterStatus, ExtendedPrinterStatus, PrinterState, WorkOffline, PortName | ConvertTo-Json"`;
+
+    exec(cmd, (err, stdout, stderr) => {
+      if (err || !stdout || !stdout.trim()) {
+        return resolve({
+          isConnected: false,
+          error: `Impossibile interrogare le stampanti nel sistema.`
+        });
+      }
+
+      try {
+        let printers = JSON.parse(stdout);
+        if (!Array.isArray(printers)) printers = [printers];
+
+        const targetName = (printerName || '').toLowerCase();
+        const info = printers.find(p => p && p.Name && p.Name.toLowerCase() === targetName);
+
+        if (!info) {
+          return resolve({
+            isConnected: false,
+            error: `Stampante "${printerName}" non trovata o disinstallata nel sistema.`
+          });
+        }
+
+        // Check if printer is set to WorkOffline or PrinterStatus is Offline / Error
+        if (info.WorkOffline === true) {
+          return resolve({
+            isConnected: false,
+            status: 'offline',
+            error: `La stampante "${printerName}" risulta scollegata o spenta.`
+          });
+        }
+
+        // PrinterStatus: 3 = Idle/Ready, 4 = Printing. Status 2, 1, 7 indicate Offline/Unknown/Error
+        if (info.PrinterStatus === 2 || info.PrinterStatus === 1 || info.PrinterStatus === 7) {
+          return resolve({
+            isConnected: false,
+            status: 'offline',
+            error: `La stampante "${printerName}" risulta scollegata o spenta.`
+          });
+        }
+
+        resolve({
+          isConnected: true,
+          status: 'online',
+          portName: info.PortName || 'USB'
+        });
+      } catch (e) {
+        console.error("Printer Status CIM Parse Error:", e);
+        resolve({ isConnected: false, error: 'Errore durante la verifica dello stato della stampante.' });
+      }
+    });
+  });
+}
+
 // TEST PRINTER API
 app.post('/api/print-test', async (req, res) => {
   const { printerName } = req.body;
   if (!printerName) {
     return res.status(400).json({ error: "Nessuna stampante selezionata" });
+  }
+
+  // 1. Verify printer connectivity before printing
+  const statusCheck = await checkPrinterConnected(printerName);
+  if (!statusCheck.isConnected) {
+    return res.status(400).json({ error: statusCheck.error });
   }
 
   try {
@@ -810,7 +873,7 @@ app.post('/api/print-test', async (req, res) => {
     console.log(`Sending test print to "${printerName}"...`);
     await printRawBuffer(printResult.buffer, printerName);
 
-    res.json({ success: true });
+    res.json({ success: true, portName: statusCheck.portName });
   } catch (err) {
     console.error("Test Print Error:", err);
     res.status(500).json({ error: err.message });
