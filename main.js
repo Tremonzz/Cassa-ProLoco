@@ -1,35 +1,47 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 // Import and start the server
-// This executes server.js, which starts listening on port 3000
 require('./server.js');
 
+let mainWindow = null;
+
 function createWindow() {
-    const win = new BrowserWindow({
-        width: 1280,
-        height: 800,
+    mainWindow = new BrowserWindow({
+        width: 520,
+        height: 650,
+        center: true,
+        resizable: true,
         title: "Gestione Ordini",
         icon: path.join(__dirname, 'public/images/logo.png'),
         webPreferences: {
-            nodeIntegration: false, // Security best practice
-            contextIsolation: true  // Security best practice
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
         },
-        autoHideMenuBar: true // Makes it look more app-like
+        autoHideMenuBar: true
     });
 
-    win.maximize();
-
-    // Load the local server
-    // We add a small delay or retry mechanic could be useful, 
-    // but usually server starts fast enough.
     setTimeout(() => {
-        win.loadURL('http://localhost:3000');
-    }, 1000);
-
-    // Optional: Open DevTools only if needed
-    // win.webContents.openDevTools();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.loadURL('http://localhost:3000');
+        }
+    }, 800);
 }
+
+ipcMain.on('close-app', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.close();
+    }
+});
+
+ipcMain.on('maximize-app', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        if (!mainWindow.isMaximized()) {
+            mainWindow.maximize();
+        }
+    }
+});
 
 app.whenReady().then(() => {
     createWindow();

@@ -24,7 +24,7 @@
     <div class="bg-shape shape-4"></div>
 
     <div class="login-container auth-container">
-      <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo">
+      <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo" id="auth-logo-img" draggable="false" style="cursor: pointer; user-select: none; -webkit-user-drag: none;" title="Tieni premuto per 5 secondi in caso di password dimenticata">
       <h1 class="login-title">Benvenuto</h1>
       <p class="login-subtitle">Accedi al sistema gestionale</p>
 
@@ -70,7 +70,7 @@
     </div>
 
     <div class="login-container">
-      <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo">
+      <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo" draggable="false" style="user-select: none; -webkit-user-drag: none;">
       <h1 class="login-title">Gestione Ordini</h1>
       <p class="login-subtitle">Proloco Lorenzago</p>
       <p class="login-instruction">Seleziona un evento per accedere alla cassa o creane uno nuovo</p>
@@ -241,6 +241,18 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- BOTTOM LEFT BAR (CLOCK & LOCK POS) -->
+    <div class="pos-bottom-left-bar">
+      <div id="pos-live-clock" class="pos-clock-pill">
+        <span class="material-symbols-rounded">schedule</span>
+        <span id="pos-clock-text">00:00</span>
+      </div>
+      <button type="button" class="btn-lock-pos" onclick="lockPOS()">
+        <span class="material-symbols-rounded">lock</span>
+        <span>Blocca Cassa</span>
+      </button>
     </div>
   </div>
 
@@ -448,7 +460,13 @@
 
           <div class="form-group">
             <label for="settings-password">Password Accesso</label>
-            <input type="password" id="settings-password" class="input-field" placeholder="Lascia vuoto per disattivare">
+            <div class="password-input-wrapper">
+              <span class="material-symbols-rounded password-icon-left">lock</span>
+              <input type="password" id="settings-password" class="input-field password-input" placeholder="Lascia vuoto per disattivare">
+              <button type="button" class="btn-toggle-password" onclick="toggleSettingsPasswordVisibility()" title="Mostra/Nascondi password">
+                <span class="material-symbols-rounded" id="settings-password-toggle-icon">visibility</span>
+              </button>
+            </div>
           </div>
 
           <div class="settings-card-row">

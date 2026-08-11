@@ -3,7 +3,8 @@ let STATE = {
     products: {}, // grouped by category
     cart: [],
     history: [],
-    isMenuDirty: false
+    isMenuDirty: false,
+    isPOSLocked: false
 };
 
 function markMenuDirty() {
@@ -208,6 +209,9 @@ function showAlert(message) {
 
 
 function requestAppFullscreen() {
+    if (window.electronAPI && typeof window.electronAPI.maximizeApp === 'function') {
+        window.electronAPI.maximizeApp();
+    }
     if (!document.fullscreenElement) {
         const docEl = document.documentElement;
         if (docEl.requestFullscreen) {
@@ -220,10 +224,7 @@ function requestAppFullscreen() {
     }
 }
 
-// Request fullscreen on first user interaction if deferred by browser policy
-window.addEventListener('click', function enterFsOnce() {
-    requestAppFullscreen();
-}, { once: true });
+
 
 function closeApp() {
     showDialog({ title: "Conferma Uscita", message: "Sei sicuro di voler uscire dall'applicazione?", icon: "door_open" }).then(confirmed => {
@@ -334,6 +335,12 @@ window.updateThemeSelectorButtons = updateThemeSelectorButtons;
 
 function selectTheme(theme) {
     const isDark = (theme === 'dark');
+    const scheduleToggle = document.getElementById('dark-mode-schedule-toggle');
+    if (scheduleToggle && scheduleToggle.checked) {
+        scheduleToggle.checked = false;
+        toggleThemeSchedule(false);
+        localStorage.setItem('themeScheduleEnabled', 'false');
+    }
     toggleTheme(isDark);
 }
 window.selectTheme = selectTheme;
@@ -368,14 +375,6 @@ async function init() {
     const savedPassword = localStorage.getItem('appPassword');
     const authContainer = document.getElementById('auth-input-container');
 
-    if (!savedPassword) {
-        // No password set -> Hide input
-        authContainer.style.display = 'none';
-        // Auto-focus button not needed but cleaner UI
-    } else {
-        authContainer.style.display = 'flex'; // or block/flex based on css, form-group is usually block or flex column
-    }
-
     // Add change calculator input listener
     const cashInput = document.getElementById('cash-received');
     if (cashInput) {
@@ -383,14 +382,80 @@ async function init() {
     }
 
     initKeyboardShortcuts();
-    requestAppFullscreen();
+    initLogoLongPressUnlock();
+    updateLiveClock();
+    setInterval(updateLiveClock, 1000);
     await loadSagras();
+
+    if (!savedPassword) {
+        if (authContainer) authContainer.style.display = 'none';
+    } else {
+        if (authContainer) authContainer.style.display = 'flex';
+    }
+
     showView('auth');
-    checkAppUpdateSilent();
+}
+
+function updateLiveClock() {
+    const clockText = document.getElementById('pos-clock-text');
+    if (!clockText) return;
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    clockText.innerText = `${hours}:${minutes}`;
+}
+
+let logoPressTimer = null;
+
+function initLogoLongPressUnlock() {
+    const authLogo = document.getElementById('auth-logo-img');
+    if (!authLogo) return;
+
+    const startPress = (e) => {
+        if (e.type === 'mousedown' && e.button !== 0) return;
+
+        cancelPress();
+        authLogo.classList.add('pressing');
+
+        logoPressTimer = setTimeout(() => {
+            cancelPress();
+            // 5 SECONDS HELD -> SILENT EMERGENCY PASSWORD RESET!
+            localStorage.removeItem('appPassword');
+            const authContainer = document.getElementById('auth-input-container');
+            if (authContainer) authContainer.style.display = 'none';
+            const pwdInput = document.getElementById('auth-password');
+            if (pwdInput) pwdInput.value = '';
+            const errBanner = document.getElementById('auth-error-banner');
+            if (errBanner) errBanner.classList.remove('visible');
+
+            showToast("Password azzerata con successo (Sblocco di Emergenza)", "success", 3000);
+        }, 5000);
+    };
+
+    const cancelPress = () => {
+        if (logoPressTimer) {
+            clearTimeout(logoPressTimer);
+            logoPressTimer = null;
+        }
+        if (authLogo) authLogo.classList.remove('pressing');
+    };
+
+    authLogo.addEventListener('mousedown', startPress);
+    authLogo.addEventListener('mouseup', cancelPress);
+    authLogo.addEventListener('mouseleave', cancelPress);
+
+    authLogo.addEventListener('touchstart', startPress, { passive: true });
+    authLogo.addEventListener('touchend', cancelPress);
+    authLogo.addEventListener('touchcancel', cancelPress);
 }
 
 function initKeyboardShortcuts() {
     window.addEventListener('keydown', (e) => {
+        // Intercept Escape key globally to prevent exiting Fullscreen (F11) mode
+        if (e.key === 'Escape') {
+            e.preventDefault();
+        }
+
         // 1. Check if any modal or dialog is open
         const dialogOverlay = document.getElementById('dialog-overlay');
         const isDialogVisible = dialogOverlay && (dialogOverlay.style.display === 'flex' || getComputedStyle(dialogOverlay).display === 'flex');
@@ -399,7 +464,7 @@ function initKeyboardShortcuts() {
             return;
         }
 
-        const modals = ['history-modal', 'stats-modal', 'settings-modal', 'sagra-options-modal', 'receipt-preview-modal'];
+        const modals = ['history-modal', 'stats-modal', 'settings-modal', 'sagra-options-modal', 'receipt-preview-modal', 'product-reorder-modal', 'linked-products-modal'];
         const openModalId = modals.find(id => {
             const el = document.getElementById(id);
             return el && (el.style.display === 'flex' || getComputedStyle(el).display === 'flex');
@@ -412,7 +477,9 @@ function initKeyboardShortcuts() {
                 else if (openModalId === 'stats-modal') closeStats();
                 else if (openModalId === 'settings-modal') closeSettings();
                 else if (openModalId === 'sagra-options-modal') closeSagraOptions();
-                else if (openModalId === 'receipt-preview-modal') closeReceiptPreviewModal();
+                else if (openModalId === 'receipt-preview-modal') closeReceiptModal();
+                else if (openModalId === 'product-reorder-modal') closeProductReorderModal();
+                else if (openModalId === 'linked-products-modal') closeLinkedProductsModal();
             }
             return;
         }
@@ -438,7 +505,7 @@ function initKeyboardShortcuts() {
         // F3 -> Modifica Menu
         if (e.key === 'F3') {
             e.preventDefault();
-            showEditor();
+            switchToEditor();
             return;
         }
 
@@ -502,11 +569,21 @@ function checkLogin() {
     const inputPassword = pwdInput ? pwdInput.value : "";
 
     if (savedPassword === "" || inputPassword === savedPassword) {
-        // Login Success
+        // Login Success -> Activate Fullscreen on Accedi Click
+        requestAppFullscreen();
         if (pwdInput) pwdInput.value = '';
         if (errBanner) errBanner.classList.remove('visible');
-        loadSagras();
-        showView('login');
+
+        if (STATE.isPOSLocked && STATE.currentSagra) {
+            STATE.isPOSLocked = false;
+            showView('pos');
+            showToast("Cassa sbloccata!", "success");
+        } else {
+            STATE.isPOSLocked = false;
+            loadSagras();
+            showView('login');
+        }
+        checkAppUpdateSilent();
     } else {
         if (errBanner) errBanner.classList.add('visible');
         if (pwdInput) {
@@ -520,11 +597,29 @@ function checkLogin() {
         }
     }
 }
+window.checkLogin = checkLogin;
 
+function lockPOS() {
+    if (!STATE.currentSagra) return;
+    STATE.isPOSLocked = true;
 
+    const savedPassword = localStorage.getItem('appPassword');
+    const authContainer = document.getElementById('auth-input-container');
+
+    if (!savedPassword) {
+        if (authContainer) authContainer.style.display = 'none';
+    } else {
+        if (authContainer) authContainer.style.display = 'flex';
+    }
+
+    showToast("Cassa bloccata - Premi Accedi per riprendere", "info");
+    showView('auth');
+}
+window.lockPOS = lockPOS;
 
 function showLogin() {
     STATE.currentSagra = null;
+    STATE.isPOSLocked = false;
     loadSagras();
     showView('login');
 }
@@ -857,6 +952,45 @@ function renderEditor() {
 
     renderBaseProductsUI();
 }
+function sortCategoryProducts(btnEl, mode) {
+    const sec = btnEl.closest('.editor-section');
+    if (!sec) return;
+
+    const stdList = sec.querySelector('.products-list-standard');
+    if (!stdList) return;
+
+    const rows = Array.from(stdList.querySelectorAll('.product-row'));
+    if (rows.length <= 1) return;
+
+    rows.sort((a, b) => {
+        const nameA = (a.querySelector('.col-name input')?.value || '').trim().toLowerCase();
+        const nameB = (b.querySelector('.col-name input')?.value || '').trim().toLowerCase();
+        const priceA = parseFloat(a.querySelector('input.col-price')?.value) || 0;
+        const priceB = parseFloat(b.querySelector('input.col-price')?.value) || 0;
+
+        if (mode === 'name') {
+            return nameA.localeCompare(nameB, 'it', { sensitivity: 'base' });
+        } else if (mode === 'price') {
+            if (priceA !== priceB) return priceA - priceB;
+            return nameA.localeCompare(nameB, 'it', { sensitivity: 'base' });
+        }
+        return 0;
+    });
+
+    rows.forEach((row, idx) => {
+        row.dataset.position = idx;
+        stdList.appendChild(row);
+    });
+
+    markMenuDirty();
+
+    if (mode === 'name') {
+        showToast("Prodotti ordinati in ordine alfabetico (A-Z)", "info");
+    } else {
+        showToast("Prodotti ordinati per prezzo crescente", "info");
+    }
+}
+window.sortCategoryProducts = sortCategoryProducts;
 
 function addCategoryUI(name = '', products = [], isHidden = false) {
     const listEl = document.getElementById('editor-sections-list') || editorContainer;
@@ -1429,7 +1563,7 @@ function openProductReorderModal() {
                 }
 
                 return `
-                    <div class="product-btn reorder-btn" draggable="true" data-row-id="${p.rowId}">
+                    <div class="product-btn reorder-btn" draggable="true" data-row-id="${p.rowId}" data-name="${p.name.replace(/"/g, '&quot;')}" data-price="${p.price}">
                         <span class="material-symbols-rounded reorder-handle">drag_indicator</span>
                         <span class="product-name">${typeIcon}${p.name}</span>
                         <span class="product-price">€ ${p.price.toFixed(2)}</span>
@@ -1438,9 +1572,19 @@ function openProductReorderModal() {
             }).join('');
 
             catSec.innerHTML = `
-                <div class="category-title">
-                    <span class="material-symbols-rounded" style="font-size: 1.3rem;">${catIcon}</span>
-                    ${catName}
+                <div class="category-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="material-symbols-rounded" style="font-size: 1.3rem;">${catIcon}</span>
+                        ${catName}
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="btn-sort-cat" onclick="sortReorderGrid(this, 'name')" title="Ordina A-Z in questa categoria">
+                            <span class="material-symbols-rounded" style="font-size: 1.05rem;">sort_by_alpha</span> A-Z
+                        </button>
+                        <button type="button" class="btn-sort-cat" onclick="sortReorderGrid(this, 'price')" title="Ordina per prezzo in questa categoria">
+                            <span class="material-symbols-rounded" style="font-size: 1.05rem;">attach_money</span> Prezzo
+                        </button>
+                    </div>
                 </div>
                 <div class="reorder-grid" data-cat-name="${catName}">
                     ${gridHTML}
@@ -1459,6 +1603,41 @@ function openProductReorderModal() {
     const modal = document.getElementById('product-reorder-modal');
     if (modal) modal.style.display = 'flex';
 }
+
+function sortReorderGrid(btnEl, mode) {
+    const sec = btnEl.closest('.reorder-cat-section');
+    if (!sec) return;
+
+    const grid = sec.querySelector('.reorder-grid');
+    if (!grid) return;
+
+    const btns = Array.from(grid.querySelectorAll('.reorder-btn'));
+    if (btns.length <= 1) return;
+
+    btns.sort((a, b) => {
+        const nameA = (a.dataset.name || '').trim().toLowerCase();
+        const nameB = (b.dataset.name || '').trim().toLowerCase();
+        const priceA = parseFloat(a.dataset.price) || 0;
+        const priceB = parseFloat(b.dataset.price) || 0;
+
+        if (mode === 'name') {
+            return nameA.localeCompare(nameB, 'it', { sensitivity: 'base' });
+        } else if (mode === 'price') {
+            if (priceA !== priceB) return priceA - priceB;
+            return nameA.localeCompare(nameB, 'it', { sensitivity: 'base' });
+        }
+        return 0;
+    });
+
+    btns.forEach(btn => grid.appendChild(btn));
+
+    if (mode === 'name') {
+        showToast("Tessere riordinate in ordine alfabetico (A-Z)", "info");
+    } else {
+        showToast("Tessere riordinate per prezzo crescente", "info");
+    }
+}
+window.sortReorderGrid = sortReorderGrid;
 
 function closeProductReorderModal() {
     const modal = document.getElementById('product-reorder-modal');
@@ -1513,12 +1692,17 @@ async function saveProductReorder() {
             const rowEl = document.getElementById(rowId);
             if (rowEl) {
                 rowEl.dataset.position = idx;
+                if (rowEl.parentNode) {
+                    rowEl.parentNode.appendChild(rowEl);
+                }
             }
         });
     });
 
     closeProductReorderModal();
+    markMenuDirty();
     await saveMenu(true, "Ordine prodotti salvato con successo!");
+    renderEditor();
 }
 
 window.openProductReorderModal = openProductReorderModal;
@@ -1785,6 +1969,7 @@ async function saveMenu(stayInEditor = false, customToastMsg = null) {
         });
 
         if (res.ok) {
+            STATE.isMenuDirty = false;
             const toastMsg = customToastMsg || "Menu salvato con successo!";
             showToast(toastMsg, "success");
             await loadSagraResources();
@@ -2192,51 +2377,58 @@ async function clearCart() {
 }
 
 
+let isPrintingOrder = false;
+
 async function printOrder() {
+    if (isPrintingOrder) return;
     if (STATE.cart.length === 0) return showToast("Il carrello è vuoto", "error");
     const total = STATE.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+    const printBtn = document.querySelector('.btn-print');
+    isPrintingOrder = true;
+    if (printBtn) printBtn.disabled = true;
 
     // Get stored printer name and template
     const printerName = localStorage.getItem('thermalPrinterName');
     const template = localStorage.getItem('receiptTemplate') || 'compact';
 
-        const payload = {
-            sagraId: STATE.currentSagra.id,
-            items: STATE.cart,
-            total: total,
-            printerName: printerName,
-            template: template,
-            testMode: (localStorage.getItem('appTestMode') === 'true'),
-            printEventName: (localStorage.getItem('appPrintEventName') !== 'false')
-        };
+    const payload = {
+        sagraId: STATE.currentSagra.id,
+        items: STATE.cart,
+        total: total,
+        printerName: printerName,
+        template: template,
+        testMode: (localStorage.getItem('appTestMode') === 'true'),
+        printEventName: (localStorage.getItem('appPrintEventName') !== 'false')
+    };
 
-        try {
-            const res = await fetch('/api/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+    try {
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-            const data = await res.json();
+        const data = await res.json();
 
-            if (res.ok && data.success) {
-                if (data.testMode && data.preview) {
-                    showReceiptPreviewModal(data.preview);
-                } else if (data.warning) {
-                    showAlert(`Nota: ${data.warning}`);
-                } else {
-                    console.log(`Ordine #${data.orderId} Stampato!`);
-                }
-
-                STATE.cart = [];
-                const cashInput = document.getElementById('cash-received');
-                if (cashInput) cashInput.value = '';
-                renderCart();
-
-                // Refresh Inventory from Server
-                await loadSagraResources();
-                renderProducts();
+        if (res.ok && data.success) {
+            if (data.testMode && data.preview) {
+                showReceiptPreviewModal(data.preview);
+            } else if (data.warning) {
+                showAlert(`Nota: ${data.warning}`);
             } else {
+                console.log(`Ordine #${data.orderId} Stampato!`);
+            }
+
+            STATE.cart = [];
+            const cashInput = document.getElementById('cash-received');
+            if (cashInput) cashInput.value = '';
+            renderCart();
+
+            // Refresh Inventory from Server
+            await loadSagraResources();
+            renderProducts();
+        } else {
             // Error (likely inventory)
             const msg = data.error || 'Sconosciuto';
             alert('Errore: ' + msg);
@@ -2244,6 +2436,9 @@ async function printOrder() {
     } catch (e) {
         console.error(e);
         alert('Errore di connessione');
+    } finally {
+        isPrintingOrder = false;
+        if (printBtn) printBtn.disabled = false;
     }
 }
 
@@ -2719,11 +2914,34 @@ function showTestStatus(type, text) {
     statusEl.innerHTML = `<span class="material-symbols-rounded">${iconName}</span><span>${text}</span>`;
 }
 
+function toggleSettingsPasswordVisibility() {
+    const pwdInput = document.getElementById('settings-password');
+    const toggleIcon = document.getElementById('settings-password-toggle-icon');
+    if (!pwdInput || !toggleIcon) return;
+
+    if (pwdInput.type === 'password') {
+        pwdInput.type = 'text';
+        toggleIcon.innerText = 'visibility_off';
+    } else {
+        pwdInput.type = 'password';
+        toggleIcon.innerText = 'visibility';
+    }
+}
+window.toggleSettingsPasswordVisibility = toggleSettingsPasswordVisibility;
+
 window.openSettings = async function () {
     const testToggle = document.getElementById('test-mode-toggle');
     const printEventToggle = document.getElementById('print-event-name-toggle');
     const darkToggle = document.getElementById('dark-mode-toggle');
     const scheduleToggle = document.getElementById('dark-mode-schedule-toggle');
+
+    // Populate current saved password into settings input
+    if (settingsPasswordInput) {
+        settingsPasswordInput.value = localStorage.getItem('appPassword') || '';
+        settingsPasswordInput.type = 'password';
+        const toggleIcon = document.getElementById('settings-password-toggle-icon');
+        if (toggleIcon) toggleIcon.innerText = 'visibility';
+    }
 
     // Reset switches before displaying so CSS transition animates smoothly
     if (testToggle) testToggle.checked = false;
@@ -2783,7 +3001,7 @@ window.closeSettings = function () {
 }
 
 // --- TOAST NOTIFICATIONS ---
-function showToast(message, type = 'success', duration = 3000) {
+function showToast(message, type = 'success', duration = 3000, showIcon = true) {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
@@ -2799,8 +3017,10 @@ function showToast(message, type = 'success', duration = 3000) {
     if (type === 'error') iconName = 'error';
     if (type === 'info') iconName = 'info';
 
+    const iconHtml = showIcon ? `<span class="material-symbols-rounded toast-icon">${iconName}</span>` : '';
+
     toast.innerHTML = `
-        <span class="material-symbols-rounded toast-icon">${iconName}</span>
+        ${iconHtml}
         <span class="toast-message">${message}</span>
     `;
 

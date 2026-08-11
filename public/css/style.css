@@ -2588,7 +2588,7 @@ select.hidden-native-select {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: var(--bg);
+  background: var(--subtle-bg);
   max-height: 80vh;
   overflow-y: auto;
 }
@@ -3197,6 +3197,34 @@ input:checked + .slider:before {
 
 .toast-info .toast-icon {
   color: var(--btn-bg);
+}
+
+/* --- CATEGORY SORT BUTTONS --- */
+.btn-sort-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--subtle-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-sort-cat:hover {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-color: var(--btn-bg);
+  transform: translateY(-1px);
+}
+
+.btn-sort-cat:active {
+  transform: translateY(0) scale(0.96);
 }
 
 /* Update Toast Banner (Bottom Right) */
@@ -4160,4 +4188,135 @@ input:checked + .slider:before {
 .btn-save:active {
   transform: scale(0.97) !important;
 }
+
+/* --- POS BOTTOM-LEFT BAR (CLOCK & LOCK BUTTON) --- */
+.pos-bottom-left-bar {
+  position: fixed !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  top: auto !important;
+  right: auto !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.pos-clock-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  background: var(--card-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15) !important;
+  padding: 10px 16px !important;
+  border-radius: 30px !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  user-select: none !important;
+}
+
+.pos-clock-pill .material-symbols-rounded {
+  font-size: 1.15rem !important;
+  color: var(--primary) !important;
+}
+
+[data-theme="dark"] .pos-clock-pill {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-main) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .pos-clock-pill .material-symbols-rounded {
+  color: var(--primary) !important;
+}
+
+.btn-lock-pos {
+  position: static !important;
+  z-index: auto !important;
+  width: auto !important;
+  max-width: fit-content !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  background: var(--card-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15) !important;
+  padding: 10px 18px !important;
+  border-radius: 30px !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.btn-lock-pos .material-symbols-rounded {
+  font-size: 1.2rem !important;
+  color: var(--primary) !important;
+  transition: color 0.2s ease !important;
+}
+
+.btn-lock-pos:hover {
+  background: var(--btn-bg, #1e2a4a) !important;
+  color: #ffffff !important;
+  border-color: var(--btn-bg, #1e2a4a) !important;
+  transform: translateY(-2px) scale(1.03) !important;
+  box-shadow: 0 8px 20px rgba(30, 42, 74, 0.35) !important;
+}
+
+.btn-lock-pos:hover .material-symbols-rounded {
+  color: #ffffff !important;
+}
+
+.btn-lock-pos:active {
+  transform: translateY(0) scale(0.96) !important;
+}
+
+[data-theme="dark"] .btn-lock-pos {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-main) !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .btn-lock-pos .material-symbols-rounded {
+  color: var(--primary) !important;
+}
+
+[data-theme="dark"] .btn-lock-pos:hover {
+  background: var(--btn-bg, #3b82f6) !important;
+  color: #ffffff !important;
+  border-color: var(--btn-bg, #3b82f6) !important;
+}
+
+[data-theme="dark"] .btn-lock-pos:hover .material-symbols-rounded {
+  color: #ffffff !important;
+}
+
+/* --- LOGO LONG-PRESS EMERGENCY UNLOCK ANIMATION --- */
+.login-logo.pressing {
+  transform: scale(0.94);
+  filter: brightness(1.25) drop-shadow(0 0 20px rgba(59, 130, 246, 0.8));
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+/* Global Image Drag Prevention */
+img {
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+  user-select: none !important;
+}
+
 

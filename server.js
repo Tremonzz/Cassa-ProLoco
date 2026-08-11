@@ -863,7 +863,8 @@ app.get('/api/check-update', (req, res) => {
   const options = {
     headers: {
       'User-Agent': 'SagraManager-App'
-    }
+    },
+    rejectUnauthorized: false
   };
 
   https.get(url, options, (apiRes) => {
@@ -938,7 +939,8 @@ app.post('/api/download-and-install', (req, res) => {
 
   const downloadFile = (url, dest, callback) => {
     const file = fs.createWriteStream(dest);
-    const request = https.get(url, { headers: { 'User-Agent': 'SagraManager-App' } }, (response) => {
+    const client = url.startsWith('https') ? https : http;
+    const request = client.get(url, { headers: { 'User-Agent': 'SagraManager-App' }, rejectUnauthorized: false }, (response) => {
       // Handle HTTP redirects (GitHub Releases redirect to S3 storage)
       if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
         file.close();
