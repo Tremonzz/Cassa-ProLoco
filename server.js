@@ -940,16 +940,78 @@ app.get('/api/version', (req, res) => {
 });
 
 // CHECK UPDATE API (GitHub Public Releases)
+let updateCache = { data: null, timestamp: 0 };
+
 app.get('/api/check-update', (req, res) => {
   const owner = req.query.owner || 'Tremonzz';
   const repo = req.query.repo || 'Cassa-ProLoco';
   const pkg = require('./package.json');
-  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
 
+  // Check cache first (5 minutes TTL)
+  if (updateCache.data && (Date.now() - updateCache.timestamp < 5 * 60 * 1000)) {
+    return res.json(updateCache.data);
+  }
+
+  const semverCompare = (v1, v2) => {
+    const p1 = (v1 || '').split('.').map(Number);
+    const p2 = (v2 || '').split('.').map(Number);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+      const num1 = p1[i] || 0;
+      const num2 = p2[i] || 0;
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+    }
+    return 0;
+  };
+
+  const tryWebFallback = () => {
+    try {
+      const { execSync } = require('child_process');
+      const headerOutput = execSync(`curl.exe -sI "https://github.com/${owner}/${repo}/releases/latest"`, { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      const match = headerOutput.match(/location:\s*https:\/\/github\.com\/[^\/]+\/[^\/]+\/releases\/tag\/v?([0-9\.]+)/i);
+      if (match) {
+        const latestTag = match[1];
+        const hasUpdate = semverCompare(latestTag, pkg.version) > 0;
+
+        let downloadUrl = `https://github.com/${owner}/${repo}/releases/download/v${latestTag}/Gestione.Ordini.Setup.${latestTag}.exe`;
+        let fileSize = 0;
+
+        // Try fetching expanded_assets HTML to get exact .exe download URL and file size
+        try {
+          const assetsHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases/expanded_assets/v${latestTag}"`, { encoding: 'utf8', windowsHide: true, timeout: 8000 });
+          const exeMatch = assetsHtml.match(/href="(\/[^"]+\.exe)"/i);
+          if (exeMatch) {
+            downloadUrl = `https://github.com${exeMatch[1]}`;
+          }
+          const sizeMatch = assetsHtml.match(/(\d+(?:\.\d+)?)\s*(MB|KB|GB)/i);
+          if (sizeMatch) {
+            const num = parseFloat(sizeMatch[1]);
+            const unit = sizeMatch[2].toUpperCase();
+            if (unit === 'MB') fileSize = Math.round(num * 1024 * 1024);
+            else if (unit === 'GB') fileSize = Math.round(num * 1024 * 1024 * 1024);
+            else if (unit === 'KB') fileSize = Math.round(num * 1024);
+          }
+        } catch(e){}
+
+        const result = {
+          hasUpdate,
+          currentVersion: pkg.version,
+          latestVersion: latestTag,
+          releaseNotes: '',
+          downloadUrl,
+          fileSize,
+          releaseUrl: `https://github.com/${owner}/${repo}/releases/tag/v${latestTag}`
+        };
+        updateCache = { data: result, timestamp: Date.now() };
+        return res.json(result);
+      }
+    } catch(e){}
+    return res.json({ hasUpdate: false, currentVersion: pkg.version, status: 'no_release', message: 'Nessuna release trovata' });
+  };
+
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
   const options = {
-    headers: {
-      'User-Agent': 'SagraManager-App'
-    },
+    headers: { 'User-Agent': 'SagraManager-App' },
     rejectUnauthorized: false
   };
 
@@ -959,154 +1021,188 @@ app.get('/api/check-update', (req, res) => {
     apiRes.on('end', () => {
       try {
         if (apiRes.statusCode !== 200) {
-          return res.json({ hasUpdate: false, currentVersion: pkg.version, status: 'no_release', message: 'Nessuna release pubblicata trovata su GitHub' });
+          return tryWebFallback();
         }
 
         const data = JSON.parse(body);
         const latestTag = (data.tag_name || '').replace(/^v/, '');
         const releaseNotes = data.body || '';
 
-        // Find .exe asset if available
         let exeAsset = (data.assets || []).find(a => a.name && a.name.endsWith('.exe'));
-        let downloadUrl = exeAsset ? exeAsset.browser_download_url : data.html_url;
-
-        const semverCompare = (v1, v2) => {
-          const p1 = (v1 || '').split('.').map(Number);
-          const p2 = (v2 || '').split('.').map(Number);
-          for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-            const num1 = p1[i] || 0;
-            const num2 = p2[i] || 0;
-            if (num1 > num2) return 1;
-            if (num1 < num2) return -1;
-          }
-          return 0;
-        };
+        let downloadUrl = exeAsset ? exeAsset.browser_download_url : null;
+        let fileSize = exeAsset ? exeAsset.size : 0;
 
         const hasUpdate = semverCompare(latestTag, pkg.version) > 0;
 
-        res.json({
+        const result = {
           hasUpdate,
           currentVersion: pkg.version,
           latestVersion: latestTag,
           releaseNotes,
           downloadUrl,
+          fileSize,
           releaseUrl: data.html_url
-        });
+        };
+
+        updateCache = { data: result, timestamp: Date.now() };
+        res.json(result);
 
       } catch (e) {
-        res.status(500).json({ error: 'Errore durante la lettura delle informazioni di aggiornamento' });
+        tryWebFallback();
       }
     });
-  }).on('error', (err) => {
-    res.status(500).json({ error: 'Impossibile connettersi a GitHub: ' + err.message });
+  }).on('error', () => {
+    tryWebFallback();
   });
 });
 
 // DOWNLOAD & AUTO-INSTALL UPDATE API
 let updateProgress = { status: 'idle', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
+let activeProcess = null;
+let activeDownloadPath = null;
 
 app.get('/api/update-progress', (req, res) => {
   res.json(updateProgress);
 });
 
+app.post('/api/cancel-update', (req, res) => {
+  if (activeProcess) {
+    try { activeProcess.kill('SIGKILL'); } catch(e){}
+    activeProcess = null;
+  }
+  if (activeDownloadPath) {
+    try { if (fs.existsSync(activeDownloadPath)) fs.unlinkSync(activeDownloadPath); } catch(e){}
+    activeDownloadPath = null;
+}
+  updateProgress = { status: 'idle', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
+  res.json({ success: true, message: 'Download annullato' });
+});
+
 app.post('/api/download-and-install', (req, res) => {
-  const { downloadUrl } = req.body;
+  const { downloadUrl, totalBytes } = req.body;
   if (!downloadUrl) return res.status(400).json({ error: 'URL di download non fornito' });
 
-  // If it's not a direct .exe URL (e.g. webpage URL), notify client
   if (!downloadUrl.endsWith('.exe')) {
     return res.json({ success: false, redirectUrl: downloadUrl, message: 'Reindirizzamento alla pagina di release' });
   }
 
+  let totalBytesKnown = parseInt(totalBytes, 10) || 0;
+
+  // Fallback: fast HEAD request to get Content-Length if not passed in body
+  if (!totalBytesKnown) {
+    try {
+      const { execSync } = require('child_process');
+      const headerOutput = execSync(`curl.exe -sI -L "${downloadUrl}"`, { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      const match = headerOutput.match(/content-length:\s*(\d+)/i);
+      if (match) totalBytesKnown = parseInt(match[1], 10);
+    } catch(e){}
+  }
+
   const tempDir = os.tmpdir();
   const destPath = path.join(tempDir, `GestioneOrdini_Update_${Date.now()}.exe`);
+  const progressPath = destPath + '.progress.json';
 
-  updateProgress = { status: 'downloading', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
+  const initialTotalMb = totalBytesKnown > 0 ? (totalBytesKnown / (1024 * 1024)).toFixed(1) : '?';
+  updateProgress = { status: 'downloading', percent: 0, downloadedMb: '0.0', totalMb: initialTotalMb, error: null };
+  activeDownloadPath = destPath;
 
-  const downloadFile = (url, dest, callback) => {
-    const file = fs.createWriteStream(dest);
-    const client = url.startsWith('https') ? https : http;
-    const request = client.get(url, { headers: { 'User-Agent': 'SagraManager-App' }, rejectUnauthorized: false }, (response) => {
-      // Handle HTTP redirects (GitHub Releases redirect to S3 storage)
-      if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
-        file.close();
-        fs.unlink(dest, () => {});
-        return downloadFile(response.headers.location, dest, callback);
-      }
+  const { spawn } = require('child_process');
 
-      if (response.statusCode !== 200) {
-        file.close();
-        fs.unlink(dest, () => {});
-        const err = new Error(`Download fallito (status: ${response.statusCode})`);
-        updateProgress = { status: 'error', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: err.message };
-        return callback(err);
-      }
+  // PowerShell script: downloads with WebClient
+  const escapedUrl = downloadUrl.replace(/'/g, "''");
+  const escapedDest = destPath.replace(/\\/g, '\\\\').replace(/'/g, "''");
+  const escapedProgress = progressPath.replace(/\\/g, '\\\\').replace(/'/g, "''");
 
-      const totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-      let downloadedBytes = 0;
+  const psScript = [
+    `$url = '${escapedUrl}'`,
+    `$dest = '${escapedDest}'`,
+    `$progressFile = '${escapedProgress}'`,
+    `$wc = New-Object System.Net.WebClient`,
+    `$wc.Headers.Add('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')`,
+    `$wc.Headers.Add('Accept', '*/*')`,
+    `try {`,
+    `  $wc.DownloadFile($url, $dest)`,
+    `  Set-Content -Path $progressFile -Value '{"status":"done"}' -Encoding UTF8`,
+    `} catch {`,
+    `  Set-Content -Path $progressFile -Value (ConvertTo-Json @{status='error';message=$_.Exception.Message}) -Encoding UTF8`,
+    `}`
+  ].join('; ');
 
-      response.on('data', (chunk) => {
-        downloadedBytes += chunk.length;
-        const percent = totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+  const psProc = spawn('powershell.exe', [
+    '-NonInteractive', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript
+  ], { windowsHide: true, stdio: 'ignore' });
+
+  activeProcess = psProc;
+
+  // Poll file size on disk every 200ms to update progress
+  const progressTimer = setInterval(() => {
+    try {
+      if (fs.existsSync(destPath)) {
+        const stat = fs.statSync(destPath);
+        const downloadedBytes = stat.size;
+        const percent = totalBytesKnown > 0 ? Math.min(99, Math.round((downloadedBytes / totalBytesKnown) * 100)) : 0;
         const downloadedMb = (downloadedBytes / (1024 * 1024)).toFixed(1);
-        const totalMb = totalBytes > 0 ? (totalBytes / (1024 * 1024)).toFixed(1) : '?';
-
-        updateProgress = {
-          status: 'downloading',
-          percent: percent,
-          downloadedMb: downloadedMb,
-          totalMb: totalMb,
-          error: null
-        };
-      });
-
-      response.pipe(file);
-
-      file.on('finish', () => {
-        file.close(() => {
-          updateProgress = { status: 'completed', percent: 100, downloadedMb: updateProgress.downloadedMb, totalMb: updateProgress.totalMb, error: null };
-          callback(null, dest);
-        });
-      });
-    });
-
-    request.on('error', (err) => {
-      fs.unlink(dest, () => {});
-      updateProgress = { status: 'error', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: err.message };
-      callback(err);
-    });
-  };
-
-  downloadFile(downloadUrl, destPath, (err, filePath) => {
-    if (err) {
-      console.error("Errore download installer:", err);
-      return res.status(500).json({ error: 'Impossibile scaricare l\'aggiornamento: ' + err.message });
-    }
-
-    res.json({ success: true, message: 'Download completato. Avvio dell\'installatore...' });
-
-    // Launch downloaded installer & close application
-    setTimeout(() => {
-      try {
-        const { spawn } = require('child_process');
-        const child = spawn(filePath, [], {
-          detached: true,
-          stdio: 'ignore'
-        });
-        child.unref();
-
-        // Close Electron app
-        try {
-          const { app: electronApp } = require('electron');
-          if (electronApp) electronApp.quit();
-          else process.exit(0);
-        } catch (e) {
-          process.exit(0);
-        }
-      } catch (e) {
-        console.error("Errore avvio installer:", e);
+        const totalMb = totalBytesKnown > 0 ? (totalBytesKnown / (1024 * 1024)).toFixed(1) : '?';
+        updateProgress = { status: 'downloading', percent, downloadedMb, totalMb, error: null };
       }
-    }, 800);
+    } catch(e){}
+  }, 200);
+
+  psProc.on('close', (code) => {
+    clearInterval(progressTimer);
+    activeProcess = null;
+    try { if (fs.existsSync(progressPath)) fs.unlinkSync(progressPath); } catch(e){}
+
+    if (updateProgress.status === 'idle') return; // Cancelled by user
+
+    const MIN_VALID_SIZE = 100 * 1024; // 100KB minimum for a real installer
+
+    if (code === 0 && fs.existsSync(destPath) && fs.statSync(destPath).size >= MIN_VALID_SIZE) {
+      const finalBytes = fs.statSync(destPath).size;
+      const finalMb = (finalBytes / (1024 * 1024)).toFixed(1);
+      updateProgress = { status: 'completed', percent: 100, downloadedMb: finalMb, totalMb: finalMb, error: null };
+
+      if (!res.headersSent) res.json({ success: true, message: 'Download completato. Avvio installatore...' });
+
+      setTimeout(() => {
+        try {
+          const child = spawn('cmd.exe', ['/c', `start /wait "" "${destPath}" & del /f /q "${destPath}"`], {
+            detached: true, stdio: 'ignore', windowsHide: true
+          });
+          child.unref();
+          try {
+            const { app: electronApp } = require('electron');
+            if (electronApp) electronApp.quit(); else process.exit(0);
+          } catch(e) { process.exit(0); }
+        } catch(e) { console.error("Errore avvio installer:", e); }
+      }, 800);
+
+    } else {
+      // Read size BEFORE deleting
+      let fileSize = 0;
+      try { if (fs.existsSync(destPath)) fileSize = fs.statSync(destPath).size; } catch(e){}
+      try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch(e){}
+      let errMsg;
+      if (code === 0 && fileSize < MIN_VALID_SIZE) {
+        // PS exited OK but file is empty or tiny = 404 or redirect to error page
+        errMsg = 'File di aggiornamento non trovato su GitHub (404). L\'asset potrebbe non essere ancora stato pubblicato.';
+      } else {
+        errMsg = updateProgress.error || `Download fallito (codice: ${code})`;
+      }
+      updateProgress = { status: 'error', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: errMsg };
+      if (!res.headersSent) res.status(500).json({ error: errMsg });
+    }
+  });
+
+  psProc.on('error', (err) => {
+    clearInterval(progressTimer);
+    activeProcess = null;
+    try { if (fs.existsSync(destPath)) fs.unlinkSync(destPath); } catch(e){}
+    try { if (fs.existsSync(progressPath)) fs.unlinkSync(progressPath); } catch(e){}
+    if (updateProgress.status !== 'idle') {
+      updateProgress = { status: 'error', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: err.message };
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+    }
   });
 });
 

@@ -28,6 +28,9 @@ const totalEl = document.getElementById('total-amount');
 
 // --- VIEW NAVIGATION ---
 async function showView(viewName) {
+    if (viewName === 'auth') {
+        dismissUpdateToast();
+    }
     if (viewName === 'auth' || viewName === 'login') {
         if (typeof closeAllModals === 'function') closeAllModals();
     }
@@ -49,6 +52,9 @@ async function showView(viewName) {
     Object.values(views).forEach(el => el.classList.remove('active'));
     if (views[viewName]) {
         views[viewName].classList.add('active');
+    }
+    if (viewName !== 'auth') {
+        checkAppUpdateSilent();
     }
     return true;
 }
@@ -411,6 +417,10 @@ async function init() {
     }
 
     showView('auth');
+
+    // Check for updates silently on startup
+    checkAppUpdateSilent();
+    setTimeout(() => checkAppUpdateSilent(), 300);
 }
 
 function updateLiveClock() {
@@ -620,6 +630,7 @@ function closeAllModals() {
     if (typeof closePosSelectionModal === 'function') closePosSelectionModal();
     if (typeof closeLinkedProductsModal === 'function') closeLinkedProductsModal();
     if (typeof closeProductReorderModal === 'function') closeProductReorderModal();
+    if (typeof closeChangelogModal === 'function') closeChangelogModal();
 
     document.querySelectorAll('.modal, .modal-backdrop, .dialog-overlay, [id$="-modal"]').forEach(modal => {
         if (modal.id === 'view-auth' || modal.id === 'view-login') return;
@@ -3694,14 +3705,20 @@ async function checkAppUpdate() {
         if (verEl && data.currentVersion) verEl.innerText = data.currentVersion;
 
         if (data.hasUpdate) {
+            latestUpdateData = data;
             if (banner) {
                 banner.className = 'status-banner status-success';
                 banner.innerHTML = `
-                    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:10px; padding:4px;">
                         <span><b>Nuova versione v${data.latestVersion} disponibile!</b> (Installata: v${data.currentVersion})</span>
-                        <button type="button" onclick="startAutoUpdate('${data.downloadUrl}')" class="btn-update-action" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;">
-                            <span class="material-symbols-rounded" style="font-size:1.1rem;">system_update</span> Aggiorna Ora
-                        </button>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button type="button" onclick="openChangelogModal()" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:var(--bg-secondary); color:var(--text-main); border:1px solid var(--border-color); border-radius:8px; font-weight:600; cursor:pointer;">
+                                <span class="material-symbols-rounded" style="font-size:1.1rem;">article</span> Dettagli
+                            </button>
+                            <button type="button" onclick="startAutoUpdate('${data.downloadUrl}')" class="btn-update-action" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:8px; font-weight:700; cursor:pointer;">
+                                <span class="material-symbols-rounded" style="font-size:1.1rem;">system_update</span> Aggiorna Ora
+                            </button>
+                        </div>
                     </div>
                 `;
             }
@@ -3723,10 +3740,23 @@ async function checkAppUpdate() {
 window.checkAppUpdate = checkAppUpdate;
 
 async function startAutoUpdate(downloadUrl) {
+    if ((!downloadUrl || downloadUrl === 'null' || downloadUrl === 'undefined') && latestUpdateData && latestUpdateData.releaseUrl) {
+        window.open(latestUpdateData.releaseUrl, '_blank');
+        return;
+    }
+
     const settingsBanner = document.getElementById('update-result-banner');
     const toastBanner = document.getElementById('update-toast-banner');
 
+    window._isUpdateCancelled = false;
+    if (window._activeUpdatePollInterval) {
+        clearInterval(window._activeUpdatePollInterval);
+        window._activeUpdatePollInterval = null;
+    }
+
     const renderProgressUI = (percent, downloadedMb, totalMb, statusText) => {
+        if (window._isUpdateCancelled) return;
+
         const progressHtml = `
             <div style="display:flex; flex-direction:column; gap:6px; width:100%; text-align:left; padding:4px 0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; font-weight:700;">
@@ -3736,8 +3766,9 @@ async function startAutoUpdate(downloadUrl) {
                 <div class="update-progress-track">
                     <div class="update-progress-bar" style="width: ${percent}%;"></div>
                 </div>
-                <div style="font-size:0.75rem; color:var(--text-light); text-align:right;">
-                    ${downloadedMb} MB / ${totalMb} MB
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-light); margin-top:2px;">
+                    <span>${downloadedMb} MB / ${totalMb} MB</span>
+                    <button type="button" onclick="cancelAutoUpdate()" style="padding:2px 8px; font-size:0.75rem; background:var(--subtle-hover); border:1px solid var(--border-color); border-radius:6px; color:var(--danger); cursor:pointer; font-weight:600;">Annulla</button>
                 </div>
             </div>
         `;
@@ -3747,7 +3778,8 @@ async function startAutoUpdate(downloadUrl) {
             settingsBanner.innerHTML = progressHtml;
         }
 
-        if (toastBanner && toastBanner.classList.contains('visible')) {
+        if (toastBanner) {
+            toastBanner.classList.add('visible');
             toastBanner.innerHTML = `
                 <div class="update-toast-content" style="width:100%;">
                     <div class="update-toast-icon">
@@ -3759,9 +3791,40 @@ async function startAutoUpdate(downloadUrl) {
         }
     };
 
+    const renderErrorUI = (errMsg) => {
+        if (window._isUpdateCancelled) return;
+
+        if (settingsBanner && settingsBanner.style.display !== 'none') {
+            settingsBanner.className = 'status-banner status-error';
+            settingsBanner.innerText = errMsg;
+        }
+
+        if (toastBanner) {
+            toastBanner.classList.add('visible');
+            toastBanner.innerHTML = `
+                <div class="update-toast-content" style="width:100%;">
+                    <div class="update-toast-icon" style="color:var(--danger);">
+                        <span class="material-symbols-rounded">error</span>
+                    </div>
+                    <div class="update-toast-info">
+                        <div class="update-toast-title" style="color:var(--danger);">Errore Aggiornamento</div>
+                        <div class="update-toast-sub" style="font-size:0.8rem;">${errMsg}</div>
+                    </div>
+                </div>
+                <div class="update-toast-actions">
+                    <button type="button" class="btn-update-close" onclick="dismissUpdateToast()">&times;</button>
+                </div>
+            `;
+        }
+    };
+
     renderProgressUI(0, '0.0', '...', 'Avvio download...');
 
     const pollInterval = setInterval(async () => {
+        if (window._isUpdateCancelled) {
+            clearInterval(pollInterval);
+            return;
+        }
         try {
             const pRes = await fetch('/api/update-progress');
             if (pRes.ok) {
@@ -3772,17 +3835,18 @@ async function startAutoUpdate(downloadUrl) {
                     renderProgressUI(100, pData.totalMb, pData.totalMb, 'Download completato! Avvio installazione...');
                     clearInterval(pollInterval);
                 } else if (pData.status === 'error') {
+                    renderErrorUI(pData.error || 'Errore durante il download');
                     clearInterval(pollInterval);
                 }
             }
         } catch (e) {}
     }, 250);
-
     try {
+        const totalBytes = (latestUpdateData && latestUpdateData.fileSize) ? latestUpdateData.fileSize : 0;
         const res = await fetch('/api/download-and-install', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ downloadUrl })
+            body: JSON.stringify({ downloadUrl, totalBytes })
         });
         const data = await res.json();
         clearInterval(pollInterval);
@@ -3791,21 +3855,44 @@ async function startAutoUpdate(downloadUrl) {
             renderProgressUI(100, '', '', 'Avvio installatore e chiusura app...');
         } else if (data.redirectUrl) {
             window.open(data.redirectUrl, '_blank');
-        } else {
-            if (settingsBanner) {
-                settingsBanner.className = 'status-banner status-error';
-                settingsBanner.innerText = data.error || 'Errore durante il download.';
-            }
+            if (latestUpdateData) showUpdateToast(latestUpdateData);
+        } else if (!window._isUpdateCancelled) {
+            renderErrorUI(data.error || 'Errore durante il download.');
         }
     } catch (e) {
         clearInterval(pollInterval);
-        if (settingsBanner) {
-            settingsBanner.className = 'status-banner status-error';
-            settingsBanner.innerText = 'Errore di rete durante il download dell\'aggiornamento.';
+        if (!window._isUpdateCancelled) {
+            renderErrorUI('Errore di rete durante il download dell\'aggiornamento.');
         }
     }
 }
 window.startAutoUpdate = startAutoUpdate;
+
+async function cancelAutoUpdate() {
+    window._isUpdateCancelled = true;
+
+    if (window._activeUpdatePollInterval) {
+        clearInterval(window._activeUpdatePollInterval);
+        window._activeUpdatePollInterval = null;
+    }
+
+    const toast = document.getElementById('update-toast-banner');
+    if (toast) {
+        toast.style.display = 'none';
+        toast.classList.remove('visible');
+    }
+
+    const settingsBanner = document.getElementById('update-result-banner');
+    if (settingsBanner && settingsBanner.style.display !== 'none') {
+        settingsBanner.className = 'status-banner status-info';
+        settingsBanner.innerText = 'Download annullato.';
+    }
+
+    try {
+        await fetch('/api/cancel-update', { method: 'POST' });
+    } catch(e) {}
+}
+window.cancelAutoUpdate = cancelAutoUpdate;
 
 let latestUpdateData = null;
 
@@ -3815,16 +3902,12 @@ async function checkAppUpdateSilent() {
         if (!res.ok) return;
         const data = await res.json();
 
-        // Dynamically update current version in settings if element exists
         const verEl = document.getElementById('current-app-version');
         if (verEl && data.currentVersion) verEl.innerText = data.currentVersion;
 
         if (data.hasUpdate) {
             latestUpdateData = data;
-            const dismissedTag = sessionStorage.getItem('dismissUpdateTag');
-            if (dismissedTag !== data.latestVersion) {
-                showUpdateToast(data);
-            }
+            showUpdateToast(data);
         }
     } catch (e) {
         console.log("Silent update check skipped (offline or network error)");
@@ -3832,27 +3915,120 @@ async function checkAppUpdateSilent() {
 }
 
 function showUpdateToast(data) {
-    const toast = document.getElementById('update-toast-banner');
-    const verEl = document.getElementById('update-toast-ver');
-    const btn = document.getElementById('update-toast-btn');
-    if (!toast || !verEl || !btn) return;
+    if (!data) return;
+    latestUpdateData = data;
 
-    verEl.innerText = `v${data.latestVersion}`;
-    btn.onclick = function() {
-        if (data.downloadUrl) {
-            startAutoUpdate(data.downloadUrl);
-        }
-    };
+    // Do NOT show toast ONLY on the initial password entry screen (view-auth)
+    const authView = document.getElementById('view-auth');
+    if (authView && authView.classList.contains('active')) {
+        return;
+    }
+
+    const toast = document.getElementById('update-toast-banner');
+    if (!toast) return;
+
+    // Restore original toast structure in case it was overwritten by download progress
+    toast.innerHTML = `
+        <div class="update-toast-content">
+            <span class="material-symbols-rounded update-toast-icon">system_update</span>
+            <div class="update-toast-info">
+                <div class="update-toast-title">Aggiornamento<br>disponibile <span style="font-size:0.85em; font-weight:600; opacity:0.85;">v${data.latestVersion}</span></div>
+            </div>
+        </div>
+        <div class="update-toast-actions">
+            <button type="button" class="btn-update-details" onclick="openChangelogModal()">Dettagli</button>
+            <button type="button" class="btn-update-now" id="update-toast-btn">Aggiorna Ora</button>
+            <button type="button" class="btn-update-close" onclick="dismissUpdateToast()">&times;</button>
+        </div>
+    `;
+
+    // Re-acquire btn reference after innerHTML reset
+    const newBtn = document.getElementById('update-toast-btn');
+    if (newBtn) {
+        newBtn.onclick = function() {
+            if (data.downloadUrl) {
+                startAutoUpdate(data.downloadUrl);
+            } else if (data.releaseUrl) {
+                // No .exe asset — open release page in browser
+                window.open(data.releaseUrl, '_blank');
+                dismissUpdateToast();
+            }
+        };
+    }
+
+    toast.style.display = 'flex';
     toast.classList.add('visible');
 }
 
 function dismissUpdateToast() {
     const toast = document.getElementById('update-toast-banner');
-    if (toast) toast.classList.remove('visible');
-    if (latestUpdateData && latestUpdateData.latestVersion) {
-        sessionStorage.setItem('dismissUpdateTag', latestUpdateData.latestVersion);
+    if (toast) {
+        toast.style.display = 'none';
+        toast.classList.remove('visible');
     }
 }
+
+function formatReleaseNotes(text) {
+    if (!text || !text.trim()) return '<div style="color:var(--text-light); text-align:center; padding:20px;">Nessuna nota di rilascio fornita per questa versione.</div>';
+
+    let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Convert markdown bold **text** -> <b>text</b>
+    html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+    // Convert markdown headings
+    html = html.replace(/^### (.*$)/gim, '<h4 style="margin:12px 0 6px 0; color:var(--primary); font-size:1.05rem;">$1</h4>');
+    html = html.replace(/^## (.*$)/gim, '<h3 style="margin:14px 0 6px 0; color:var(--primary); font-size:1.15rem;">$1</h3>');
+    html = html.replace(/^# (.*$)/gim, '<h2 style="margin:16px 0 8px 0; color:var(--primary); font-size:1.25rem;">$1</h2>');
+
+    // Convert list items - item -> <li>item</li>
+    html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<li style="margin-bottom:4px;">$1</li>');
+
+    // Wrap continuous <li> in <ul>
+    html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/gs, '<ul style="margin:8px 0 12px 20px; padding-left:0;">$1</ul>');
+
+    // Convert double newlines to breaks
+    html = html.replace(/\n\n/g, '<br><br>');
+
+    return html;
+}
+
+function openChangelogModal() {
+    if (!latestUpdateData) return;
+
+    const modal = document.getElementById('changelog-modal');
+    const verEl = document.getElementById('changelog-modal-version');
+    const bodyEl = document.getElementById('changelog-modal-body');
+    const updateBtn = document.getElementById('changelog-modal-update-btn');
+
+    if (verEl) verEl.innerText = `v${latestUpdateData.latestVersion}`;
+    if (bodyEl) bodyEl.innerHTML = formatReleaseNotes(latestUpdateData.releaseNotes);
+
+    if (updateBtn) {
+        if (latestUpdateData.downloadUrl) {
+            updateBtn.style.display = 'inline-flex';
+            updateBtn.onclick = function() {
+                closeChangelogModal();
+                startAutoUpdate(latestUpdateData.downloadUrl);
+            };
+        } else {
+            updateBtn.style.display = 'none';
+        }
+    }
+
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeChangelogModal() {
+    const modal = document.getElementById('changelog-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+window.openChangelogModal = openChangelogModal;
+window.closeChangelogModal = closeChangelogModal;
 window.dismissUpdateToast = dismissUpdateToast;
 window.checkAppUpdateSilent = checkAppUpdateSilent;
 

@@ -1296,17 +1296,21 @@ select.hidden-native-select {
 }
 
 .status-banner.status-loading .material-symbols-rounded {
-  animation: spin 1.2s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .spinning-icon {
   display: inline-block;
-  animation: spin 1s linear infinite;
+  transform-origin: 50% 50%;
+  animation: spin 0.9s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 .btn-small {
@@ -3232,7 +3236,7 @@ input:checked + .slider:before {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 10000;
+  z-index: 900;
   background: var(--card-bg);
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(30, 42, 74, 0.08);
@@ -3240,7 +3244,9 @@ input:checked + .slider:before {
   display: none;
   align-items: center;
   gap: 16px;
-  max-width: 420px;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -3252,6 +3258,8 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .update-toast-icon {
@@ -3261,24 +3269,34 @@ input:checked + .slider:before {
   padding: 8px;
   border-radius: 10px;
   border: 1px solid var(--border-dark);
+  flex-shrink: 0;
+}
+
+.update-toast-info {
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .update-toast-title {
   font-weight: 700;
   color: var(--primary);
   font-size: 0.95rem;
+  line-height: 1.25;
 }
 
 .update-toast-sub {
   font-size: 0.85rem;
   color: var(--text-light);
   margin-top: 2px;
+  white-space: nowrap;
 }
 
 .update-toast-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .btn-update-now {
@@ -3295,6 +3313,24 @@ input:checked + .slider:before {
   box-shadow: 0 2px 6px rgba(30, 42, 74, 0.2);
 }
 
+.btn-update-details {
+  background: var(--subtle-hover);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-update-details:hover {
+  background: var(--border-color);
+  transform: translateY(-1px);
+}
+
 .btn-update-now:hover {
   background: var(--primary-light);
   transform: translateY(-1px);
@@ -3305,11 +3341,13 @@ input:checked + .slider:before {
   background: transparent;
   border: none;
   color: var(--text-light);
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: 6px;
+  flex-shrink: 0;
+  margin-left: 2px;
   transition: all 0.15s ease;
 }
 

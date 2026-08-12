@@ -625,17 +625,37 @@
     <div class="update-toast-content">
       <span class="material-symbols-rounded update-toast-icon">system_update</span>
       <div class="update-toast-info">
-        <div class="update-toast-title">Aggiornamento Disponibile</div>
-        <div class="update-toast-sub">Nuova versione <b id="update-toast-ver">v2.0.5</b> pronta.</div>
+        <div class="update-toast-title">Aggiornamento<br>disponibile</div>
       </div>
     </div>
     <div class="update-toast-actions">
+      <button type="button" class="btn-update-details" onclick="openChangelogModal()">Dettagli</button>
       <button type="button" class="btn-update-now" id="update-toast-btn">Aggiorna Ora</button>
       <button type="button" class="btn-update-close" onclick="dismissUpdateToast()">&times;</button>
     </div>
   </div>
 
-
+  <!-- Changelog / Release Notes Modal -->
+  <div id="changelog-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width: 650px; width: 92%;">
+      <div class="modal-header">
+        <h2 style="display:flex; align-items:center; gap:8px;">
+          <span class="material-symbols-rounded" style="color:var(--primary);">article</span>
+          Note di Rilascio <span id="changelog-modal-version" style="font-size:0.9rem; background:rgba(59,130,246,0.12); color:var(--primary); padding:2px 8px; border-radius:12px; margin-left:4px;">v--</span>
+        </h2>
+        <span class="close-modal" onclick="closeChangelogModal()">&times;</span>
+      </div>
+      <div class="modal-body" style="max-height: 65vh; overflow-y: auto; padding: 20px; font-size: 0.95rem; line-height: 1.6; color: var(--text-main);" id="changelog-modal-body">
+        <!-- Injected JS -->
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <button type="button" class="btn-pos-secondary" onclick="closeChangelogModal()" style="height: 42px; padding: 10px 22px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-border;">Chiudi</button>
+        <button type="button" class="btn-save" id="changelog-modal-update-btn" style="height: 42px; padding: 10px 22px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box;">
+          <span class="material-symbols-rounded" style="font-size: 1.15rem;">system_update</span> Aggiorna Ora
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container"></div>
