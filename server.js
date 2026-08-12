@@ -975,6 +975,27 @@ app.get('/api/check-update', (req, res) => {
 
         let downloadUrl = `https://github.com/${owner}/${repo}/releases/download/v${latestTag}/Gestione.Ordini.Setup.${latestTag}.exe`;
         let fileSize = 0;
+        let releaseNotes = '';
+
+        // Try fetching release HTML page to extract release notes
+        try {
+          const releaseHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases/tag/v${latestTag}"`, { encoding: 'utf8', windowsHide: true, timeout: 8000 });
+          const notesMatch = releaseHtml.match(/class="markdown-body[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || releaseHtml.match(/data-test-selector="body-content"[^>]*>([\s\S]*?)<\/div>/i);
+          if (notesMatch) {
+            releaseNotes = notesMatch[1]
+              .replace(/<style[\s\S]*?<\/style>/gi, '')
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n### $1\n')
+              .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<[^>]+>/g, '')
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/\n\s*\n\s*\n/g, '\n\n')
+              .trim();
+          }
+        } catch(e){}
 
         // Try fetching expanded_assets HTML to get exact .exe download URL and file size
         try {
@@ -997,7 +1018,7 @@ app.get('/api/check-update', (req, res) => {
           hasUpdate,
           currentVersion: pkg.version,
           latestVersion: latestTag,
-          releaseNotes: '',
+          releaseNotes,
           downloadUrl,
           fileSize,
           releaseUrl: `https://github.com/${owner}/${repo}/releases/tag/v${latestTag}`

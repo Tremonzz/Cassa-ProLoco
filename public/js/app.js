@@ -3779,15 +3779,43 @@ async function startAutoUpdate(downloadUrl) {
         }
 
         if (toastBanner) {
+            toastBanner.style.display = 'flex';
             toastBanner.classList.add('visible');
-            toastBanner.innerHTML = `
-                <div class="update-toast-content" style="width:100%;">
-                    <div class="update-toast-icon">
-                        <span class="material-symbols-rounded spinning-icon">sync</span>
+
+            // If toast DOM is not initialized with spinning icon yet, set static outer layout ONCE
+            if (!toastBanner.querySelector('.spinning-icon')) {
+                toastBanner.innerHTML = `
+                    <div class="update-toast-content" style="width:100%;">
+                        <div class="update-toast-icon">
+                            <span class="material-symbols-rounded spinning-icon">sync</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:6px; width:100%; text-align:left; padding:4px 0;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; font-weight:700;">
+                                <span class="update-status-text">${statusText}</span>
+                                <span class="update-percent-text" style="color:var(--primary);">${percent}%</span>
+                            </div>
+                            <div class="update-progress-track">
+                                <div class="update-progress-bar" style="width: ${percent}%;"></div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-light); margin-top:2px;">
+                                <span class="update-mb-text">${downloadedMb} MB / ${totalMb} MB</span>
+                                <button type="button" onclick="cancelAutoUpdate()" style="padding:2px 8px; font-size:0.75rem; background:var(--subtle-hover); border:1px solid var(--border-color); border-radius:6px; color:var(--danger); cursor:pointer; font-weight:600;">Annulla</button>
+                            </div>
+                        </div>
                     </div>
-                    ${progressHtml}
-                </div>
-            `;
+                `;
+            } else {
+                // Icon exists — update ONLY text and progress bar width so icon animation never resets
+                const statusEl = toastBanner.querySelector('.update-status-text');
+                const percentEl = toastBanner.querySelector('.update-percent-text');
+                const barEl = toastBanner.querySelector('.update-progress-bar');
+                const mbEl = toastBanner.querySelector('.update-mb-text');
+
+                if (statusEl) statusEl.innerText = statusText;
+                if (percentEl) percentEl.innerText = `${percent}%`;
+                if (barEl) barEl.style.width = `${percent}%`;
+                if (mbEl) mbEl.innerText = `${downloadedMb} MB / ${totalMb} MB`;
+            }
         }
     };
 

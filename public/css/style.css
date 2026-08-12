@@ -3263,13 +3263,20 @@ input:checked + .slider:before {
 }
 
 .update-toast-icon {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   color: var(--primary);
   background: var(--subtle-hover);
-  padding: 8px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
   border: 1px solid var(--border-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .update-toast-info {
