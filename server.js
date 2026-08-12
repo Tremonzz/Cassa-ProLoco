@@ -467,6 +467,43 @@ app.post('/api/orders', async (req, res) => {
       // 1. Inventory Check & Aggregated Update
       const stockDeductions = {};
 
+      // Helper function to resolve sub-component stock deductions recursively
+      async function resolveProductStockDeductions(compName, requiredQty, visited = new Set()) {
+        if (!compName || visited.has(compName)) return;
+        visited.add(compName);
+
+        const compRows = await dbAll(`
+          SELECT p.id, p.name, p.quantity, p.is_composite, p.is_selection, p.components 
+          FROM products p 
+          JOIN categories c ON p.category_id = c.id 
+          WHERE c.sagra_id = ? AND p.name = ?
+        `, [targetSagra, compName]);
+
+        if (compRows.length > 0) {
+          const comp = compRows[0];
+          const isNestedComp = comp.is_composite === 1 || comp.is_selection === 1;
+
+          if (isNestedComp) {
+            let subComps = [];
+            if (comp.components) {
+              try { subComps = JSON.parse(comp.components); } catch (e) {}
+            }
+            if (Array.isArray(subComps) && subComps.length > 0) {
+              for (const subName of subComps) {
+                await resolveProductStockDeductions(subName, requiredQty, visited);
+              }
+            }
+          } else {
+            if (comp.quantity !== null && comp.quantity !== undefined) {
+              if (!stockDeductions[comp.id]) {
+                stockDeductions[comp.id] = { id: comp.id, name: comp.name, currentQty: comp.quantity, requiredQty: 0 };
+              }
+              stockDeductions[comp.id].requiredQty += requiredQty;
+            }
+          }
+        }
+      }
+
       for (const item of items) {
         if (item.id) {
           const prodRows = await dbAll("SELECT id, name, quantity, is_composite, is_selection, components FROM products WHERE id = ?", [item.id]);
@@ -486,22 +523,7 @@ app.post('/api/orders', async (req, res) => {
               }
 
               for (const compName of comps) {
-                const compRows = await dbAll(`
-                  SELECT p.id, p.name, p.quantity 
-                  FROM products p 
-                  JOIN categories c ON p.category_id = c.id 
-                  WHERE c.sagra_id = ? AND p.name = ?
-                `, [targetSagra, compName]);
-
-                if (compRows.length > 0) {
-                  const comp = compRows[0];
-                  if (comp.quantity !== null) {
-                    if (!stockDeductions[comp.id]) {
-                      stockDeductions[comp.id] = { id: comp.id, name: comp.name, currentQty: comp.quantity, requiredQty: 0 };
-                    }
-                    stockDeductions[comp.id].requiredQty += item.quantity;
-                  }
-                }
+                await resolveProductStockDeductions(compName, item.quantity);
               }
             } else {
               // Standard product
@@ -531,7 +553,8 @@ app.post('/api/orders', async (req, res) => {
       }
 
       // 2. Insert Order
-      const result = await dbRun("INSERT INTO orders (total, sagra_id) VALUES (?, ?)", [total, targetSagra]);
+      const isoNow = new Date().toISOString();
+      const result = await dbRun("INSERT INTO orders (total, sagra_id, created_at) VALUES (?, ?, ?)", [total, targetSagra, isoNow]);
       const newOrderId = result.lastID;
 
       // 3. Get Sequence Number
@@ -742,13 +765,13 @@ app.get('/api/stats', async (req, res) => {
     const hourlySales = await new Promise((resolve, reject) => {
       db.all(`
             SELECT 
-              strftime('%H:00', created_at) as hour_slot, 
+              strftime('%H:00', datetime(created_at, 'localtime')) as hour_slot, 
               COUNT(id) as orders_count, 
               SUM(total) as revenue,
               MIN(created_at) as min_time
             FROM orders 
             WHERE sagra_id = ? 
-            GROUP BY strftime('%Y-%m-%d %H:00', created_at) 
+            GROUP BY strftime('%Y-%m-%d %H:00', datetime(created_at, 'localtime')) 
             ORDER BY min_time ASC
         `, [sagraId], (err, rows) => {
         if (err) reject(err); else resolve(rows);

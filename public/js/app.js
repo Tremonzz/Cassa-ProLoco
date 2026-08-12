@@ -28,6 +28,10 @@ const totalEl = document.getElementById('total-amount');
 
 // --- VIEW NAVIGATION ---
 async function showView(viewName) {
+    if (viewName === 'auth' || viewName === 'login') {
+        if (typeof closeAllModals === 'function') closeAllModals();
+    }
+
     // Check if attempting to leave editor with unsaved changes
     if (views.editor && views.editor.classList.contains('active') && viewName !== 'editor' && STATE.isMenuDirty) {
         const confirmed = await showDialog({
@@ -612,9 +616,23 @@ function checkLogin() {
 }
 window.checkLogin = checkLogin;
 
+function closeAllModals() {
+    if (typeof closePosSelectionModal === 'function') closePosSelectionModal();
+    if (typeof closeLinkedProductsModal === 'function') closeLinkedProductsModal();
+    if (typeof closeProductReorderModal === 'function') closeProductReorderModal();
+
+    document.querySelectorAll('.modal, .modal-backdrop, .dialog-overlay, [id$="-modal"]').forEach(modal => {
+        if (modal.id === 'view-auth' || modal.id === 'view-login') return;
+        modal.style.display = 'none';
+    });
+}
+window.closeAllModals = closeAllModals;
+
 function lockPOS() {
     if (!STATE.currentSagra) return;
     STATE.isPOSLocked = true;
+
+    closeAllModals();
 
     const savedPassword = localStorage.getItem('appPassword');
     const authContainer = document.getElementById('auth-input-container');
@@ -1156,6 +1174,37 @@ window.deleteProductRow = deleteProductRow;
 
 let currentEditingCompositeRow = null;
 
+function getAllNestedComponentNames(compNames, visited = new Set()) {
+    let result = [];
+    if (!Array.isArray(compNames)) return result;
+
+    compNames.forEach(compName => {
+        if (!compName || visited.has(compName)) return;
+        visited.add(compName);
+        result.push(compName);
+
+        let foundProd = null;
+        for (const catProds of Object.values(STATE.products)) {
+            foundProd = catProds.find(item => item.name === compName);
+            if (foundProd) break;
+        }
+
+        if (foundProd && foundProd.components) {
+            let subComps = foundProd.components;
+            if (typeof subComps === 'string') {
+                try { subComps = JSON.parse(subComps); } catch(e){}
+            }
+            if (Array.isArray(subComps) && subComps.length > 0) {
+                const nested = getAllNestedComponentNames(subComps, visited);
+                result = result.concat(nested);
+            }
+        }
+    });
+
+    return result;
+}
+window.getAllNestedComponentNames = getAllNestedComponentNames;
+
 function openLinkedProductsModal(btn) {
     currentEditingCompositeRow = btn.closest('.product-row');
     if (!currentEditingCompositeRow) return;
@@ -1190,13 +1239,20 @@ function openLinkedProductsModal(btn) {
         if (!catName) catName = 'Categoria';
 
         const prods = [];
-        sec.querySelectorAll('.products-list-standard .product-row').forEach(row => {
+        sec.querySelectorAll('.products-list-standard .product-row, .products-list-composite .product-row').forEach(row => {
+            if (row === currentEditingCompositeRow) return;
             const pInput = row.querySelector('.col-name') || row.querySelector('input[type="text"]');
             const priceInput = row.querySelector('.col-price') || row.querySelectorAll('input')[1];
             const pName = pInput ? pInput.value.trim() : '';
             const pPrice = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
-            if (pName) {
-                prods.push({ name: pName, price: pPrice });
+            const isCompRow = row.closest('.products-list-composite') !== null;
+            let compSubItems = [];
+            if (isCompRow && row.dataset.linkedProducts) {
+                try { compSubItems = JSON.parse(row.dataset.linkedProducts); } catch(e){}
+            }
+
+            if (pName && pName.toLowerCase() !== compName.toLowerCase()) {
+                prods.push({ name: pName, price: pPrice, is_composite: isCompRow, components: compSubItems });
             }
         });
 
@@ -1210,8 +1266,8 @@ function openLinkedProductsModal(btn) {
     document.querySelectorAll('#base-products-list .base-product-row').forEach(row => {
         const pInput = row.querySelector('.base-name-input');
         const pName = pInput ? pInput.value.trim() : '';
-        if (pName) {
-            baseProds.push({ name: pName, price: 0 });
+        if (pName && pName.toLowerCase() !== compName.toLowerCase()) {
+            baseProds.push({ name: pName, price: 0, is_composite: false });
         }
     });
     if (baseProds.length > 0) {
@@ -1219,7 +1275,7 @@ function openLinkedProductsModal(btn) {
     }
 
     if (menuCategories.length === 0) {
-        listEl.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-light);">Nessun prodotto standard trovato nel menu. Aggiungi prima dei prodotti standard per poterli collegare.</div>';
+        listEl.innerHTML = '<div style="padding:16px; text-align:center; color:var(--text-light);">Nessun altro prodotto trovato nel menu da collegare. Aggiungi prima dei prodotti nel menu per poterli collegare.</div>';
     } else {
         let html = '';
         menuCategories.forEach(cat => {
@@ -1231,10 +1287,18 @@ function openLinkedProductsModal(btn) {
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
                         ${cat.products.map(p => {
                             const isChecked = linkedArray.includes(p.name);
+                            let typeIconHTML = '';
+                            let compDataAttr = '';
+                            if (p.is_composite) {
+                                typeIconHTML = `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; color: var(--primary);" title="Prodotto Composto">link</span>`;
+                                if (Array.isArray(p.components) && p.components.length > 0) {
+                                    compDataAttr = `data-components="${encodeURIComponent(JSON.stringify(p.components))}"`;
+                                }
+                            }
                             return `
-                                <label class="linked-prod-item">
-                                    <input type="checkbox" class="linked-prod-checkbox" value="${p.name}" ${isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-                                    <span style="font-weight: 600; font-size: 0.9rem;">${p.name}</span>
+                                <label class="linked-prod-item" style="display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; transition: background 0.15s;">
+                                    <input type="checkbox" class="linked-prod-checkbox" value="${p.name}" ${compDataAttr} ${isChecked ? 'checked' : ''} onchange="updateLinkedProductsDisabling()" style="width: 18px; height: 18px; cursor: pointer; margin-right: 6px;">
+                                    <span class="linked-prod-name" style="font-weight: 600; font-size: 0.9rem; display: inline-flex; align-items: center; flex: 1;">${typeIconHTML}${p.name}</span>
                                 </label>
                             `;
                         }).join('')}
@@ -1243,11 +1307,93 @@ function openLinkedProductsModal(btn) {
             `;
         });
         listEl.innerHTML = html;
+        updateLinkedProductsDisabling();
     }
 
     const modal = document.getElementById('linked-products-modal');
     if (modal) modal.style.display = 'flex';
 }
+
+function updateLinkedProductsDisabling() {
+    const listEl = document.getElementById('linked-products-list');
+    if (!listEl) return;
+
+    const isEditingSelectionProduct = currentEditingCompositeRow && currentEditingCompositeRow.closest('.products-list-selection') !== null;
+
+    const disabledMap = {}; // { subCompName: parentCompName }
+    const checkboxes = listEl.querySelectorAll('.linked-prod-checkbox');
+
+    // Pass 1: find all checked composite products and resolve sub-components
+    checkboxes.forEach(cb => {
+        if (cb.checked && !cb.disabled) {
+            const compAttr = cb.dataset.components;
+            if (compAttr) {
+                try {
+                    const comps = JSON.parse(decodeURIComponent(compAttr));
+                    if (Array.isArray(comps) && comps.length > 0) {
+                        const allNested = getAllNestedComponentNames(comps);
+                        allNested.forEach(nestedName => {
+                            const targetCb = Array.from(checkboxes).find(item => item.value === nestedName);
+                            const isTargetComposite = targetCb && targetCb.hasAttribute('data-components');
+
+                            // For Selection Products: block ONLY non-composite sub-products
+                            // For Composite Products: block ALL sub-products (both composite and non-composite)
+                            const shouldBlock = isEditingSelectionProduct ? !isTargetComposite : true;
+
+                            if (shouldBlock && !disabledMap[nestedName]) {
+                                disabledMap[nestedName] = cb.value;
+                            }
+                        });
+                    }
+                } catch(e) {}
+            }
+        }
+    });
+
+    // Pass 2: update checkboxes state and labels
+    checkboxes.forEach(cb => {
+        const itemLabel = cb.closest('.linked-prod-item');
+        const parentComp = disabledMap[cb.value];
+
+        if (parentComp && cb.value !== parentComp) {
+            cb.disabled = true;
+            cb.checked = false;
+            cb.classList.add('inherited-disabled-cb');
+            if (itemLabel) {
+                itemLabel.style.opacity = '0.5';
+                itemLabel.style.cursor = 'not-allowed';
+                itemLabel.title = `Selezione bloccata: componente già incluso in "${parentComp}"`;
+                let badge = itemLabel.querySelector('.inherited-badge');
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'inherited-badge';
+                    badge.style.cssText = 'font-size: 0.72rem; color: #64748b; background: rgba(100, 116, 139, 0.12); border: 1px solid rgba(100, 116, 139, 0.25); border-radius: 4px; padding: 2px 6px; margin-left: 6px; font-weight: 600; white-space: nowrap;';
+                    itemLabel.appendChild(badge);
+                }
+                badge.innerText = `Già incluso da ${parentComp}`;
+            }
+        } else {
+            if (cb.classList.contains('inherited-disabled-cb')) {
+                cb.disabled = false;
+                cb.checked = false;
+                cb.classList.remove('inherited-disabled-cb');
+            } else if (!cb.dataset.components) {
+                cb.disabled = false;
+            } else {
+                cb.disabled = false;
+            }
+
+            if (itemLabel) {
+                itemLabel.style.opacity = '1';
+                itemLabel.style.cursor = 'pointer';
+                itemLabel.removeAttribute('title');
+                const badge = itemLabel.querySelector('.inherited-badge');
+                if (badge) badge.remove();
+            }
+        }
+    });
+}
+window.updateLinkedProductsDisabling = updateLinkedProductsDisabling;
 
 function closeLinkedProductsModal() {
     const modal = document.getElementById('linked-products-modal');
@@ -1336,27 +1482,77 @@ function openPosSelectionModal(foundProduct, foundCategory) {
                 return;
             }
 
-            const hasLimit = compProd && (compProd.quantity !== null && compProd.quantity !== undefined);
-            let totalUsedInCart = 0;
-            if (compProd && hasLimit) {
-                STATE.cart.forEach(cartItem => {
-                    if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
-                        totalUsedInCart += cartItem.quantity;
-                    } else if (Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
-                        totalUsedInCart += cartItem.quantity;
-                    }
-                });
-            }
+            let hasLimit = false;
+            let remStock = null;
+            let isOOS = false;
 
-            const remStock = hasLimit ? (compProd.quantity - totalUsedInCart) : null;
-            const isOOS = hasLimit && remStock <= 0;
+            if (compProd) {
+                if (compProd.is_composite === 1) {
+                    // Calculate composite product remaining stock dynamically from its sub-components
+                    let subComps = compProd.components || [];
+                    if (typeof subComps === 'string') {
+                        try { subComps = JSON.parse(subComps); } catch(e){}
+                    }
+
+                    if (Array.isArray(subComps) && subComps.length > 0) {
+                        let minRemaining = Infinity;
+                        let foundLimit = false;
+                        const allNested = getAllNestedComponentNames(subComps);
+
+                        for (const subName of allNested) {
+                            let subProd = null;
+                            for (const catProds of Object.values(STATE.products)) {
+                                subProd = catProds.find(item => item.name === subName);
+                                if (subProd) break;
+                            }
+
+                            if (subProd && subProd.quantity !== null && subProd.quantity !== undefined) {
+                                foundLimit = true;
+                                let totalUsedInCart = 0;
+                                STATE.cart.forEach(cartItem => {
+                                    if (cartItem.id === subProd.id || cartItem.name === subProd.name) {
+                                        totalUsedInCart += cartItem.quantity;
+                                    } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(subProd.name)) {
+                                        totalUsedInCart += cartItem.quantity;
+                                    }
+                                });
+
+                                const rem = subProd.quantity - totalUsedInCart;
+                                if (rem < minRemaining) minRemaining = rem;
+                            }
+                        }
+
+                        if (foundLimit && minRemaining !== Infinity) {
+                            hasLimit = true;
+                            remStock = minRemaining;
+                        }
+                    }
+                    isOOS = hasLimit && remStock <= 0;
+                } else {
+                    hasLimit = (compProd.quantity !== null && compProd.quantity !== undefined);
+                    if (hasLimit) {
+                        let totalUsedInCart = 0;
+                        STATE.cart.forEach(cartItem => {
+                            if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                                totalUsedInCart += cartItem.quantity;
+                            } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(compProd.name)) {
+                                totalUsedInCart += cartItem.quantity;
+                            }
+                        });
+                        remStock = compProd.quantity - totalUsedInCart;
+                        isOOS = remStock <= 0;
+                    }
+                }
+            }
 
             if (!grouped[compCat]) grouped[compCat] = [];
             grouped[compCat].push({
                 compName,
                 hasLimit,
                 remStock,
-                isOOS
+                isOOS,
+                isComp: compProd && compProd.is_composite === 1,
+                isSel: compProd && compProd.is_selection === 1
             });
         });
 
@@ -1381,25 +1577,188 @@ function openPosSelectionModal(foundProduct, foundCategory) {
                 card.onclick = function() { togglePosCardSelection(this); };
 
                 const badgeHTML = item.hasLimit ? `<span class="qty-badge ${item.isOOS ? 'oos' : ''}">${Math.max(0, item.remStock)}</span>` : '';
+                const iconHTML = item.isComp ? `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; color: var(--primary);" title="Prodotto Composto">link</span>` : (item.isSel ? `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; color: var(--primary);" title="Prodotto con Selezione">checklist</span>` : '');
 
                 card.innerHTML = `
                     ${badgeHTML}
-                    <span class="pos-select-card-name">${item.compName}</span>
+                    <span class="pos-select-card-name" style="display: inline-flex; align-items: center; justify-content: center; gap: 2px;">${iconHTML}${item.compName}</span>
                 `;
                 grid.appendChild(card);
             });
 
             listEl.appendChild(grid);
         }
+
+        updatePosSelectionModalStockBadges();
     }
 
     const modal = document.getElementById('pos-selection-modal');
     if (modal) modal.style.display = 'flex';
 }
 
+function updatePosSelectionModalStockBadges() {
+    const listEl = document.getElementById('pos-selection-list');
+    if (!listEl || !currentPosSelectionProduct) return;
+
+    // Collect all component names currently SELECTED in the popup
+    const currentlySelectedCardValues = [];
+    listEl.querySelectorAll('.pos-select-card.selected').forEach(card => {
+        if (card.dataset.value) currentlySelectedCardValues.push(card.dataset.value);
+    });
+
+    // Calculate temporary component usage from popup selections
+    const popupSelectionComponentCounts = {};
+    const popupNestedComps = getAllNestedComponentNames(currentlySelectedCardValues);
+    popupNestedComps.forEach(compName => {
+        popupSelectionComponentCounts[compName] = (popupSelectionComponentCounts[compName] || 0) + 1;
+    });
+
+    // Re-evaluate stock badges for every card in popup
+    listEl.querySelectorAll('.pos-select-card').forEach(card => {
+        const compName = card.dataset.value;
+        if (!compName) return;
+
+        let compProd = null;
+        for (const catProds of Object.values(STATE.products)) {
+            compProd = catProds.find(item => item.name === compName);
+            if (compProd) break;
+        }
+
+        if (!compProd) return;
+
+        const isThisCardSelected = card.classList.contains('selected');
+
+        let isBlockedBySelectedComposite = false;
+        if (!isThisCardSelected && currentlySelectedCardValues.length > 0) {
+            currentlySelectedCardValues.forEach(selectedName => {
+                if (selectedName === compName) return;
+                let selProd = null;
+                for (const catProds of Object.values(STATE.products)) {
+                    selProd = catProds.find(item => item.name === selectedName);
+                    if (selProd) break;
+                }
+
+                if (selProd && selProd.is_composite === 1) {
+                    let selComps = selProd.components || [];
+                    if (typeof selComps === 'string') {
+                        try { selComps = JSON.parse(selComps); } catch(e){}
+                    }
+                    const selNested = getAllNestedComponentNames(selComps);
+
+                    let cardComps = compProd.components || [];
+                    if (typeof cardComps === 'string') {
+                        try { cardComps = JSON.parse(cardComps); } catch(e){}
+                    }
+                    const cardNested = getAllNestedComponentNames(cardComps);
+
+                    if (selNested.includes(compName) || cardNested.includes(selectedName)) {
+                        isBlockedBySelectedComposite = true;
+                    }
+                }
+            });
+        }
+
+        let hasLimit = false;
+        let remStock = null;
+        let isOOS = false;
+
+        if (compProd.is_composite === 1) {
+            let subComps = compProd.components || [];
+            if (typeof subComps === 'string') {
+                try { subComps = JSON.parse(subComps); } catch(e){}
+            }
+
+            if (Array.isArray(subComps) && subComps.length > 0) {
+                let minRemaining = Infinity;
+                let foundLimit = false;
+                const allNested = getAllNestedComponentNames(subComps);
+
+                for (const subName of allNested) {
+                    let subProd = null;
+                    for (const catProds of Object.values(STATE.products)) {
+                        subProd = catProds.find(item => item.name === subName);
+                        if (subProd) break;
+                    }
+
+                    if (subProd && subProd.quantity !== null && subProd.quantity !== undefined) {
+                        foundLimit = true;
+                        let totalUsedInCart = 0;
+                        STATE.cart.forEach(cartItem => {
+                            if (cartItem.id === subProd.id || cartItem.name === subProd.name) {
+                                totalUsedInCart += cartItem.quantity;
+                            } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(subProd.name)) {
+                                totalUsedInCart += cartItem.quantity;
+                            }
+                        });
+
+                        let popupUsed = popupSelectionComponentCounts[subProd.name] || 0;
+                        if (isThisCardSelected) {
+                            const thisCardNested = getAllNestedComponentNames([compName]);
+                            if (thisCardNested.includes(subProd.name)) {
+                                popupUsed = Math.max(0, popupUsed - 1);
+                            }
+                        }
+
+                        const rem = subProd.quantity - (totalUsedInCart + popupUsed);
+                        if (rem < minRemaining) minRemaining = rem;
+                    }
+                }
+
+                if (foundLimit && minRemaining !== Infinity) {
+                    hasLimit = true;
+                    remStock = minRemaining;
+                }
+            }
+            isOOS = (hasLimit && remStock <= 0 && !isThisCardSelected) || isBlockedBySelectedComposite;
+        } else {
+            hasLimit = (compProd.quantity !== null && compProd.quantity !== undefined);
+            if (hasLimit) {
+                let totalUsedInCart = 0;
+                STATE.cart.forEach(cartItem => {
+                    if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                        totalUsedInCart += cartItem.quantity;
+                    } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(compProd.name)) {
+                        totalUsedInCart += cartItem.quantity;
+                    }
+                });
+                let popupUsed = popupSelectionComponentCounts[compProd.name] || 0;
+                if (isThisCardSelected) {
+                    popupUsed = Math.max(0, popupUsed - 1);
+                }
+                remStock = compProd.quantity - (totalUsedInCart + popupUsed);
+                isOOS = (remStock <= 0 && !isThisCardSelected) || isBlockedBySelectedComposite;
+            } else if (isBlockedBySelectedComposite) {
+                isOOS = true;
+            }
+        }
+
+        let badgeEl = card.querySelector('.qty-badge');
+        if (hasLimit) {
+            const displayQty = Math.max(0, remStock);
+            if (!badgeEl) {
+                badgeEl = document.createElement('span');
+                card.insertBefore(badgeEl, card.firstChild);
+            }
+            badgeEl.className = `qty-badge ${isOOS ? 'oos' : ''}`;
+            badgeEl.innerText = displayQty;
+        } else if (badgeEl) {
+            badgeEl.remove();
+        }
+
+        if (isOOS) {
+            card.classList.add('is-oos');
+            card.classList.remove('selected');
+        } else {
+            card.classList.remove('is-oos');
+        }
+    });
+}
+window.updatePosSelectionModalStockBadges = updatePosSelectionModalStockBadges;
+
 function togglePosCardSelection(card) {
     if (card.classList.contains('is-oos')) return;
     card.classList.toggle('selected');
+    updatePosSelectionModalStockBadges();
 }
 window.togglePosCardSelection = togglePosCardSelection;
 
@@ -1898,6 +2257,51 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
 async function saveMenu(stayInEditor = false, customToastMsg = null) {
     if (!STATE.currentSagra) return;
 
+    // Validate incomplete product rows before saving
+    let validationError = null;
+    let errorInputToFocus = null;
+
+    document.querySelectorAll('.editor-section').forEach(sec => {
+        if (validationError) return;
+
+        let catName = '';
+        const catNameInput = sec.querySelector('.cat-name-input');
+        if (catNameInput) catName = catNameInput.value.trim();
+        else {
+            const titleEl = sec.querySelector('.fixed-cat-title-text');
+            if (titleEl) catName = titleEl.innerText.trim();
+        }
+
+        sec.querySelectorAll('.product-row').forEach(row => {
+            if (validationError) return;
+
+            const nameInput = row.querySelector('.col-name input') || row.querySelector('input[type="text"]');
+            const priceInput = row.querySelector('input.col-price') || row.querySelectorAll('input')[1];
+
+            const pName = nameInput ? nameInput.value.trim() : '';
+            const rawPrice = priceInput ? priceInput.value.trim() : '';
+            const pPrice = priceInput ? parseFloat(priceInput.value) : NaN;
+
+            if (pName !== '' && (rawPrice === '' || isNaN(pPrice))) {
+                validationError = `Inserisci un prezzo per il prodotto "${pName}" in ${catName || 'Categoria'}.`;
+                errorInputToFocus = priceInput;
+            } else if (pName === '' && rawPrice !== '' && !isNaN(pPrice)) {
+                validationError = `Inserisci il nome per il prodotto con prezzo € ${pPrice.toFixed(2)} in ${catName || 'Categoria'}.`;
+                errorInputToFocus = nameInput;
+            }
+        });
+    });
+
+    if (validationError) {
+        showToast(validationError, "error");
+        if (errorInputToFocus) {
+            errorInputToFocus.focus();
+            errorInputToFocus.style.borderColor = 'var(--danger)';
+            setTimeout(() => { errorInputToFocus.style.borderColor = ''; }, 3000);
+        }
+        return false;
+    }
+
     const sections = document.querySelectorAll('.editor-section');
     const payload = { categories: [] };
 
@@ -2068,7 +2472,9 @@ function renderProducts() {
                     let minRemaining = Infinity;
                     let foundLimit = false;
 
-                    for (const compName of comps) {
+                    const allNestedComps = getAllNestedComponentNames(comps);
+
+                    for (const compName of allNestedComps) {
                         let compProd = null;
                         for (const catProds of Object.values(STATE.products)) {
                             compProd = catProds.find(item => item.name === compName);
@@ -2081,7 +2487,7 @@ function renderProducts() {
                             STATE.cart.forEach(cartItem => {
                                 if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
                                     totalUsedInCart += cartItem.quantity;
-                                } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                                } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(compProd.name)) {
                                     totalUsedInCart += cartItem.quantity;
                                 }
                             });
@@ -2107,7 +2513,9 @@ function renderProducts() {
 
                 if (Array.isArray(comps) && comps.length > 0) {
                     let hasAtLeastOneAvailable = false;
-                    for (const compName of comps) {
+                    const allNestedComps = getAllNestedComponentNames(comps);
+
+                    for (const compName of allNestedComps) {
                         let compProd = null;
                         for (const catProds of Object.values(STATE.products)) {
                             compProd = catProds.find(item => item.name === compName);
@@ -2122,7 +2530,7 @@ function renderProducts() {
                             STATE.cart.forEach(cartItem => {
                                 if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
                                     totalUsedInCart += cartItem.quantity;
-                                } else if (Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                                } else if (Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(compProd.name)) {
                                     totalUsedInCart += cartItem.quantity;
                                 }
                             });
@@ -2143,7 +2551,7 @@ function renderProducts() {
                 STATE.cart.forEach(cartItem => {
                     if (cartItem.id === p.id || cartItem.name === p.name) {
                         totalUsedInCart += cartItem.quantity;
-                    } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(p.name)) {
+                    } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(p.name)) {
                         totalUsedInCart += cartItem.quantity;
                     }
                 });
@@ -2204,7 +2612,9 @@ function addToCart(productId) {
         }
 
         if (Array.isArray(comps)) {
-            for (const compName of comps) {
+            const allNestedComps = getAllNestedComponentNames(comps);
+
+            for (const compName of allNestedComps) {
                 let compProd = null;
                 for (const catProds of Object.values(STATE.products)) {
                     compProd = catProds.find(item => item.name === compName);
@@ -2216,7 +2626,7 @@ function addToCart(productId) {
                     STATE.cart.forEach(cartItem => {
                         if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
                             totalUsedInCart += cartItem.quantity;
-                        } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(compProd.name)) {
+                        } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(compProd.name)) {
                             totalUsedInCart += cartItem.quantity;
                         }
                     });
@@ -2235,7 +2645,7 @@ function addToCart(productId) {
             STATE.cart.forEach(cartItem => {
                 if (cartItem.id === foundProduct.id || cartItem.name === foundProduct.name) {
                     totalUsedInCart += cartItem.quantity;
-                } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && cartItem.components.includes(foundProduct.name)) {
+                } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(foundProduct.name)) {
                     totalUsedInCart += cartItem.quantity;
                 }
             });
@@ -2496,6 +2906,17 @@ async function reprintOrderFromHistory(orderId) {
 }
 window.reprintOrderFromHistory = reprintOrderFromHistory;
 
+function parseOrderDate(dateStr) {
+    if (!dateStr) return new Date();
+    let s = String(dateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+        s = s.replace(' ', 'T') + 'Z';
+    }
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? new Date() : d;
+}
+window.parseOrderDate = parseOrderDate;
+
 async function showHistory() {
     if (!STATE.currentSagra) return;
 
@@ -2531,7 +2952,7 @@ async function showHistory() {
                 const displayOrders = [...STATE.history].reverse();
 
                 historyListEl.innerHTML = displayOrders.map(o => {
-                    const formattedDate = new Date(o.created_at).toLocaleString('it-IT', {
+                    const formattedDate = parseOrderDate(o.created_at).toLocaleString('it-IT', {
                         day: '2-digit', month: '2-digit', year: 'numeric',
                         hour: '2-digit', minute: '2-digit', second: '2-digit'
                     });
