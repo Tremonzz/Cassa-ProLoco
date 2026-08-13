@@ -348,14 +348,24 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
     const result = await dbRun("INSERT INTO sagras (name, status) VALUES (?, 'active')", [newName]);
     const newSagraId = result.lastID;
 
+    // Duplicate Categories and all Product types (Simple, Base [type='base'], Composite, Selection) & Links
     const categories = await dbAll("SELECT * FROM categories WHERE sagra_id = ?", [sourceId]);
     for (const cat of categories) {
-      const catResult = await dbRun("INSERT INTO categories (name, is_hidden, sagra_id) VALUES (?, ?, ?)", [cat.name, cat.is_hidden, newSagraId]);
+      const catResult = await dbRun("INSERT INTO categories (name, is_hidden, sagra_id) VALUES (?, ?, ?)", [cat.name, cat.is_hidden || 0, newSagraId]);
       const newCatId = catResult.lastID;
 
-      const products = await dbAll("SELECT * FROM products WHERE category_id = ?", [cat.id]);
+      const products = await dbAll("SELECT * FROM products WHERE category_id = ? ORDER BY position ASC, id ASC", [cat.id]);
       for (const prod of products) {
-        await dbRun("INSERT INTO products (name, price, quantity, is_composite, is_selection, components, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)", [prod.name, prod.price, prod.quantity, prod.is_composite || 0, prod.is_selection || 0, prod.components || null, newCatId]);
+        const pType = prod.type || (prod.is_selection === 1 ? 'selection' : (prod.is_composite === 1 ? 'composite' : 'simple'));
+        const isComp = pType === 'composite' ? 1 : 0;
+        const isSel = pType === 'selection' ? 1 : 0;
+        const compsStr = typeof prod.components === 'string' ? prod.components : (prod.components ? JSON.stringify(prod.components) : null);
+        const pos = (prod.position !== undefined && prod.position !== null) ? parseInt(prod.position) : 0;
+
+        await dbRun(
+          "INSERT INTO products (name, price, quantity, type, is_composite, is_selection, components, category_id, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [prod.name, prod.price, prod.quantity, pType, isComp, isSel, compsStr, newCatId, pos]
+        );
       }
     }
 
@@ -363,7 +373,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
     res.json({ id: newSagraId, name: newName, status: 'active' });
   } catch (e) {
     await dbRun("ROLLBACK").catch(() => {});
-    console.error(e);
+    console.error("Duplicate Sagra Error:", e);
     res.status(500).send(e.message);
   }
 });
