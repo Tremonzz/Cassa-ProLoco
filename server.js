@@ -994,37 +994,24 @@ app.get('/api/check-update', (req, res) => {
   const tryWebFallback = () => {
     try {
       const { execSync } = require('child_process');
-      const headerOutput = execSync(`curl.exe -sI "https://github.com/${owner}/${repo}/releases/latest"`, { encoding: 'utf8', windowsHide: true, timeout: 5000 });
-      const match = headerOutput.match(/location:\s*https:\/\/github\.com\/[^\/]+\/[^\/]+\/releases\/tag\/v?([0-9\.]+)/i);
-      if (match) {
-        const latestTag = match[1];
-        const hasUpdate = semverCompare(latestTag, pkg.version) > 0;
+      const releasesHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases"`, { encoding: 'utf8', windowsHide: true, timeout: 10000 });
 
+      const tagRegex = /\/releases\/tag\/v?([0-9\.]+)/g;
+      let tagsFound = [];
+      let match;
+      while ((match = tagRegex.exec(releasesHtml)) !== null) {
+        if (!tagsFound.includes(match[1])) {
+          tagsFound.push(match[1]);
+        }
+      }
+
+      const newerTags = tagsFound.filter(tag => semverCompare(tag, pkg.version) > 0);
+
+      if (newerTags.length > 0) {
+        const latestTag = newerTags[0];
         let downloadUrl = `https://github.com/${owner}/${repo}/releases/download/v${latestTag}/Gestione.Ordini.Setup.${latestTag}.exe`;
         let fileSize = 0;
-        let releaseNotes = '';
 
-        // Try fetching release HTML page to extract release notes
-        try {
-          const releaseHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases/tag/v${latestTag}"`, { encoding: 'utf8', windowsHide: true, timeout: 8000 });
-          const notesMatch = releaseHtml.match(/class="markdown-body[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || releaseHtml.match(/data-test-selector="body-content"[^>]*>([\s\S]*?)<\/div>/i);
-          if (notesMatch) {
-            releaseNotes = notesMatch[1]
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n### $1\n')
-              .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
-              .replace(/<br\s*\/?>/gi, '\n')
-              .replace(/<[^>]+>/g, '')
-              .replace(/&amp;/g, '&')
-              .replace(/&lt;/g, '<')
-              .replace(/&gt;/g, '>')
-              .replace(/\n\s*\n\s*\n/g, '\n\n')
-              .trim();
-          }
-        } catch(e){}
-
-        // Try fetching expanded_assets HTML to get exact .exe download URL and file size
         try {
           const assetsHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases/expanded_assets/v${latestTag}"`, { encoding: 'utf8', windowsHide: true, timeout: 8000 });
           const exeMatch = assetsHtml.match(/href="(\/[^"]+\.exe)"/i);
@@ -1041,11 +1028,39 @@ app.get('/api/check-update', (req, res) => {
           }
         } catch(e){}
 
+        let notesArray = [];
+        newerTags.forEach(tag => {
+          try {
+            const tagHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases/tag/v${tag}"`, { encoding: 'utf8', windowsHide: true, timeout: 6000 });
+            const notesMatch = tagHtml.match(/class="markdown-body[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || tagHtml.match(/data-test-selector="body-content"[^>]*>([\s\S]*?)<\/div>/i);
+            if (notesMatch) {
+              const cleanNotes = notesMatch[1]
+                .replace(/<style[\s\S]*?<\/style>/gi, '')
+                .replace(/<script[\s\S]*?<\/script>/gi, '')
+                .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n### $1\n')
+                .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/\n\s*\n\s*\n/g, '\n\n')
+                .trim();
+
+              notesArray.push(`# Versione v${tag}\n${cleanNotes}`);
+            } else {
+              notesArray.push(`# Versione v${tag}`);
+            }
+          } catch(e) {
+            notesArray.push(`# Versione v${tag}`);
+          }
+        });
+
         const result = {
-          hasUpdate,
+          hasUpdate: true,
           currentVersion: pkg.version,
           latestVersion: latestTag,
-          releaseNotes,
+          releaseNotes: notesArray.join('\n\n---\n\n'),
           downloadUrl,
           fileSize,
           releaseUrl: `https://github.com/${owner}/${repo}/releases/tag/v${latestTag}`
@@ -1057,7 +1072,7 @@ app.get('/api/check-update', (req, res) => {
     return res.json({ hasUpdate: false, currentVersion: pkg.version, status: 'no_release', message: 'Nessuna release trovata' });
   };
 
-  const url = `https://api.github.com/repos/${owner}/${repo}/releases/latest`;
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
   const options = {
     headers: { 'User-Agent': 'SagraManager-App' },
     rejectUnauthorized: false
@@ -1072,24 +1087,49 @@ app.get('/api/check-update', (req, res) => {
           return tryWebFallback();
         }
 
-        const data = JSON.parse(body);
-        const latestTag = (data.tag_name || '').replace(/^v/, '');
-        const releaseNotes = data.body || '';
+        const releases = JSON.parse(body);
+        if (!Array.isArray(releases)) {
+          return tryWebFallback();
+        }
 
-        let exeAsset = (data.assets || []).find(a => a.name && a.name.endsWith('.exe'));
+        const newerReleases = releases.filter(r => {
+          const tag = (r.tag_name || '').replace(/^v/, '');
+          return semverCompare(tag, pkg.version) > 0;
+        });
+
+        if (newerReleases.length === 0) {
+          const result = { hasUpdate: false, currentVersion: pkg.version };
+          updateCache = { data: result, timestamp: Date.now() };
+          return res.json(result);
+        }
+
+        newerReleases.sort((a, b) => {
+          const tagA = (a.tag_name || '').replace(/^v/, '');
+          const tagB = (b.tag_name || '').replace(/^v/, '');
+          return semverCompare(tagB, tagA);
+        });
+
+        const latestRelease = newerReleases[0];
+        const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+
+        let exeAsset = (latestRelease.assets || []).find(a => a.name && a.name.endsWith('.exe'));
         let downloadUrl = exeAsset ? exeAsset.browser_download_url : null;
         let fileSize = exeAsset ? exeAsset.size : 0;
 
-        const hasUpdate = semverCompare(latestTag, pkg.version) > 0;
+        const notesArray = newerReleases.map(r => {
+          const tag = (r.tag_name || '').replace(/^v/, '');
+          const notes = (r.body || '').trim();
+          return `# Versione v${tag}\n${notes || 'Nessuna nota fornita per questa versione.'}`;
+        });
 
         const result = {
-          hasUpdate,
+          hasUpdate: true,
           currentVersion: pkg.version,
           latestVersion: latestTag,
-          releaseNotes,
+          releaseNotes: notesArray.join('\n\n---\n\n'),
           downloadUrl,
           fileSize,
-          releaseUrl: data.html_url
+          releaseUrl: latestRelease.html_url
         };
 
         updateCache = { data: result, timestamp: Date.now() };

@@ -4037,6 +4037,9 @@ function formatReleaseNotes(text) {
     // Wrap continuous <li> in <ul>
     html = html.replace(/((?:<li[^>]*>.*?<\/li>\s*)+)/gs, '<ul style="margin:8px 0 12px 20px; padding-left:0;">$1</ul>');
 
+    // Convert markdown horizontal rules ---
+    html = html.replace(/^---$/gim, '<hr style="border:none; border-top:1px dashed var(--border-color); margin:20px 0;">');
+
     // Convert double newlines to breaks
     html = html.replace(/\n\n/g, '<br><br>');
 
