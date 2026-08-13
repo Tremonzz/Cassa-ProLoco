@@ -4822,5 +4822,70 @@ img {
   color: var(--primary);
 }
 
+/* --- PRODUCT AUTOCOMPLETE DROPDOWN (Select Option Style) --- */
+.product-name-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+}
+
+.product-name-wrapper .input-field {
+  width: 100%;
+}
+
+.product-autocomplete-popup {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  width: 100%;
+  z-index: 999999;
+  background: var(--card-bg, #ffffff);
+  border: 1.5px solid var(--primary, #6366f1);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 4px;
+  gap: 2px;
+  animation: dropdownSlideDown 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+@keyframes dropdownSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.product-autocomplete-item {
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
+  background: transparent;
+}
+
+.product-autocomplete-item:hover {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.product-autocomplete-item:hover .material-symbols-rounded {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .product-autocomplete-popup {
+  background: var(--card-bg, #1e293b);
+  border-color: var(--primary, #6366f1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
 
 

@@ -751,6 +751,7 @@ function closeAllModals() {
     if (typeof closeLinkedProductsModal === 'function') closeLinkedProductsModal();
     if (typeof closeProductReorderModal === 'function') closeProductReorderModal();
     if (typeof closeChangelogModal === 'function') closeChangelogModal();
+    if (typeof closeProductAutocomplete === 'function') closeProductAutocomplete();
 
     document.querySelectorAll('.modal, .modal-backdrop, .dialog-overlay, [id$="-modal"]').forEach(modal => {
         if (modal.id === 'view-auth' || modal.id === 'view-login') return;
@@ -758,6 +759,110 @@ function closeAllModals() {
     });
 }
 window.closeAllModals = closeAllModals;
+
+// --- PRODUCT NAME AUTOCOMPLETE (Database Query) ---
+let autocompleteTimeout = null;
+let activeAutocompleteInput = null;
+
+async function handleProductNameInput(e) {
+    const input = e.target;
+    if (!input || (!input.classList.contains('col-name') && !input.classList.contains('base-prod-name'))) return;
+
+    const val = input.value.trim();
+    clearTimeout(autocompleteTimeout);
+
+    if (val.length < 3) {
+        closeProductAutocomplete();
+        return;
+    }
+
+    autocompleteTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`/api/products/suggestions?q=${encodeURIComponent(val)}`);
+            if (!res.ok) {
+                closeProductAutocomplete();
+                return;
+            }
+            let suggestions = await res.json();
+            if (Array.isArray(suggestions)) {
+                // Filter out exact case-insensitive matches
+                suggestions = suggestions.filter(name => name.trim().toLowerCase() !== val.trim().toLowerCase());
+            }
+
+            if (Array.isArray(suggestions) && suggestions.length > 0) {
+                showProductAutocomplete(input, suggestions);
+            } else {
+                closeProductAutocomplete();
+            }
+        } catch (err) {
+            closeProductAutocomplete();
+        }
+    }, 180);
+}
+
+function showProductAutocomplete(input, suggestions) {
+    let popup = document.getElementById('product-autocomplete-popup');
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'product-autocomplete-popup';
+        popup.className = 'product-autocomplete-popup';
+    }
+
+    let wrapper = input.closest('.product-name-wrapper') || input.parentElement;
+    if (wrapper) {
+        if (getComputedStyle(wrapper).position === 'static') {
+            wrapper.style.position = 'relative';
+        }
+        if (popup.parentElement !== wrapper) {
+            wrapper.appendChild(popup);
+        }
+    } else {
+        document.body.appendChild(popup);
+    }
+
+    activeAutocompleteInput = input;
+
+    popup.innerHTML = suggestions.map(name => `
+        <div class="product-autocomplete-item" onclick="selectProductAutocomplete('${encodeURIComponent(name.replace(/'/g, "\\'"))}')">
+            <span>${name}</span>
+        </div>
+    `).join('');
+
+    popup.style.top = 'calc(100% + 3px)';
+    popup.style.left = '0';
+    popup.style.width = '100%';
+    popup.style.display = 'flex';
+}
+
+function selectProductAutocomplete(encodedName) {
+    const name = decodeURIComponent(encodedName);
+    const input = activeAutocompleteInput;
+    closeProductAutocomplete();
+    if (input) {
+        input.value = name;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof markMenuDirty === 'function') markMenuDirty();
+        input.focus();
+    }
+}
+window.selectProductAutocomplete = selectProductAutocomplete;
+
+function closeProductAutocomplete() {
+    const popup = document.getElementById('product-autocomplete-popup');
+    if (popup) {
+        popup.style.display = 'none';
+        popup.innerHTML = '';
+    }
+    activeAutocompleteInput = null;
+}
+window.closeProductAutocomplete = closeProductAutocomplete;
+
+document.addEventListener('input', handleProductNameInput);
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#product-autocomplete-popup') && !e.target.classList.contains('col-name') && !e.target.classList.contains('base-prod-name')) {
+        closeProductAutocomplete();
+    }
+});
 
 function lockPOS() {
     if (!STATE.currentSagra) return;
@@ -2272,7 +2377,9 @@ function addBaseProductRowUI(name = '', quantity = '') {
     const qtyVal = (quantity !== null && quantity !== undefined) ? quantity : '';
 
     row.innerHTML = `
-      <input type="text" class="input-field col-name base-name-input" placeholder="es. Pane" value="${name}">
+      <div class="product-name-wrapper">
+        <input type="text" class="input-field col-name base-name-input" placeholder="es. Pane" value="${name}">
+      </div>
       <input type="number" class="input-field col-qty base-qty-input" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
       <button type="button" class="btn-del-product" title="Elimina Prodotto Base" onclick="this.closest('.base-product-row').remove()">
         <span class="material-symbols-rounded" style="font-size: 1.2rem;">delete_outline</span>
@@ -2378,7 +2485,9 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
     if (isSel) namePlaceholder = "es. Piatto con Selezione";
 
     row.innerHTML = `
-      <input type="text" class="input-field col-name" placeholder="${namePlaceholder}" value="${name}">
+      <div class="product-name-wrapper">
+        <input type="text" class="input-field col-name" placeholder="${namePlaceholder}" value="${name}">
+      </div>
       <input type="number" class="input-field col-price" placeholder="0.00" value="${price}" step="0.10" min="0">
       ${qtyFieldHTML}
       <button type="button" class="btn-del-product" title="Elimina Prodotto" onclick="deleteProductRow(this)">

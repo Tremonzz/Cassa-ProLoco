@@ -439,6 +439,32 @@ app.get('/api/sagras/:id/products', async (req, res) => {
   }
 });
 
+// GET Product Name Suggestions across all sagras
+app.get('/api/products/suggestions', async (req, res) => {
+  const query = (req.query.q || '').trim();
+  if (query.length < 3) {
+    return res.json([]);
+  }
+
+  try {
+    const sql = `
+      SELECT p.name, MAX(p.id) as max_id
+      FROM products p
+      WHERE LOWER(p.name) LIKE LOWER(?)
+      GROUP BY LOWER(p.name)
+      ORDER BY max_id DESC
+      LIMIT 2
+    `;
+    const searchPattern = `%${query}%`;
+    const rows = await dbAll(sql, [searchPattern]);
+    const suggestions = rows.map(r => r.name);
+    res.json(suggestions);
+  } catch (e) {
+    console.error("Error fetching product suggestions:", e);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // UPDATE Menu
 app.put('/api/sagras/:id/menu', async (req, res) => {
   const sagraId = req.params.id;
