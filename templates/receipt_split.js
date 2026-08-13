@@ -2,7 +2,7 @@ const ThermalPrinter = require("node-thermal-printer").printer;
 const PrinterTypes = require("node-thermal-printer").types;
 const path = require("path");
 const { generateReceiptBuffer } = require("./receipt_compact");
-const { printReceiptHeader } = require("./receipt_header");
+const { printReceiptHeader, getReceiptConfig } = require("./receipt_header");
 const { printReceiptFooter } = require("./receipt_footer");
 
 /**
@@ -46,14 +46,31 @@ async function generateSplitReceipt(data) {
         return await generateReceiptBuffer(data);
     }
 
+    const cfg = getReceiptConfig();
+    const dividerStyle = cfg.body?.dividerStyle || 'dashed';
+
+    let lineChar = "-";
+    if (dividerStyle === 'solid') lineChar = "_";
+    else if (dividerStyle === 'dotted') lineChar = ".";
+    else if (dividerStyle === 'double') lineChar = "=";
+    else if (dividerStyle === 'stars') lineChar = "*";
+
     const printer = new ThermalPrinter({
         type: PrinterTypes.EPSON,
         interface: path.join(__dirname, '..', 'printer-output.bin'),
         width: 48,
         removeSpecialCharacters: false,
-        lineCharacter: "=",
+        lineCharacter: lineChar,
         options: { timeout: 5000 }
     });
+
+    const printDivider = () => {
+        if (dividerStyle === 'none') {
+            printer.newLine();
+        } else {
+            printer.drawLine();
+        }
+    };
 
     const dateStr = new Date().toLocaleString('it-IT');
     const totalDrinks = standardDrinks.reduce((sum, i) => sum + (i.price * i.quantity), 0);
@@ -72,7 +89,7 @@ async function generateSplitReceipt(data) {
     const foodItemsPreview = [];
 
     if (food.length > 0) {
-        receipt1HeaderInfo = await printReceiptHeader(printer, data.sagraName);
+        receipt1HeaderInfo = await printReceiptHeader(printer, data.sagraName, cfg);
 
         printer.raw(Buffer.from([0x1B, 0x33, 60]));
         food.forEach(item => {
@@ -105,13 +122,13 @@ async function generateSplitReceipt(data) {
             printer.bold(false);
         }
 
-        printer.drawLine();
+        printDivider();
         printer.bold(true);
         printRow("TOTALE", "EUR " + Number(data.total).toFixed(2));
         printer.bold(false);
         printer.newLine();
 
-        receipt1FooterInfo = printReceiptFooter(printer, { includeThanks: true, dateStr });
+        receipt1FooterInfo = printReceiptFooter(printer, { includeThanks: true, dateStr, customConfig: cfg });
     }
 
     // --- RECEIPT 2: DRINKS (Standard + Menu Drinks for Bar) ---
@@ -146,13 +163,13 @@ async function generateSplitReceipt(data) {
 
         printer.raw(Buffer.from([0x1B, 0x32]));
 
-        printer.drawLine();
+        printDivider();
         printer.bold(true);
         printRow("TOTALE BEVANDE", "EUR " + totalDrinks.toFixed(2));
         printer.bold(false);
         printer.newLine();
 
-        receipt2FooterInfo = printReceiptFooter(printer, { includeThanks: false, dateStr });
+        receipt2FooterInfo = printReceiptFooter(printer, { includeThanks: false, dateStr, customConfig: cfg });
     }
 
     if (totalDrinks > 0) {

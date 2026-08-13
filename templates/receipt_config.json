@@ -1,0 +1,27 @@
+{
+  "header": {
+    "showLogo": true,
+    "showCompanyName": true,
+    "companyName": "PROLOCO LORENZAGO",
+    "showAddress": true,
+    "address": "Via Faureana 117 - Lorenzago (BL)",
+    "showPiva": true,
+    "piva": "P.IVA 01089600256",
+    "showTitle": true,
+    "title": "SCONTRINO NON FISCALE",
+    "showEventName": true,
+    "eventNamePrefix": "Evento: "
+  },
+  "body": {
+    "dividerStyle": "dashed",
+    "showSubitems": true,
+    "subitemPrefix": "    - ",
+    "menuLabel": "MENU",
+    "currencySymbol": "EUR"
+  },
+  "footer": {
+    "showThanks": true,
+    "thanksMessage": "Grazie e arrivederci!",
+    "showDate": true
+  }
+}

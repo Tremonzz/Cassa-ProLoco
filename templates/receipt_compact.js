@@ -1,7 +1,7 @@
 const ThermalPrinter = require("node-thermal-printer").printer;
 const PrinterTypes = require("node-thermal-printer").types;
 const path = require("path");
-const { printReceiptHeader } = require("./receipt_header");
+const { printReceiptHeader, getReceiptConfig } = require("./receipt_header");
 const { printReceiptFooter } = require("./receipt_footer");
 
 /**
@@ -13,19 +13,36 @@ const { printReceiptFooter } = require("./receipt_footer");
  * @returns {Promise<{buffer: Buffer, preview: Object}>}
  */
 async function generateReceiptBuffer(data) {
+    const cfg = getReceiptConfig();
+    const dividerStyle = cfg.body?.dividerStyle || 'dashed';
+
+    let lineChar = "-";
+    if (dividerStyle === 'solid') lineChar = "_";
+    else if (dividerStyle === 'dotted') lineChar = ".";
+    else if (dividerStyle === 'double') lineChar = "=";
+    else if (dividerStyle === 'stars') lineChar = "*";
+
     const printer = new ThermalPrinter({
         type: PrinterTypes.EPSON,
         interface: path.join(__dirname, '..', 'printer-output.bin'),
         width: 48,
         removeSpecialCharacters: false,
-        lineCharacter: "=",
+        lineCharacter: lineChar,
         options: { timeout: 5000 }
     });
+
+    const printDivider = () => {
+        if (dividerStyle === 'none') {
+            printer.newLine();
+        } else {
+            printer.drawLine();
+        }
+    };
 
     const dateStr = new Date().toLocaleString('it-IT');
 
     // 1. HEADER (Shared module)
-    const { hasHeaderImage, headerLines } = await printReceiptHeader(printer, data.sagraName);
+    const { hasHeaderImage, headerLines } = await printReceiptHeader(printer, data.sagraName, cfg);
 
     // 2. BODY (Items & Total)
     printer.raw(Buffer.from([0x1B, 0x33, 60]));
@@ -80,14 +97,14 @@ async function generateReceiptBuffer(data) {
 
     printer.raw(Buffer.from([0x1B, 0x32]));
 
-    printer.drawLine();
+    printDivider();
     printer.bold(true);
     printRow("TOTALE", `EUR ${data.total.toFixed(2)}`);
     printer.bold(false);
     printer.newLine();
 
     // 3. FOOTER (Shared module)
-    const { footerLines } = printReceiptFooter(printer, { includeThanks: true, dateStr });
+    const { footerLines } = printReceiptFooter(printer, { includeThanks: true, dateStr, customConfig: cfg });
 
     const preview = {
         receipts: [

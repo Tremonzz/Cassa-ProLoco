@@ -3558,6 +3558,20 @@ function showReceiptPreviewModal(preview) {
     const container = document.getElementById('receipt-preview-container');
     if (!container || !preview || !preview.receipts) return;
 
+    const dividerStyle = (currentReceiptConfig && currentReceiptConfig.body && currentReceiptConfig.body.dividerStyle) || 'dashed';
+    let dividerHtml = '<div class="thermal-divider"></div>';
+    if (dividerStyle === 'none') {
+        dividerHtml = '<div class="thermal-divider" style="display: none;"></div>';
+    } else if (dividerStyle === 'solid') {
+        dividerHtml = '<div class="thermal-divider" style="border-top: 1.5px solid #000; margin: 12px 0;"></div>';
+    } else if (dividerStyle === 'dotted') {
+        dividerHtml = '<div class="thermal-divider" style="border-top: 1.5px dotted #000; margin: 12px 0;"></div>';
+    } else if (dividerStyle === 'double') {
+        dividerHtml = '<div class="thermal-divider" style="border-top: 3px double #000; margin: 12px 0;"></div>';
+    } else if (dividerStyle === 'stars') {
+        dividerHtml = '<div class="thermal-divider" style="border-top: none; text-align: center; font-size: 0.85rem; font-weight: bold; letter-spacing: 3px; margin: 8px 0;">* * * * * * * * * * * * * * * * *</div>';
+    }
+
     let html = '<div class="thermal-paper-wrapper">';
     html += '<div class="thermal-paper">';
 
@@ -3586,7 +3600,7 @@ function showReceiptPreviewModal(preview) {
             html += `</div>`;
         }
 
-        html += `<div class="thermal-divider"></div>`;
+        html += dividerHtml;
 
         if (receipt.items && receipt.items.length > 0) {
             receipt.items.forEach(item => {
@@ -3603,7 +3617,7 @@ function showReceiptPreviewModal(preview) {
             });
         }
 
-        html += `<div class="thermal-divider"></div>`;
+        html += dividerHtml;
 
         if (receipt.totalLabel && receipt.totalValue) {
             html += `
@@ -3615,7 +3629,7 @@ function showReceiptPreviewModal(preview) {
         }
 
         if (receipt.footerLines && receipt.footerLines.length > 0) {
-            html += `<div class="thermal-divider"></div>`;
+            html += dividerHtml;
             html += `<div class="thermal-text-center">`;
             receipt.footerLines.forEach(line => {
                 html += `<div>${line}</div>`;
@@ -4059,5 +4073,229 @@ window.openChangelogModal = openChangelogModal;
 window.closeChangelogModal = closeChangelogModal;
 window.dismissUpdateToast = dismissUpdateToast;
 window.checkAppUpdateSilent = checkAppUpdateSilent;
+
+let currentReceiptConfig = {
+    header: {
+        showLogo: true,
+        companyName: "PROLOCO LORENZAGO",
+        address: "Via Faureana 117 - Lorenzago (BL)",
+        piva: "P.IVA 01089600256",
+        title: "SCONTRINO NON FISCALE",
+        showEventName: true,
+        eventNamePrefix: "Evento: "
+    },
+    body: {
+        showSubitems: true,
+        subitemPrefix: "    - ",
+        menuLabel: "MENU",
+        currencySymbol: "EUR"
+    },
+    footer: {
+        showThanks: true,
+        thanksMessage: "Grazie e arrivederci!",
+        showDate: true
+    }
+};
+
+async function loadReceiptConfig() {
+    try {
+        const res = await fetch('/api/receipt-config');
+        if (res.ok) {
+            const data = await res.json();
+            currentReceiptConfig = {
+                header: { ...currentReceiptConfig.header, ...(data.header || {}) },
+                body: { ...currentReceiptConfig.body, ...(data.body || {}) },
+                footer: { ...currentReceiptConfig.footer, ...(data.footer || {}) }
+            };
+        }
+    } catch (e) {
+        console.log("Error loading receipt config:", e);
+    }
+}
+
+function updateReceiptPreviewFromInputs() {
+    const showLogo = document.getElementById('rc-show-logo')?.checked ?? true;
+    const showCompanyName = document.getElementById('rc-show-company-name')?.checked ?? true;
+    const companyName = document.getElementById('rc-company-name')?.value || '';
+    const showAddress = document.getElementById('rc-show-address')?.checked ?? true;
+    const address = document.getElementById('rc-address')?.value || '';
+    const showPiva = document.getElementById('rc-show-piva')?.checked ?? true;
+    const piva = document.getElementById('rc-piva')?.value || '';
+    const showTitle = document.getElementById('rc-show-title')?.checked ?? true;
+    const title = document.getElementById('rc-title')?.value || '';
+    const showEventName = document.getElementById('rc-show-event-name')?.checked ?? true;
+    const eventNamePrefix = document.getElementById('rc-event-name-prefix')?.value ?? '';
+    const dividerStyle = document.getElementById('rc-divider-style')?.value || 'dashed';
+    const showThanks = document.getElementById('rc-show-thanks')?.checked ?? true;
+    const thanksMessage = document.getElementById('rc-thanks-message')?.value || '';
+    const showDate = document.getElementById('rc-show-date')?.checked ?? true;
+
+    // Enable or disable input fields based on switch state
+    if (document.getElementById('rc-company-name')) document.getElementById('rc-company-name').disabled = !showCompanyName;
+    if (document.getElementById('rc-address')) document.getElementById('rc-address').disabled = !showAddress;
+    if (document.getElementById('rc-piva')) document.getElementById('rc-piva').disabled = !showPiva;
+    if (document.getElementById('rc-title')) document.getElementById('rc-title').disabled = !showTitle;
+    if (document.getElementById('rc-event-name-prefix')) document.getElementById('rc-event-name-prefix').disabled = !showEventName;
+    if (document.getElementById('rc-thanks-message')) document.getElementById('rc-thanks-message').disabled = !showThanks;
+
+    currentReceiptConfig.header.showLogo = showLogo;
+    currentReceiptConfig.header.showCompanyName = showCompanyName;
+    currentReceiptConfig.header.companyName = companyName;
+    currentReceiptConfig.header.showAddress = showAddress;
+    currentReceiptConfig.header.address = address;
+    currentReceiptConfig.header.showPiva = showPiva;
+    currentReceiptConfig.header.piva = piva;
+    currentReceiptConfig.header.showTitle = showTitle;
+    currentReceiptConfig.header.title = title;
+    currentReceiptConfig.header.showEventName = showEventName;
+    currentReceiptConfig.header.eventNamePrefix = eventNamePrefix;
+    currentReceiptConfig.body.dividerStyle = dividerStyle;
+    currentReceiptConfig.footer.showThanks = showThanks;
+    currentReceiptConfig.footer.thanksMessage = thanksMessage;
+    currentReceiptConfig.footer.showDate = showDate;
+
+    // Update section dividers in receipt preview
+    const dividers = document.querySelectorAll('#receipt-customizer-modal .thermal-divider');
+    dividers.forEach(div => {
+        div.removeAttribute('style');
+        div.innerText = '';
+        if (dividerStyle === 'none') {
+            div.style.display = 'none';
+        } else if (dividerStyle === 'solid') {
+            div.style.display = 'block';
+            div.style.borderTop = '1.5px solid #000000';
+            div.style.margin = '12px 0';
+        } else if (dividerStyle === 'dotted') {
+            div.style.display = 'block';
+            div.style.borderTop = '1.5px dotted #000000';
+            div.style.margin = '12px 0';
+        } else if (dividerStyle === 'double') {
+            div.style.display = 'block';
+            div.style.borderTop = '3px double #000000';
+            div.style.margin = '12px 0';
+        } else if (dividerStyle === 'stars') {
+            div.style.display = 'block';
+            div.style.borderTop = 'none';
+            div.style.textAlign = 'center';
+            div.style.fontSize = '0.85rem';
+            div.style.fontWeight = 'bold';
+            div.style.letterSpacing = '3px';
+            div.style.margin = '8px 0';
+            div.innerText = '* * * * * * * * * * * * * * * * *';
+        } else {
+            div.style.display = 'block';
+            div.style.borderTop = '1px dashed #000000';
+            div.style.margin = '12px 0';
+        }
+    });
+
+    const logoImg = document.querySelector('#receipt-customizer-modal .thermal-header-img-container');
+    if (logoImg) logoImg.style.display = showLogo ? 'block' : 'none';
+
+    const headerTextCenter = document.querySelector('#receipt-customizer-modal .thermal-text-center');
+    if (headerTextCenter) {
+        const companyEl = headerTextCenter.children[0];
+        const addressEl = headerTextCenter.children[1];
+        const pivaEl = headerTextCenter.children[2];
+        const titleEl = headerTextCenter.children[3];
+        const eventEl = headerTextCenter.children[4];
+
+        if (companyEl) {
+            companyEl.innerText = companyName;
+            const isCompanyVisible = showCompanyName && (!showLogo || !logoImg);
+            companyEl.style.display = (isCompanyVisible && companyName.trim()) ? 'block' : 'none';
+        }
+        if (addressEl) {
+            addressEl.innerText = address;
+            addressEl.style.display = (showAddress && address.trim()) ? 'block' : 'none';
+        }
+        if (pivaEl) {
+            pivaEl.innerText = piva;
+            pivaEl.style.display = (showPiva && piva.trim()) ? 'block' : 'none';
+        }
+        if (titleEl) {
+            titleEl.innerText = title;
+            titleEl.style.display = (showTitle && title.trim()) ? 'block' : 'none';
+        }
+        if (eventEl) {
+            eventEl.innerText = showEventName ? `${eventNamePrefix}Sagra del Fungo 2026` : '';
+            eventEl.style.display = showEventName ? 'block' : 'none';
+        }
+    }
+
+    const footerTextCenter = document.querySelectorAll('#receipt-customizer-modal .thermal-text-center')[1];
+    if (footerTextCenter) {
+        const thanksEl = footerTextCenter.children[0];
+        const dateEl = footerTextCenter.children[1];
+
+        if (thanksEl) {
+            thanksEl.innerText = thanksMessage;
+            thanksEl.style.display = (showThanks && thanksMessage.trim()) ? 'block' : 'none';
+        }
+        if (dateEl) {
+            dateEl.style.display = showDate ? 'block' : 'none';
+        }
+    }
+}
+
+async function openReceiptCustomizerModal() {
+    await loadReceiptConfig();
+
+    if (document.getElementById('rc-show-logo')) document.getElementById('rc-show-logo').checked = currentReceiptConfig.header.showLogo !== false;
+    if (document.getElementById('rc-show-company-name')) document.getElementById('rc-show-company-name').checked = currentReceiptConfig.header.showCompanyName !== false;
+    if (document.getElementById('rc-company-name')) document.getElementById('rc-company-name').value = currentReceiptConfig.header.companyName || '';
+    if (document.getElementById('rc-show-address')) document.getElementById('rc-show-address').checked = currentReceiptConfig.header.showAddress !== false;
+    if (document.getElementById('rc-address')) document.getElementById('rc-address').value = currentReceiptConfig.header.address || '';
+    if (document.getElementById('rc-show-piva')) document.getElementById('rc-show-piva').checked = currentReceiptConfig.header.showPiva !== false;
+    if (document.getElementById('rc-piva')) document.getElementById('rc-piva').value = currentReceiptConfig.header.piva || '';
+    if (document.getElementById('rc-show-title')) document.getElementById('rc-show-title').checked = currentReceiptConfig.header.showTitle !== false;
+    if (document.getElementById('rc-title')) document.getElementById('rc-title').value = currentReceiptConfig.header.title || '';
+    if (document.getElementById('rc-show-event-name')) document.getElementById('rc-show-event-name').checked = currentReceiptConfig.header.showEventName !== false;
+    if (document.getElementById('rc-event-name-prefix')) document.getElementById('rc-event-name-prefix').value = currentReceiptConfig.header.eventNamePrefix !== undefined ? currentReceiptConfig.header.eventNamePrefix : 'Evento: ';
+    if (document.getElementById('rc-divider-style')) document.getElementById('rc-divider-style').value = currentReceiptConfig.body.dividerStyle || 'dashed';
+    if (document.getElementById('rc-show-thanks')) document.getElementById('rc-show-thanks').checked = currentReceiptConfig.footer.showThanks !== false;
+    if (document.getElementById('rc-thanks-message')) document.getElementById('rc-thanks-message').value = currentReceiptConfig.footer.thanksMessage || '';
+    if (document.getElementById('rc-show-date')) document.getElementById('rc-show-date').checked = currentReceiptConfig.footer.showDate !== false;
+
+    updateReceiptPreviewFromInputs();
+
+    const modal = document.getElementById('receipt-customizer-modal');
+    if (modal) {
+        modal.classList.add('visible');
+        modal.style.display = 'flex';
+    }
+}
+
+function closeReceiptCustomizerModal() {
+    const modal = document.getElementById('receipt-customizer-modal');
+    if (modal) {
+        modal.classList.remove('visible');
+        modal.style.display = 'none';
+    }
+}
+
+async function saveReceiptCustomization() {
+    updateReceiptPreviewFromInputs();
+    try {
+        const res = await fetch('/api/receipt-config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentReceiptConfig)
+        });
+        if (res.ok) {
+            showToast("Personalizzazione scontrino salvata con successo!", "success");
+            closeReceiptCustomizerModal();
+        } else {
+            showToast("Errore durante il salvataggio della personalizzazione", "error");
+        }
+    } catch (e) {
+        showToast("Errore di connessione durante il salvataggio", "error");
+    }
+}
+
+window.openReceiptCustomizerModal = openReceiptCustomizerModal;
+window.closeReceiptCustomizerModal = closeReceiptCustomizerModal;
+window.updateReceiptPreviewFromInputs = updateReceiptPreviewFromInputs;
+window.saveReceiptCustomization = saveReceiptCustomization;
 
 init();

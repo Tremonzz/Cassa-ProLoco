@@ -405,6 +405,16 @@
               <span class="slider round"></span>
             </label>
           </div>
+
+          <div class="settings-card-row" style="margin-top: 12px;">
+            <div class="settings-card-info">
+              <label class="clickable-label">Personalizzazione Layout</label>
+              <span class="settings-card-sub">Personalizza l'intestazione, il testo e la struttura dello scontrino</span>
+            </div>
+            <button type="button" class="btn-pos-secondary" id="btn-customize-receipt" onclick="openReceiptCustomizerModal()" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              <span class="material-symbols-rounded" style="font-size: 1.2rem;">edit_note</span> Personalizza scontrino
+            </button>
+          </div>
         </div>
 
         <!-- SECTION 2: ASPETTO -->
@@ -541,6 +551,269 @@
       </div>
       <div class="modal-footer">
         <button class="btn-save" onclick="closeReceiptModal()">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Receipt Customization Modal (Full Screen 2-Column Layout) -->
+  <div id="receipt-customizer-modal" class="modal">
+    <div class="modal-content receipt-customizer-modal-content">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="material-symbols-rounded modal-title-icon">receipt_long</span>
+          <div>
+            <h2 style="margin: 0; font-size: 1.25rem;">Personalizzazione Scontrino</h2>
+            <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-light); font-weight: 500;">Modifica l'intestazione, le informazioni e il layout dello scontrino stampato</p>
+          </div>
+        </div>
+        <span class="close-modal" onclick="closeReceiptCustomizerModal()">&times;</span>
+      </div>
+
+      <div class="modal-body receipt-customizer-body">
+        <!-- LEFT COLUMN: RECEIPT PREVIEW (EXACT TEST MODE STRUCTURE) -->
+        <div class="receipt-preview-sidebar">
+          <div class="sidebar-section-title">
+            <span class="material-symbols-rounded">visibility</span>
+            Anteprima Scontrino (Modalità Test)
+          </div>
+
+          <div class="thermal-paper-receipt-container">
+            <div class="thermal-paper-wrapper" style="padding-top: 0; width: 100%;">
+              <div class="thermal-paper" style="max-width: 420px; font-size: 0.98rem; padding: 28px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-radius: 6px;">
+                
+                <!-- Logo & Header -->
+                <div class="thermal-header-img-container" style="text-align: center;">
+                  <img src="images/receipt_header.png" class="thermal-header-img" alt="Header Logo" style="max-width: 280px; width: 100%; margin: 0 auto 12px auto; display: block; object-fit: contain;">
+                </div>
+
+                <div class="thermal-text-center" style="display: flex; flex-direction: column; gap: 2px;">
+                  <div class="thermal-bold" style="font-size: 1.05rem;">PROLOCO LORENZAGO</div>
+                  <div>Via Faureana 117 - Lorenzago (BL)</div>
+                  <div>P.IVA 01089600256</div>
+                  <div class="thermal-bold" style="margin-top: 6px; font-size: 0.95rem;">SCONTRINO NON FISCALE</div>
+                  <div style="margin-top: 2px;">Evento: Sagra del Fungo 2026</div>
+                </div>
+
+                <div class="thermal-divider"></div>
+
+                <!-- Items -->
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div class="thermal-row">
+                    <span>2x Tagliatelle ai Funghi</span>
+                    <span>€ 18.00</span>
+                  </div>
+                  <div class="thermal-row">
+                    <span>1x Spezzatino di Capriolo</span>
+                    <span>€ 12.50</span>
+                  </div>
+                  <div class="thermal-row">
+                    <span>2x Panino Salsiccia</span>
+                    <span>€ 10.00</span>
+                  </div>
+                  <div class="thermal-row thermal-row-subitem">
+                    <span>- Senza Cipolla</span>
+                    <span></span>
+                  </div>
+                  <div class="thermal-row thermal-row-subitem">
+                    <span>- Senza Senape</span>
+                    <span></span>
+                  </div>
+                  <div class="thermal-row">
+                    <span>2x Birra Media 0.4L</span>
+                    <span>MENU</span>
+                  </div>
+                </div>
+
+                <div class="thermal-divider"></div>
+
+                <!-- Total -->
+                <div class="thermal-row thermal-row-bold" style="font-size: 1.15rem;">
+                  <span>TOTALE</span>
+                  <span>EUR 40.50</span>
+                </div>
+
+                <div class="thermal-divider"></div>
+
+                <!-- Footer -->
+                <div class="thermal-text-center" style="display: flex; flex-direction: column; gap: 4px;">
+                  <div>Grazie e arrivederci!</div>
+                  <div style="font-size: 0.88rem; opacity: 0.85;">Data/Ora: 13/08/2026 14:45:00</div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: SETTINGS CONTROLS (INTERACTIVE INPUTS) -->
+        <div class="receipt-settings-content">
+          <div class="sidebar-section-title">
+            <span class="material-symbols-rounded">tune</span>
+            Impostazioni Layout & Contenuto
+          </div>
+
+          <div class="receipt-settings-scroll-area">
+            <!-- SECTION A: INTESTAZIONE & LOGO -->
+            <div class="settings-section">
+              <div class="settings-section-title">
+                <span class="material-symbols-rounded">image</span>
+                Intestazione & Logo
+              </div>
+
+              <!-- Logo Switch Box -->
+              <div class="settings-card-row">
+                <div class="settings-card-info">
+                  <label for="rc-show-logo" class="clickable-label">Stampa Logo Aziendale</label>
+                  <span class="settings-card-sub">Include l'immagine del logo in cima allo scontrino</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="rc-show-logo" checked onchange="updateReceiptPreviewFromInputs()">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <!-- Company Name Box -->
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div class="settings-card-info">
+                    <label for="rc-company-name" class="clickable-label">Nome Associazione / Testo Fallback</label>
+                    <span class="settings-card-sub">Stampata se il logo è disattivato o non presente</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="rc-show-company-name" checked onchange="updateReceiptPreviewFromInputs()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <input type="text" id="rc-company-name" class="input-field" value="PROLOCO LORENZAGO" placeholder="es. PROLOCO LORENZAGO" oninput="updateReceiptPreviewFromInputs()">
+              </div>
+
+              <!-- Address Box -->
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div class="settings-card-info">
+                    <label for="rc-address" class="clickable-label">Indirizzo / Sede</label>
+                    <span class="settings-card-sub">Indirizzo della sede o luogo dell'evento</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="rc-show-address" checked onchange="updateReceiptPreviewFromInputs()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <input type="text" id="rc-address" class="input-field" value="Via Faureana 117 - Lorenzago (BL)" placeholder="es. Via Roma 12" oninput="updateReceiptPreviewFromInputs()">
+              </div>
+
+              <!-- P.IVA Box -->
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div class="settings-card-info">
+                    <label for="rc-piva" class="clickable-label">Partita IVA / Codice Fiscale</label>
+                    <span class="settings-card-sub">Dati fiscali dell'associazione</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="rc-show-piva" checked onchange="updateReceiptPreviewFromInputs()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <input type="text" id="rc-piva" class="input-field" value="P.IVA 01089600256" placeholder="es. P.IVA 01089600256" oninput="updateReceiptPreviewFromInputs()">
+              </div>
+
+              <!-- Title Box -->
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div class="settings-card-info">
+                    <label for="rc-title" class="clickable-label">Titolo Scontrino</label>
+                    <span class="settings-card-sub">Titolo principale dello scontrino</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="rc-show-title" checked onchange="updateReceiptPreviewFromInputs()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <input type="text" id="rc-title" class="input-field" value="SCONTRINO NON FISCALE" placeholder="es. SCONTRINO NON FISCALE" oninput="updateReceiptPreviewFromInputs()">
+              </div>
+
+              <!-- Event Name Box -->
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div class="settings-card-info">
+                    <label for="rc-event-name-prefix" class="clickable-label">Stampa Nome Evento</label>
+                    <span class="settings-card-sub">Prefisso per il nome dell'evento attivo</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="rc-show-event-name" checked onchange="updateReceiptPreviewFromInputs()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <input type="text" id="rc-event-name-prefix" class="input-field" value="Evento: " placeholder="es. Evento: " oninput="updateReceiptPreviewFromInputs()">
+              </div>
+            </div>
+
+            <!-- SECTION B: DIVISORI & LINEE DI SEZIONE -->
+            <div class="settings-section">
+              <div class="settings-section-title">
+                <span class="material-symbols-rounded">horizontal_rule</span>
+                Divisori & Linee di Sezione
+              </div>
+
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                <div class="settings-card-info">
+                  <label for="rc-divider-style" class="clickable-label">Stile Divisore di Sezione</label>
+                  <span class="settings-card-sub">Seleziona il tipo di riga / trattini per separare le sezioni dello scontrino</span>
+                </div>
+                <select id="rc-divider-style" class="input-field" onchange="updateReceiptPreviewFromInputs()" style="cursor: pointer;">
+                  <option value="dashed">Trattini Semplici (- - - - - - - - - - - - -)</option>
+                  <option value="solid">Linea Continua (__________________________)</option>
+                  <option value="dotted">Puntini (. . . . . . . . . . . . . . . . . . . . . . . . .)</option>
+                  <option value="double">Doppia Spezzettata (= = = = = = = = = = = = =)</option>
+                  <option value="stars">Asterischi (* * * * * * * * * * * * * * * * * * *)</option>
+                  <option value="none">Nessun Divisore (Spazio vuoto)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- SECTION C: PIÈ DI PAGINA & MESSAGGI -->
+            <div class="settings-section">
+              <div class="settings-section-title">
+                <span class="material-symbols-rounded">notes</span>
+                Piè di Pagina & Messaggi
+              </div>
+
+              <!-- Thanks Message Box -->
+              <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <div class="settings-card-info">
+                    <label for="rc-thanks-message" class="clickable-label">Messaggio di Ringraziamento</label>
+                    <span class="settings-card-sub">Testo di cortesia in fondo allo scontrino</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="rc-show-thanks" checked onchange="updateReceiptPreviewFromInputs()">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+                <input type="text" id="rc-thanks-message" class="input-field" value="Grazie e arrivederci!" placeholder="es. Grazie e arrivederci!" oninput="updateReceiptPreviewFromInputs()">
+              </div>
+
+              <!-- Date & Time Box -->
+              <div class="settings-card-row">
+                <div class="settings-card-info">
+                  <label for="rc-show-date" class="clickable-label">Stampa Data e Ora</label>
+                  <span class="settings-card-sub">Mostra la data ed ora di stampa del documento</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="rc-show-date" checked onchange="updateReceiptPreviewFromInputs()">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--border-color); background: var(--subtle-bg);">
+        <button class="btn-cancel" onclick="closeReceiptCustomizerModal()" style="padding: 10px 18px; font-weight: 600; background: var(--subtle-hover); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-color); cursor: pointer;">Annulla</button>
+        <button class="btn-save" onclick="saveReceiptCustomization()" style="padding: 10px 20px; font-weight: 600;">
+          <span class="material-symbols-rounded" style="vertical-align: middle; margin-right: 4px;">check</span> Salva Personalizzazione
+        </button>
       </div>
     </div>
   </div>

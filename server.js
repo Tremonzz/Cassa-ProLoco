@@ -254,6 +254,23 @@ app.post('/api/database/import', (req, res) => {
   });
 });
 
+// RECEIPT CONFIG APIs
+app.get('/api/receipt-config', (req, res) => {
+  const { getReceiptConfig } = require('./templates/receipt_header');
+  res.json(getReceiptConfig());
+});
+
+app.put('/api/receipt-config', (req, res) => {
+  try {
+    const configPath = path.join(__dirname, 'templates', 'receipt_config.json');
+    fs.writeFileSync(configPath, JSON.stringify(req.body, null, 2), 'utf8');
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Save Receipt Config Error:", e);
+    res.status(500).send(e.message);
+  }
+});
+
 // --- APIs ---
 
 // SAGRAS APIs
