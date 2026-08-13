@@ -2542,6 +2542,8 @@ function renderProducts() {
             let hasLimit = false;
             let isOOS = false;
 
+            let oosComponentsList = [];
+
             if (isComp) {
                 // Composite product: min remaining stock of components
                 let comps = p.components || [];
@@ -2575,6 +2577,9 @@ function renderProducts() {
 
                             const compRem = compProd.quantity - totalUsedInCart;
                             if (compRem < minRemaining) minRemaining = compRem;
+                            if (compRem <= 0 && !oosComponentsList.includes(compProd.name)) {
+                                oosComponentsList.push(compProd.name);
+                            }
                         }
                     }
 
@@ -2605,7 +2610,6 @@ function renderProducts() {
 
                         if (!compProd || compProd.quantity === null || compProd.quantity === undefined) {
                             hasAtLeastOneAvailable = true;
-                            break;
                         } else {
                             let totalUsedInCart = 0;
                             STATE.cart.forEach(cartItem => {
@@ -2615,9 +2619,12 @@ function renderProducts() {
                                     totalUsedInCart += cartItem.quantity;
                                 }
                             });
-                            if ((compProd.quantity - totalUsedInCart) > 0) {
+
+                            const rem = compProd.quantity - totalUsedInCart;
+                            if (rem > 0) {
                                 hasAtLeastOneAvailable = true;
-                                break;
+                            } else if (!oosComponentsList.includes(compProd.name)) {
+                                oosComponentsList.push(compProd.name);
                             }
                         }
                     }
@@ -2648,8 +2655,16 @@ function renderProducts() {
                 typeIcon = `<span class="material-symbols-rounded" style="font-size: 1.05rem; vertical-align: middle; margin-right: 4px; opacity: 0.85;" title="Prodotto Composto">link</span>`;
             }
 
+            let tooltipAttr = '';
+            let titleAttr = '';
+            if (isComp && oosComponentsList.length > 0) {
+                const oosMsg = `Esaurito per mancanza di: ${oosComponentsList.join(', ')}`;
+                tooltipAttr = `data-tooltip="${oosMsg}"`;
+                titleAttr = `title="${oosMsg}"`;
+            }
+
             return `
-          <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id})" oncontextmenu="handleProductRightClick(event, ${p.id})">
+          <button class="product-btn" ${isOOS ? 'disabled' : ''} ${tooltipAttr} ${titleAttr} onclick="addToCart(${p.id})" oncontextmenu="handleProductRightClick(event, ${p.id})">
             ${qtyLabel}
             <span class="product-name">${typeIcon}${p.name}</span>
             <span class="product-price">€ ${p.price.toFixed(2)}</span>
