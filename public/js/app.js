@@ -29,7 +29,11 @@ const totalEl = document.getElementById('total-amount');
 // --- VIEW NAVIGATION ---
 async function showView(viewName) {
     if (viewName === 'auth') {
-        dismissUpdateToast();
+        const toast = document.getElementById('update-toast-banner');
+        if (toast) {
+            toast.style.display = 'none';
+            toast.classList.remove('visible');
+        }
     }
     if (viewName === 'auth' || viewName === 'login') {
         if (typeof closeAllModals === 'function') closeAllModals();
@@ -3957,7 +3961,7 @@ async function checkAppUpdateSilent() {
 }
 
 function showUpdateToast(data) {
-    if (!data) return;
+    if (!data || window._isUpdateToastDismissed) return;
     latestUpdateData = data;
 
     // Do NOT show toast ONLY on the initial password entry screen (view-auth)
@@ -4003,6 +4007,7 @@ function showUpdateToast(data) {
 }
 
 function dismissUpdateToast() {
+    window._isUpdateToastDismissed = true;
     const toast = document.getElementById('update-toast-banner');
     if (toast) {
         toast.style.display = 'none';
