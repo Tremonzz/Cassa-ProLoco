@@ -395,9 +395,69 @@ window.toggleThemeSchedule = toggleThemeSchedule;
 
 setInterval(checkThemeSchedule, 30000);
 
+// --- CHANGE CALCULATOR DISPLAY SETTING ---
+function applyChangeCalcMode(mode) {
+    const validMode = ['none', 'keyboard', 'full'].includes(mode) ? mode : 'full';
+    localStorage.setItem('changeCalcMode', validMode);
+
+    const calcContainer = document.getElementById('change-calculator-container');
+    const quickBar = document.getElementById('quick-cash-bar');
+
+    if (calcContainer) {
+        if (validMode === 'none') {
+            calcContainer.style.display = 'none';
+        } else {
+            calcContainer.style.display = 'block';
+        }
+    }
+
+    if (quickBar) {
+        if (validMode === 'full') {
+            quickBar.style.display = 'flex';
+        } else {
+            quickBar.style.display = 'none';
+        }
+    }
+
+    updateChangeCalcSelectorButtons(validMode);
+}
+
+function updateChangeCalcSelectorButtons(mode) {
+    const pill = document.getElementById('change-calc-selector-pill');
+    const btnNone = document.getElementById('change-calc-btn-none');
+    const btnKeyboard = document.getElementById('change-calc-btn-keyboard');
+    const btnFull = document.getElementById('change-calc-btn-full');
+
+    [btnNone, btnKeyboard, btnFull].forEach(btn => {
+        if (btn) btn.classList.remove('active');
+    });
+
+    if (pill) {
+        if (mode === 'none') {
+            pill.style.transform = 'translateX(0%)';
+            if (btnNone) btnNone.classList.add('active');
+        } else if (mode === 'keyboard') {
+            pill.style.transform = 'translateX(100%)';
+            if (btnKeyboard) btnKeyboard.classList.add('active');
+        } else {
+            pill.style.transform = 'translateX(200%)';
+            if (btnFull) btnFull.classList.add('active');
+        }
+    }
+}
+
+function selectChangeCalcMode(mode) {
+    applyChangeCalcMode(mode);
+}
+window.selectChangeCalcMode = selectChangeCalcMode;
+window.applyChangeCalcMode = applyChangeCalcMode;
+window.updateChangeCalcSelectorButtons = updateChangeCalcSelectorButtons;
+
 // --- APP INIT ---
 async function init() {
     initTheme();
+    const savedCalcMode = localStorage.getItem('changeCalcMode') || 'full';
+    applyChangeCalcMode(savedCalcMode);
     // Check password existence
     const savedPassword = localStorage.getItem('appPassword');
     const authContainer = document.getElementById('auth-input-container');
@@ -3893,6 +3953,7 @@ window.openSettings = async function () {
     showTestStatus(null);
 
     updateThemeSelectorButtons(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+    updateChangeCalcSelectorButtons(localStorage.getItem('changeCalcMode') || 'full');
 
     // Animate switches into their actual saved state after modal layout is active
     setTimeout(() => {
