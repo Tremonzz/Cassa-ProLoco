@@ -893,6 +893,75 @@
     </div>
   </div>
 
+  <!-- POS Product Options Modal (Right Click Options) -->
+  <div id="pos-product-options-modal" class="modal">
+    <div class="modal-content" style="max-width: 520px; width: 92%;">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="material-symbols-rounded modal-title-icon" style="color: var(--primary);">tune</span>
+          <div>
+            <h2 id="ppo-modal-title" style="font-size: 1.25rem; font-weight: 700; margin: 0;">Opzioni Prodotto</h2>
+            <div id="ppo-modal-subtitle" style="font-size: 0.85rem; color: var(--text-light); margin-top: 2px;"></div>
+          </div>
+        </div>
+        <span class="close-modal" onclick="closePosProductOptionsModal()">&times;</span>
+      </div>
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Section 1: Quick Add to Cart -->
+        <div style="background: var(--subtle-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span class="material-symbols-rounded" style="color: var(--primary);">add_shopping_cart</span>
+            Aggiungi al Carrello (Quantità)
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="number" id="ppo-cart-qty-input" class="input-field" value="1" min="1" style="width: 100px; text-align: center; font-weight: 700; font-size: 1.1rem;">
+            <button type="button" class="btn-save ppo-add-cart-btn" style="flex: 1; padding: 10px 16px;" onclick="confirmPpoAddToCart()">
+              <span class="material-symbols-rounded" style="font-size: 1.1rem; vertical-align: middle; margin-right: 4px;">shopping_cart_checkout</span>
+              Aggiungi al Carrello
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 2: Rapid Product Management (Clean Inline Action Cards) -->
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          
+          <div class="ppo-action-card" onclick="handlePpoEditPrice()">
+            <div class="ppo-action-icon-badge">
+              <span class="material-symbols-rounded">euro</span>
+            </div>
+            <div class="ppo-action-title">Modifica Prezzo</div>
+            <span class="material-symbols-rounded ppo-action-arrow">chevron_right</span>
+          </div>
+
+          <div class="ppo-action-card" onclick="handlePpoEditStock()">
+            <div class="ppo-action-icon-badge">
+              <span class="material-symbols-rounded">inventory_2</span>
+            </div>
+            <div class="ppo-action-title">Modifica Scorte</div>
+            <span class="material-symbols-rounded ppo-action-arrow">chevron_right</span>
+          </div>
+
+        </div>
+
+        <!-- Section 3: Linked Products Stock List -->
+        <div id="ppo-linked-stock-container" style="display: none; background: var(--card-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; color: var(--primary);">
+            <span class="material-symbols-rounded">link</span>
+            Scorte Prodotti Collegati
+          </div>
+          <div id="ppo-linked-stock-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
+            <!-- Injected dynamically -->
+          </div>
+          <button type="button" class="btn-save" style="width: 100%; margin-top: 14px; padding: 10px;" onclick="savePpoLinkedStocks()">
+            <span class="material-symbols-rounded" style="vertical-align: middle; margin-right: 4px;">save</span> Salva Scorte Collegati
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <!-- Update Notification Toast (Bottom-Right) -->
   <div id="update-toast-banner" class="update-toast">
     <div class="update-toast-content">

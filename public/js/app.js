@@ -481,6 +481,11 @@ function initLogoLongPressUnlock() {
 }
 
 function initKeyboardShortcuts() {
+    // Disable default browser context menu globally
+    window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+    });
+
     window.addEventListener('keydown', (e) => {
         // Intercept Escape key globally to prevent exiting Fullscreen (F11) mode
         if (e.key === 'Escape') {
@@ -495,7 +500,7 @@ function initKeyboardShortcuts() {
             return;
         }
 
-        const modals = ['history-modal', 'stats-modal', 'settings-modal', 'sagra-options-modal', 'receipt-preview-modal', 'product-reorder-modal', 'linked-products-modal'];
+        const modals = ['history-modal', 'stats-modal', 'settings-modal', 'sagra-options-modal', 'receipt-preview-modal', 'product-reorder-modal', 'linked-products-modal', 'pos-selection-modal', 'pos-product-options-modal'];
         const openModalId = modals.find(id => {
             const el = document.getElementById(id);
             return el && (el.style.display === 'flex' || getComputedStyle(el).display === 'flex');
@@ -511,8 +516,59 @@ function initKeyboardShortcuts() {
                 else if (openModalId === 'receipt-preview-modal') closeReceiptModal();
                 else if (openModalId === 'product-reorder-modal') closeProductReorderModal();
                 else if (openModalId === 'linked-products-modal') closeLinkedProductsModal();
+                else if (openModalId === 'pos-selection-modal') closePosSelectionModal();
+                else if (openModalId === 'pos-product-options-modal') closePosProductOptionsModal();
             }
             return;
+        }
+
+        // Ctrl + Enter shortcut to add another product in Menu Editor
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            const active = document.activeElement;
+            if (active) {
+                // Check if inside a base product row in drawer
+                const baseRow = active.closest('.base-product-row');
+                if (baseRow) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addBaseProductRowUI();
+                    return;
+                }
+
+                // Check if inside a product row in editor
+                const productRow = active.closest('.product-row');
+                if (productRow) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const isComp = productRow.dataset.isComposite === "1";
+                    const isSel = productRow.dataset.isSelection === "1";
+                    const container = productRow.parentElement;
+
+                    if (container) {
+                        addProductUI(container, '', '', '', isComp, isSel);
+                    }
+                    return;
+                }
+
+                // Check if inside an editor section
+                const editorSection = active.closest('.editor-section');
+                if (editorSection) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const stdList = editorSection.querySelector('.products-list-standard');
+                    const compList = editorSection.querySelector('.products-list-composite');
+                    const selList = editorSection.querySelector('.products-list-selection');
+                    if (active.closest('.composite-table') && compList) {
+                        addProductUI(compList, '', '', '', true, false);
+                    } else if (active.closest('.selection-table') && selList) {
+                        addProductUI(selList, '', '', '', false, true);
+                    } else if (stdList) {
+                        addProductUI(stdList, '', '', '', false, false);
+                    }
+                    return;
+                }
+            }
         }
 
         // 2. POS View Shortcuts
@@ -722,7 +778,7 @@ function renderSagraCard(s, isArchived) {
     }) : '';
 
     return `
-    <div class="sagra-card ${isArchived ? 'is-archived' : ''}" onclick="selectSagra(${s.id}, '${safeName}')">
+    <div class="sagra-card ${isArchived ? 'is-archived' : ''}" onclick="selectSagra(${s.id}, '${safeName}')" oncontextmenu="openSagraOptions(event, ${s.id}, '${safeName}', ${isArchived})">
       <div class="sagra-card-content">
         <div class="sagra-card-info">
           <span class="sagra-card-title">${s.name} ${isArchived ? '(Archiviata)' : ''}</span>
@@ -739,7 +795,10 @@ function renderSagraCard(s, isArchived) {
 }
 
 function openSagraOptions(event, id, nameEncoded, isArchived) {
-    if (event) event.stopPropagation();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     const sagraName = decodeURIComponent(nameEncoded);
 
     const modalEl = document.getElementById('sagra-options-modal');
@@ -2267,6 +2326,13 @@ function addProductUI(container, name = '', price = '', quantity = '', isComposi
       </button>
     `;
     container.appendChild(row);
+
+    if (!name) {
+        const nameInput = row.querySelector('.col-name');
+        if (nameInput) {
+            setTimeout(() => nameInput.focus(), 10);
+        }
+    }
 }
 
 async function saveMenu(stayInEditor = false, customToastMsg = null) {
@@ -2583,7 +2649,7 @@ function renderProducts() {
             }
 
             return `
-          <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id})">
+          <button class="product-btn" ${isOOS ? 'disabled' : ''} onclick="addToCart(${p.id})" oncontextmenu="handleProductRightClick(event, ${p.id})">
             ${qtyLabel}
             <span class="product-name">${typeIcon}${p.name}</span>
             <span class="product-price">€ ${p.price.toFixed(2)}</span>
@@ -2694,6 +2760,413 @@ function addToCart(productId) {
     renderProducts();
 }
 
+let currentPpoProduct = null;
+let currentPpoCategory = null;
+
+async function syncStateToEditorAndSave(customToastMsg) {
+    if (!STATE.currentSagra) return;
+
+    const payload = { categories: [] };
+
+    for (const [catName, prods] of Object.entries(STATE.products)) {
+        if (!Array.isArray(prods)) continue;
+        const isBaseCat = catName === 'Prodotti Base';
+        const formattedProds = prods.map((p, idx) => ({
+            name: p.name,
+            price: p.price || 0,
+            quantity: (p.quantity !== undefined && p.quantity !== null) ? p.quantity : null,
+            type: p.type || (p.is_composite ? 'composite' : (p.is_selection ? 'selection' : 'simple')),
+            components: p.components || [],
+            position: p.position !== undefined ? p.position : idx
+        }));
+
+        payload.categories.push({
+            name: catName,
+            is_hidden: isBaseCat ? 1 : 0,
+            products: formattedProds
+        });
+    }
+
+    try {
+        const res = await fetch(`/api/sagras/${STATE.currentSagra.id}/menu`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            STATE.isMenuDirty = false;
+            if (customToastMsg) showToast(customToastMsg, "success");
+            await loadSagraResources();
+        } else {
+            showToast("Errore durante il salvataggio del menu", "error");
+        }
+    } catch (e) {
+        console.error(e);
+        showToast("Errore di comunicazione col server", "error");
+    }
+}
+
+function handleProductRightClick(e, productId) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    let foundProduct = null;
+    let foundCategory = 'Altro';
+    for (const [cat, prods] of Object.entries(STATE.products)) {
+        const prod = prods.find(p => p.id === productId);
+        if (prod) {
+            foundProduct = prod;
+            foundCategory = cat;
+            break;
+        }
+    }
+    if (!foundProduct) return;
+
+    currentPpoProduct = foundProduct;
+    currentPpoCategory = foundCategory;
+
+    const titleEl = document.getElementById('ppo-modal-title');
+    const subtitleEl = document.getElementById('ppo-modal-subtitle');
+    const qtyInput = document.getElementById('ppo-cart-qty-input');
+    const linkedContainer = document.getElementById('ppo-linked-stock-container');
+
+    if (titleEl) titleEl.innerText = foundProduct.name;
+    if (subtitleEl) {
+        const stockStr = (foundProduct.quantity !== null && foundProduct.quantity !== undefined) ? `${foundProduct.quantity} disponibili` : 'Scorte illimitate';
+        subtitleEl.innerText = `Prezzo: € ${foundProduct.price.toFixed(2)} | Scorte attuali: ${stockStr}`;
+    }
+    if (qtyInput) qtyInput.value = "1";
+    if (linkedContainer) linkedContainer.style.display = "none";
+
+    const modal = document.getElementById('pos-product-options-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+window.handleProductRightClick = handleProductRightClick;
+
+function closePosProductOptionsModal() {
+    const modal = document.getElementById('pos-product-options-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+window.closePosProductOptionsModal = closePosProductOptionsModal;
+
+function confirmPpoAddToCart() {
+    if (!currentPpoProduct) return;
+    const qtyInput = document.getElementById('ppo-cart-qty-input');
+    const qtyToAdd = parseInt(qtyInput ? qtyInput.value : '1', 10);
+    if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+        showToast("Inserisci un numero di quantità valido", "error");
+        return;
+    }
+
+    closePosProductOptionsModal();
+
+    if (currentPpoProduct.is_selection === 1) {
+        openPosSelectionModal(currentPpoProduct, currentPpoCategory);
+        return;
+    }
+
+    if (currentPpoProduct.quantity !== null && currentPpoProduct.quantity !== undefined) {
+        let totalUsedInCart = 0;
+        STATE.cart.forEach(cartItem => {
+            if (cartItem.id === currentPpoProduct.id || cartItem.name === currentPpoProduct.name) {
+                totalUsedInCart += cartItem.quantity;
+            } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(currentPpoProduct.name)) {
+                totalUsedInCart += cartItem.quantity;
+            }
+        });
+
+        if ((totalUsedInCart + qtyToAdd) > currentPpoProduct.quantity) {
+            const avail = Math.max(0, currentPpoProduct.quantity - totalUsedInCart);
+            showToast(`Scorte insufficienti per "${currentPpoProduct.name}" (disponibili: ${avail})`, "error");
+            return;
+        }
+    }
+
+    const existing = STATE.cart.find(i => i.id === currentPpoProduct.id || i.name === currentPpoProduct.name);
+    if (existing) {
+        existing.id = currentPpoProduct.id;
+        existing.quantity += qtyToAdd;
+    } else {
+        STATE.cart.push({
+            id: currentPpoProduct.id,
+            name: currentPpoProduct.name,
+            price: currentPpoProduct.price,
+            quantity: qtyToAdd,
+            category: currentPpoCategory,
+            is_composite: currentPpoProduct.is_composite || 0,
+            is_selection: currentPpoProduct.is_selection || 0,
+            components: currentPpoProduct.components || []
+        });
+    }
+
+    showToast(`Aggiunti +${qtyToAdd}x ${currentPpoProduct.name} al carrello`, "success");
+    renderCart();
+    renderProducts();
+}
+window.confirmPpoAddToCart = confirmPpoAddToCart;
+
+async function handlePpoEditPrice() {
+    if (!currentPpoProduct) return;
+    const prod = currentPpoProduct;
+
+    const inputVal = await showDialog({
+        title: `Modifica Prezzo: ${prod.name}`,
+        message: `Inserisci il nuovo prezzo in EUR per "${prod.name}":`,
+        icon: "euro",
+        isPrompt: true,
+        defaultValue: prod.price.toFixed(2),
+        okText: "Aggiorna Prezzo",
+        cancelText: "Annulla"
+    });
+
+    if (inputVal === null || inputVal === false) return;
+    const newPrice = parseFloat(inputVal.replace(',', '.'));
+    if (isNaN(newPrice) || newPrice < 0) {
+        showToast("Inserisci un prezzo valido (es. 4.50)", "error");
+        return;
+    }
+
+    prod.price = newPrice;
+
+    STATE.cart.forEach(item => {
+        if (item.id === prod.id || item.name === prod.name) {
+            item.price = newPrice;
+        }
+    });
+
+    closePosProductOptionsModal();
+    await syncStateToEditorAndSave(`Prezzo di "${prod.name}" aggiornato a € ${newPrice.toFixed(2)}`);
+    renderCart();
+    renderProducts();
+}
+window.handlePpoEditPrice = handlePpoEditPrice;
+
+async function handlePpoEditStock() {
+    if (!currentPpoProduct) return;
+    const prod = currentPpoProduct;
+
+    const isComp = prod.is_composite === 1;
+    const isSel = prod.is_selection === 1;
+    let comps = prod.components || [];
+    if (typeof comps === 'string') {
+        try { comps = JSON.parse(comps); } catch(e){}
+    }
+
+    const hasLinkedComps = (isComp || isSel) && Array.isArray(comps) && comps.length > 0;
+
+    if (hasLinkedComps) {
+        const linkedContainer = document.getElementById('ppo-linked-stock-container');
+        const linkedList = document.getElementById('ppo-linked-stock-list');
+        if (!linkedContainer || !linkedList) return;
+
+        linkedList.innerHTML = '';
+
+        const allNestedNames = getAllNestedComponentNames(comps);
+        const linkedProdsMap = new Map();
+
+        allNestedNames.forEach(compName => {
+            for (const catProds of Object.values(STATE.products)) {
+                const found = catProds.find(item => item.name === compName);
+                if (found) {
+                    linkedProdsMap.set(found.id || found.name, found);
+                    break;
+                }
+            }
+        });
+
+        if (linkedProdsMap.size === 0) {
+            showToast("Nessun prodotto collegato trovato nel menu", "warning");
+            return;
+        }
+
+        linkedProdsMap.forEach(compProd => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border-color);';
+            const qtyVal = (compProd.quantity !== null && compProd.quantity !== undefined) ? compProd.quantity : '';
+
+            row.innerHTML = `
+                <div style="font-weight: 600; font-size: 0.9rem; flex: 1; text-align: left;">${compProd.name}</div>
+                <input type="number" class="input-field ppo-linked-qty-input" data-prod-id="${compProd.id}" data-prod-name="${compProd.name}" placeholder="Illimitata" value="${qtyVal}" min="0" style="width: 110px; text-align: center;">
+            `;
+            linkedList.appendChild(row);
+        });
+
+        linkedContainer.style.display = 'block';
+
+    } else {
+        const currentQtyStr = (prod.quantity !== null && prod.quantity !== undefined) ? String(prod.quantity) : '';
+        const inputVal = await showDialog({
+            title: `Modifica Scorte: ${prod.name}`,
+            message: `Inserisci la quantità di scorte rimanenti per "${prod.name}" (lascia vuoto per scorte illimitate):`,
+            icon: "inventory_2",
+            isPrompt: true,
+            defaultValue: currentQtyStr,
+            okText: "Aggiorna Scorte",
+            cancelText: "Annulla"
+        });
+
+        if (inputVal === null || inputVal === false) return;
+
+        let newQty = null;
+        if (inputVal.trim() !== '') {
+            newQty = parseInt(inputVal.trim(), 10);
+            if (isNaN(newQty) || newQty < 0) {
+                showToast("Inserisci un numero di scorte valido (es. 50 o lascia vuoto)", "error");
+                return;
+            }
+        }
+
+        prod.quantity = newQty;
+
+        closePosProductOptionsModal();
+        await syncStateToEditorAndSave(`Scorte di "${prod.name}" aggiornate`);
+        renderProducts();
+    }
+}
+window.handlePpoEditStock = handlePpoEditStock;
+
+async function savePpoLinkedStocks() {
+    const inputs = document.querySelectorAll('.ppo-linked-qty-input');
+    let updatedCount = 0;
+
+    inputs.forEach(input => {
+        const prodId = input.dataset.prodId;
+        const prodName = input.dataset.prodName;
+        const rawVal = input.value.trim();
+
+        let newQty = null;
+        if (rawVal !== '') {
+            const parsed = parseInt(rawVal, 10);
+            if (!isNaN(parsed) && parsed >= 0) {
+                newQty = parsed;
+            }
+        }
+
+        for (const catProds of Object.values(STATE.products)) {
+            const prod = catProds.find(p => (prodId && String(p.id) === String(prodId)) || p.name === prodName);
+            if (prod) {
+                prod.quantity = newQty;
+                updatedCount++;
+                break;
+            }
+        }
+    });
+
+    closePosProductOptionsModal();
+    await syncStateToEditorAndSave(`Scorte aggiornate per ${updatedCount} prodotti collegati`);
+    renderProducts();
+}
+window.savePpoLinkedStocks = savePpoLinkedStocks;
+
+async function handleCartItemRightClick(e, idx) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    const item = STATE.cart[idx];
+    if (!item) return;
+
+    const inputVal = await showDialog({
+        title: `Modifica Quantità: ${item.name}`,
+        message: `Inserisci la nuova quantità per "${item.name}":`,
+        icon: "edit_note",
+        isPrompt: true,
+        defaultValue: String(item.quantity),
+        okText: "Aggiorna Quantità",
+        cancelText: "Annulla"
+    });
+
+    if (inputVal === null || inputVal === false) return;
+    const newQty = parseInt(inputVal, 10);
+    if (isNaN(newQty) || newQty < 0) {
+        showToast("Inserisci un numero di quantità valido (es. 0 per rimuovere o maggiore)", "error");
+        return;
+    }
+
+    if (newQty === 0) {
+        removeFromCart(idx);
+        showToast(`Rimosso "${item.name}" dal carrello`, "info");
+        return;
+    }
+
+    // Check stock limits if increasing quantity
+    let foundProduct = null;
+    for (const catProds of Object.values(STATE.products)) {
+        foundProduct = catProds.find(p => p.id === item.id || p.name === item.name);
+        if (foundProduct) break;
+    }
+
+    if (foundProduct) {
+        if (foundProduct.is_composite === 1) {
+            let comps = foundProduct.components || [];
+            if (typeof comps === 'string') {
+                try { comps = JSON.parse(comps); } catch(err){}
+            }
+
+            if (Array.isArray(comps)) {
+                const allNestedComps = getAllNestedComponentNames(comps);
+                for (const compName of allNestedComps) {
+                    let compProd = null;
+                    for (const catProds of Object.values(STATE.products)) {
+                        compProd = catProds.find(p => p.name === compName);
+                        if (compProd) break;
+                    }
+
+                    if (compProd && compProd.quantity !== null && compProd.quantity !== undefined) {
+                        let otherUsedInCart = 0;
+                        STATE.cart.forEach((cartItem, cIdx) => {
+                            if (cIdx === idx) return; // Exclude current cart row
+                            if (cartItem.id === compProd.id || cartItem.name === compProd.name) {
+                                otherUsedInCart += cartItem.quantity;
+                            } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(compProd.name)) {
+                                otherUsedInCart += cartItem.quantity;
+                            }
+                        });
+
+                        if ((otherUsedInCart + newQty) > compProd.quantity) {
+                            const maxAvail = Math.max(0, compProd.quantity - otherUsedInCart);
+                            showToast(`Scorte insufficienti per "${compProd.name}" (massimo impostabile: ${maxAvail})`, "error");
+                            return;
+                        }
+                    }
+                }
+            }
+        } else {
+            if (foundProduct.quantity !== null && foundProduct.quantity !== undefined) {
+                let otherUsedInCart = 0;
+                STATE.cart.forEach((cartItem, cIdx) => {
+                    if (cIdx === idx) return; // Exclude current cart row
+                    if (cartItem.id === foundProduct.id || cartItem.name === foundProduct.name) {
+                        otherUsedInCart += cartItem.quantity;
+                    } else if ((cartItem.is_composite === 1 || cartItem.is_selection === 1) && Array.isArray(cartItem.components) && getAllNestedComponentNames(cartItem.components).includes(foundProduct.name)) {
+                        otherUsedInCart += cartItem.quantity;
+                    }
+                });
+
+                if ((otherUsedInCart + newQty) > foundProduct.quantity) {
+                    const maxAvail = Math.max(0, foundProduct.quantity - otherUsedInCart);
+                    showToast(`Scorte insufficienti per "${foundProduct.name}" (massimo impostabile: ${maxAvail})`, "error");
+                    return;
+                }
+            }
+        }
+    }
+
+    item.quantity = newQty;
+    showToast(`Quantità impostata: ${item.name} x${newQty}`, "success");
+    renderCart();
+    renderProducts();
+}
+window.handleCartItemRightClick = handleCartItemRightClick;
+
 function removeFromCart(idx) {
     STATE.cart.splice(idx, 1);
     renderCart();
@@ -2723,6 +3196,8 @@ function renderCart() {
 
         const div = document.createElement('div');
         div.className = 'order-item';
+        div.setAttribute('oncontextmenu', `handleCartItemRightClick(event, ${idx})`);
+        div.setAttribute('title', 'Tasto destro per modificare la quantità');
 
         const isComp = item.is_composite === 1;
         const isSel = item.is_selection === 1;

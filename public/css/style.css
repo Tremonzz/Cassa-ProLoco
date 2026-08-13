@@ -4607,5 +4607,91 @@ img {
   gap: 16px !important;
 }
 
+/* --- PPO ACTION CARDS (POS Right-Click Modal) --- */
+.ppo-add-cart-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ppo-add-cart-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15) !important;
+  filter: brightness(1.08) !important;
+}
+
+.ppo-add-cart-btn:active {
+  transform: translateY(0) scale(0.98) !important;
+  box-shadow: none !important;
+}
+
+.ppo-action-card {
+  flex: 1;
+  min-width: 190px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.ppo-action-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  background: var(--card-hover, var(--subtle-bg));
+}
+
+.ppo-action-card:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+.ppo-action-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--subtle-bg);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.ppo-action-card:hover .ppo-action-icon-badge {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.ppo-action-icon-badge .material-symbols-rounded {
+  font-size: 1.25rem;
+}
+
+.ppo-action-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-color);
+  line-height: 1.2;
+}
+
+.ppo-action-arrow {
+  margin-left: auto;
+  font-size: 1.2rem;
+  color: var(--text-light);
+  opacity: 0.5;
+  transition: transform 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+}
+
+.ppo-action-card:hover .ppo-action-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+  color: var(--primary);
+}
+
 
 
