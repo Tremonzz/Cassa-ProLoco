@@ -3842,6 +3842,7 @@ input:checked + .slider:before {
 }
 
 .base-product-table-header .col-name,
+.base-product-row .product-name-wrapper,
 .base-product-row input.base-name-input {
   flex: 7 1 70% !important;
   width: 70% !important;
