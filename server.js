@@ -986,6 +986,49 @@ app.get('/api/export', (req, res) => {
   });
 });
 
+// GET Current Version Changelog / Whats New Notes
+app.get('/api/current-changelog', async (req, res) => {
+  const pkg = require('./package.json');
+  const currentVersion = pkg.version;
+  const owner = req.query.owner || 'Tremonzz';
+  const repo = req.query.repo || 'Cassa-ProLoco';
+
+  try {
+    const { execSync } = require('child_process');
+    const tagHtml = execSync(`curl.exe -s -L -H "User-Agent: Mozilla/5.0" "https://github.com/${owner}/${repo}/releases/tag/v${currentVersion}"`, { encoding: 'utf8', windowsHide: true, timeout: 6000 });
+    const notesMatch = tagHtml.match(/class="markdown-body[^"]*"[^>]*>([\s\S]*?)<\/div>/i) || tagHtml.match(/data-test-selector="body-content"[^>]*>([\s\S]*?)<\/div>/i);
+    let cleanNotes = "";
+    if (notesMatch) {
+      cleanNotes = notesMatch[1]
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n### $1\n')
+        .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\n\s*\n\s*\n/g, '\n\n')
+        .trim();
+    }
+
+    if (!cleanNotes) {
+      cleanNotes = `### Novità della versione v${currentVersion}\n- Prestazioni migliorate ed interfaccia utente aggiornata.`;
+    }
+
+    res.json({
+      version: currentVersion,
+      notes: cleanNotes
+    });
+  } catch (e) {
+    res.json({
+      version: currentVersion,
+      notes: `### Novità della versione v${currentVersion}\n- Prestazioni migliorate ed interfaccia utente aggiornata.`
+    });
+  }
+});
+
 // GET Dynamic App Version from package.json
 app.get('/api/version', (req, res) => {
   const pkg = require('./package.json');

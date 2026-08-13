@@ -482,6 +482,9 @@ async function init() {
 
     showView('auth');
 
+    // Check for post-update Whats New Changelog modal
+    checkPostUpdateChangelog();
+
     // Check for updates silently on startup
     checkAppUpdateSilent();
     setTimeout(() => checkAppUpdateSilent(), 300);
@@ -4738,8 +4741,42 @@ function closeChangelogModal() {
     if (modal) modal.style.display = 'none';
 }
 
+async function checkPostUpdateChangelog() {
+    try {
+        const res = await fetch('/api/current-changelog');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const currentVersion = data.version;
+        const lastSeenVersion = localStorage.getItem('lastSeenAppVersion');
+
+        if (!lastSeenVersion) {
+            localStorage.setItem('lastSeenAppVersion', currentVersion);
+            return;
+        }
+
+        if (lastSeenVersion !== currentVersion) {
+            localStorage.setItem('lastSeenAppVersion', currentVersion);
+
+            const modal = document.getElementById('changelog-modal');
+            const verEl = document.getElementById('changelog-modal-version');
+            const bodyEl = document.getElementById('changelog-modal-body');
+            const updateBtn = document.getElementById('changelog-modal-update-btn');
+
+            if (verEl) verEl.innerText = `v${data.version}`;
+            if (bodyEl) bodyEl.innerHTML = formatReleaseNotes(data.notes);
+            if (updateBtn) updateBtn.style.display = 'none';
+
+            if (modal) modal.style.display = 'flex';
+        }
+    } catch (e) {
+        console.log("Post update changelog check skipped:", e);
+    }
+}
+
 window.openChangelogModal = openChangelogModal;
 window.closeChangelogModal = closeChangelogModal;
+window.checkPostUpdateChangelog = checkPostUpdateChangelog;
 window.dismissUpdateToast = dismissUpdateToast;
 window.checkAppUpdateSilent = checkAppUpdateSilent;
 
