@@ -180,7 +180,7 @@ function showDialog(optsOrTitle, messageStr = '', isPrompt = false, isAlert = fa
 
         dOk.onclick = () => {
             const val = opts.isPrompt ? dInput.value : true;
-            if (opts.isPrompt && !val.trim()) return;
+            if (opts.isPrompt && !opts.allowEmpty && !val.trim()) return;
             cleanup();
             resolve(val);
         };
@@ -3007,6 +3007,7 @@ async function handlePpoEditStock() {
             message: `Inserisci la quantità di scorte rimanenti per "${prod.name}" (lascia vuoto per scorte illimitate):`,
             icon: "inventory_2",
             isPrompt: true,
+            allowEmpty: true,
             defaultValue: currentQtyStr,
             okText: "Aggiorna Scorte",
             cancelText: "Annulla"
