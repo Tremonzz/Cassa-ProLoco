@@ -811,15 +811,7 @@ function showProductAutocomplete(input, suggestions) {
         popup.className = 'product-autocomplete-popup';
     }
 
-    let wrapper = input.closest('.product-name-wrapper') || input.parentElement;
-    if (wrapper) {
-        if (getComputedStyle(wrapper).position === 'static') {
-            wrapper.style.position = 'relative';
-        }
-        if (popup.parentElement !== wrapper) {
-            wrapper.appendChild(popup);
-        }
-    } else {
+    if (popup.parentElement !== document.body) {
         document.body.appendChild(popup);
     }
 
@@ -831,9 +823,24 @@ function showProductAutocomplete(input, suggestions) {
         </div>
     `).join('');
 
-    popup.style.top = 'calc(100% + 3px)';
-    popup.style.left = '0';
-    popup.style.width = '100%';
+    const rect = input.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+
+    popup.style.position = 'fixed';
+    popup.style.left = `${rect.left}px`;
+    popup.style.width = `${rect.width}px`;
+    popup.style.zIndex = '9999999';
+
+    if (spaceBelow < 160) {
+        popup.style.top = 'auto';
+        popup.style.bottom = `${window.innerHeight - rect.top + 3}px`;
+        popup.style.boxShadow = '0 -8px 24px rgba(0, 0, 0, 0.25)';
+    } else {
+        popup.style.top = `${rect.bottom + 3}px`;
+        popup.style.bottom = 'auto';
+        popup.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.25)';
+    }
+
     popup.style.display = 'flex';
 }
 
@@ -865,6 +872,7 @@ function closeProductAutocomplete() {
 window.closeProductAutocomplete = closeProductAutocomplete;
 
 document.addEventListener('input', handleProductNameInput);
+window.addEventListener('scroll', () => closeProductAutocomplete(), { capture: true, passive: true });
 document.addEventListener('click', (e) => {
     if (!e.target.closest('#product-autocomplete-popup') && !e.target.classList.contains('col-name') && !e.target.classList.contains('base-prod-name')) {
         closeProductAutocomplete();
@@ -2363,8 +2371,11 @@ document.addEventListener('click', function(e) {
     const drawer = document.getElementById('base-products-drawer');
     if (!drawer) return;
 
-    // Do NOT toggle/close drawer if click is inside autocomplete popup or input field
-    if (e.target.closest('#product-autocomplete-popup') || e.target.closest('.product-name-wrapper') || e.target.classList.contains('product-autocomplete-item')) {
+    // Do NOT toggle/close drawer if click is inside autocomplete popup, input field, or delete button
+    if (e.target.closest('#product-autocomplete-popup') || 
+        e.target.closest('.product-name-wrapper') || 
+        e.target.classList.contains('product-autocomplete-item') ||
+        e.target.closest('.btn-del-product')) {
         return;
     }
 
@@ -2393,7 +2404,7 @@ function addBaseProductRowUI(name = '', quantity = '') {
         <input type="text" class="input-field col-name base-name-input" placeholder="es. Pane" value="${name}">
       </div>
       <input type="number" class="input-field col-qty base-qty-input" placeholder="Illimitata" value="${qtyVal}" min="0" title="Lascia vuoto per scorte illimitate">
-      <button type="button" class="btn-del-product" title="Elimina Prodotto Base" onclick="this.closest('.base-product-row').remove()">
+      <button type="button" class="btn-del-product" title="Elimina Prodotto Base" onclick="removeBaseProductRow(this, event)">
         <span class="material-symbols-rounded" style="font-size: 1.2rem;">delete_outline</span>
       </button>
     `;
@@ -2405,6 +2416,18 @@ function addBaseProductRowUI(name = '', quantity = '') {
         if (nameInput) nameInput.focus();
     }
 }
+
+function removeBaseProductRow(btn, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
+    const row = btn.closest('.base-product-row');
+    if (row) {
+        row.remove();
+        if (typeof markMenuDirty === 'function') markMenuDirty();
+    }
+}
+window.removeBaseProductRow = removeBaseProductRow;
 
 function renderBaseProductsUI() {
     const list = document.getElementById('base-products-list');

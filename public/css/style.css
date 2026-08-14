@@ -3806,14 +3806,22 @@ input:checked + .slider:before {
   box-shadow: 0 4px 10px rgba(30, 42, 74, 0.2);
 }
 
+.base-products-panel .panel-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* Panel Body */
 .base-products-panel .panel-body {
   padding: 16px;
-  overflow-y: auto;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* Base Product Table Header & Input Rows (Strict 70% Name, 30% Stock) */
@@ -3873,6 +3881,10 @@ input:checked + .slider:before {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
 }
 
 /* --- DARK THEME OVERRIDES --- */
@@ -4835,11 +4847,7 @@ img {
 }
 
 .product-autocomplete-popup {
-  position: absolute;
-  top: calc(100% + 3px);
-  left: 0;
-  width: 100%;
-  z-index: 999999;
+  z-index: 9999999 !important;
   background: var(--card-bg, #ffffff);
   border: 1.5px solid var(--primary, #6366f1);
   border-radius: 8px;
