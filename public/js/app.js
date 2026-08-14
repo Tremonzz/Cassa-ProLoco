@@ -4043,7 +4043,6 @@ window.toggleSettingsPasswordVisibility = toggleSettingsPasswordVisibility;
 
 window.openSettings = async function () {
     const testToggle = document.getElementById('test-mode-toggle');
-    const printEventToggle = document.getElementById('print-event-name-toggle');
     const darkToggle = document.getElementById('dark-mode-toggle');
     const scheduleToggle = document.getElementById('dark-mode-schedule-toggle');
 
@@ -4057,7 +4056,6 @@ window.openSettings = async function () {
 
     // Reset switches before displaying so CSS transition animates smoothly
     if (testToggle) testToggle.checked = false;
-    if (printEventToggle) printEventToggle.checked = false;
     if (darkToggle) darkToggle.checked = false;
     if (scheduleToggle) scheduleToggle.checked = false;
 
@@ -4070,7 +4068,6 @@ window.openSettings = async function () {
     // Animate switches into their actual saved state after modal layout is active
     setTimeout(() => {
         if (testToggle) testToggle.checked = (localStorage.getItem('appTestMode') === 'true');
-        if (printEventToggle) printEventToggle.checked = (localStorage.getItem('appPrintEventName') !== 'false');
 
         const isScheduleEnabled = (localStorage.getItem('themeScheduleEnabled') !== 'false');
         if (scheduleToggle) scheduleToggle.checked = isScheduleEnabled;
@@ -4155,7 +4152,6 @@ window.saveSettings = function () {
     const newPassword = settingsPasswordInput.value.trim();
     const selectedTemplate = document.getElementById('template-select').value;
     const isTestMode = document.getElementById('test-mode-toggle').checked;
-    const printEventName = document.getElementById('print-event-name-toggle').checked;
 
     const isScheduleEnabled = document.getElementById('dark-mode-schedule-toggle').checked;
     const scheduleStart = document.getElementById('dark-mode-start-time').value;
@@ -4165,11 +4161,10 @@ window.saveSettings = function () {
         localStorage.setItem('thermalPrinterName', selectedPrinter);
     }
 
-    // Save Password, Template, Test Mode & Print Event Name
+    // Save Password, Template, Test Mode
     localStorage.setItem('appPassword', newPassword);
     localStorage.setItem('receiptTemplate', selectedTemplate);
     localStorage.setItem('appTestMode', isTestMode ? 'true' : 'false');
-    localStorage.setItem('appPrintEventName', printEventName ? 'true' : 'false');
 
     // Save Scheduled Dark Mode
     localStorage.setItem('themeScheduleEnabled', isScheduleEnabled ? 'true' : 'false');
