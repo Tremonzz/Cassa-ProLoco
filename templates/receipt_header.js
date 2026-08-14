@@ -3,8 +3,24 @@ const fs = require("fs");
 const os = require("os");
 const sharp = require("sharp");
 
+function getReceiptConfigPath() {
+    try {
+        const { app: electronApp } = require('electron');
+        if (electronApp) {
+            const userDataPath = electronApp.getPath('userData');
+            return path.join(userDataPath, 'receipt_config.json');
+        }
+    } catch (e) {}
+
+    const appRoot = __dirname.includes('app.asar')
+        ? path.dirname(__dirname.replace('app.asar', ''))
+        : path.join(__dirname, '..');
+    return path.join(appRoot, 'receipt_config.json');
+}
+
 function getReceiptConfig() {
-    const configPath = path.join(__dirname, 'receipt_config.json');
+    const userConfigPath = getReceiptConfigPath();
+    const defaultConfigPath = path.join(__dirname, 'receipt_config.json');
     const defaults = {
         header: {
             showLogo: true,
@@ -31,9 +47,11 @@ function getReceiptConfig() {
             showDate: true
         }
     };
-    if (fs.existsSync(configPath)) {
+
+    // 1. Try reading saved user config from writable location
+    if (fs.existsSync(userConfigPath)) {
         try {
-            const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(userConfigPath, 'utf8'));
             return {
                 header: { ...defaults.header, ...(data.header || {}) },
                 body: { ...defaults.body, ...(data.body || {}) },
@@ -41,6 +59,19 @@ function getReceiptConfig() {
             };
         } catch (e) {}
     }
+
+    // 2. Fallback to default config bundled in app
+    if (fs.existsSync(defaultConfigPath)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(defaultConfigPath, 'utf8'));
+            return {
+                header: { ...defaults.header, ...(data.header || {}) },
+                body: { ...defaults.body, ...(data.body || {}) },
+                footer: { ...defaults.footer, ...(data.footer || {}) }
+            };
+        } catch (e) {}
+    }
+
     return defaults;
 }
 
@@ -56,7 +87,11 @@ async function printReceiptHeader(printer, sagraName, customConfig = null) {
     const cfg = customConfig || getReceiptConfig();
     const h = cfg.header || {};
 
-    const headerPath = path.join(__dirname, '..', 'public', 'images', 'receipt_header.png');
+    let headerPath = path.join(__dirname, '..', 'public', 'images', 'receipt_header.png');
+    const unpackedHeaderPath = headerPath.replace('app.asar', 'app.asar.unpacked');
+    if (fs.existsSync(unpackedHeaderPath)) {
+        headerPath = unpackedHeaderPath;
+    }
     let hasHeaderImage = false;
 
     if (h.showLogo !== false && fs.existsSync(headerPath)) {
@@ -116,4 +151,4 @@ async function printReceiptHeader(printer, sagraName, customConfig = null) {
     };
 }
 
-module.exports = { printReceiptHeader, getReceiptConfig };
+module.exports = { printReceiptHeader, getReceiptConfig, getReceiptConfigPath };

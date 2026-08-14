@@ -50,14 +50,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Serve resized header image from OS temp dir or fallback
-app.get('/receipt_header_resized.png', (req, res) => {
+app.get('/receipt_header_resized.png', async (req, res) => {
   const resizedPath = path.join(os.tmpdir(), 'receipt_header_resized.png');
   if (fs.existsSync(resizedPath)) {
     return res.sendFile(resizedPath);
   }
-  const originalPath = path.join(__dirname, 'public', 'images', 'receipt_header.png');
+  let originalPath = path.join(__dirname, 'public', 'images', 'receipt_header.png');
+  const unpackedPath = originalPath.replace('app.asar', 'app.asar.unpacked');
+  if (fs.existsSync(unpackedPath)) {
+    originalPath = unpackedPath;
+  }
   if (fs.existsSync(originalPath)) {
-    return res.sendFile(originalPath);
+    try {
+      const sharp = require('sharp');
+      await sharp(originalPath)
+        .resize({ width: 380 })
+        .toFile(resizedPath);
+      return res.sendFile(resizedPath);
+    } catch (e) {
+      return res.sendFile(originalPath);
+    }
   }
   res.status(404).send('Not found');
 });
@@ -262,7 +274,8 @@ app.get('/api/receipt-config', (req, res) => {
 
 app.put('/api/receipt-config', (req, res) => {
   try {
-    const configPath = path.join(__dirname, 'templates', 'receipt_config.json');
+    const { getReceiptConfigPath } = require('./templates/receipt_header');
+    const configPath = getReceiptConfigPath();
     fs.writeFileSync(configPath, JSON.stringify(req.body, null, 2), 'utf8');
     res.json({ success: true });
   } catch (e) {
