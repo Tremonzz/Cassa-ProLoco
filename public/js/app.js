@@ -826,7 +826,7 @@ function showProductAutocomplete(input, suggestions) {
     activeAutocompleteInput = input;
 
     popup.innerHTML = suggestions.map(name => `
-        <div class="product-autocomplete-item" onclick="selectProductAutocomplete('${encodeURIComponent(name.replace(/'/g, "\\'"))}')">
+        <div class="product-autocomplete-item" onclick="selectProductAutocomplete('${encodeURIComponent(name.replace(/'/g, "\\'"))}', event)">
             <span>${name}</span>
         </div>
     `).join('');
@@ -837,7 +837,11 @@ function showProductAutocomplete(input, suggestions) {
     popup.style.display = 'flex';
 }
 
-function selectProductAutocomplete(encodedName) {
+function selectProductAutocomplete(encodedName, event) {
+    if (event) {
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    }
     const name = decodeURIComponent(encodedName);
     const input = activeAutocompleteInput;
     closeProductAutocomplete();
@@ -2358,6 +2362,11 @@ function closeBaseProductsDrawer(e) {
 document.addEventListener('click', function(e) {
     const drawer = document.getElementById('base-products-drawer');
     if (!drawer) return;
+
+    // Do NOT toggle/close drawer if click is inside autocomplete popup or input field
+    if (e.target.closest('#product-autocomplete-popup') || e.target.closest('.product-name-wrapper') || e.target.classList.contains('product-autocomplete-item')) {
+        return;
+    }
 
     if (drawer.classList.contains('open')) {
         if (!drawer.contains(e.target)) {
