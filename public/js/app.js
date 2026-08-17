@@ -4112,6 +4112,10 @@ window.openSettings = async function () {
     const endTimeInput = document.getElementById('dark-mode-end-time');
     if (endTimeInput) endTimeInput.value = localStorage.getItem('themeScheduleEnd') || '07:00';
 
+    const templateSelect = document.getElementById('template-select');
+    if (templateSelect) {
+        templateSelect.value = localStorage.getItem('receiptTemplate') || 'compact';
+    }
     syncCustomSelect('template-select');
 
     try {
