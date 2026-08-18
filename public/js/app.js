@@ -932,39 +932,114 @@ function showLogin() {
 
 // --- SAGRA MANAGEMENT ---
 let showArchivedState = false;
+let sagraSearchQuery = '';
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 async function loadSagras() {
-    const res = await fetch('/api/sagras');
-    const allSagras = await res.json();
+    try {
+        const res = await fetch('/api/sagras');
+        const allSagras = await res.json();
+        STATE.sagras = allSagras || [];
+        renderSagrasList();
+    } catch (err) {
+        console.error("Error loading sagras:", err);
+    }
+}
 
-    const activeSagras = allSagras.filter(s => s.status !== 'archived');
-    const archivedSagras = allSagras.filter(s => s.status === 'archived');
+function filterSagras(query) {
+    sagraSearchQuery = (query || '').trim().toLowerCase();
+    const clearBtn = document.getElementById('sagra-search-clear-btn');
+    if (clearBtn) {
+        clearBtn.style.display = sagraSearchQuery ? 'flex' : 'none';
+    }
+    renderSagrasList();
+}
 
-    let html = '';
+function clearSagraSearch() {
+    sagraSearchQuery = '';
+    const input = document.getElementById('sagra-search-input');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    const clearBtn = document.getElementById('sagra-search-clear-btn');
+    if (clearBtn) {
+        clearBtn.style.display = 'none';
+    }
+    renderSagrasList();
+}
+
+function renderSagrasList() {
+    const allSagras = STATE.sagras || [];
+    const query = sagraSearchQuery;
+
+    let filtered = allSagras;
+    if (query) {
+        filtered = allSagras.filter(s => {
+            const nameMatch = s.name && s.name.toLowerCase().includes(query);
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT') : '';
+            const dateMatch = dateStr.includes(query);
+            return nameMatch || dateMatch;
+        });
+    }
+
+    const activeSagras = filtered.filter(s => s.status !== 'archived');
+    const archivedSagras = filtered.filter(s => s.status === 'archived');
 
     // Active List
     const titleEl = views.login.querySelector('.login-title') || views.login.querySelector('h1');
-    if (activeSagras.length === 0 && archivedSagras.length === 0) {
+    if (allSagras.length === 0) {
         if (titleEl) titleEl.innerText = "Benvenuto! Crea il tuo primo Evento.";
     } else {
         if (titleEl) titleEl.innerText = "Gestione Ordini";
     }
 
-    html += activeSagras.map(s => renderSagraCard(s, false)).join('');
+    let html = '';
 
-    // Archived List
-    if (archivedSagras.length > 0) {
-        html += `
-      <div class="archived-section">
-        <button class="btn-toggle-archive" onclick="toggleArchived()">
-          <span class="material-symbols-rounded" style="font-size: 1.1rem;">${showArchivedState ? 'unfold_less' : 'archive'}</span>
-          ${showArchivedState ? 'Nascondi Archiviate' : 'Mostra Archiviate'} (${archivedSagras.length})
-        </button>
-        <div class="archived-list ${showArchivedState ? 'visible' : ''}">
-          ${archivedSagras.map(s => renderSagraCard(s, true)).join('')}
-        </div>
-      </div>
-    `;
+    if (filtered.length === 0) {
+        if (query) {
+            html = `
+              <div class="empty-sagra-search">
+                <span class="material-symbols-rounded">search_off</span>
+                <p>Nessun evento trovato per "<b>${escapeHtml(query)}</b>"</p>
+              </div>
+            `;
+        } else {
+            html = `
+              <div class="empty-sagra-search">
+                <span class="material-symbols-rounded">event_busy</span>
+                <p>Nessun evento disponibile. Creane uno nuovo!</p>
+              </div>
+            `;
+        }
+    } else {
+        html += activeSagras.map(s => renderSagraCard(s, false)).join('');
+
+        // Archived List
+        if (archivedSagras.length > 0) {
+            const isAutoExpanded = query.length > 0;
+            const isVisible = showArchivedState || isAutoExpanded;
+            html += `
+              <div class="archived-section">
+                <button class="btn-toggle-archive" onclick="toggleArchived()">
+                  <span class="material-symbols-rounded" style="font-size: 1.1rem;">${isVisible ? 'unfold_less' : 'archive'}</span>
+                  ${isVisible ? 'Nascondi Archiviate' : 'Mostra Archiviate'} (${archivedSagras.length})
+                </button>
+                <div class="archived-list ${isVisible ? 'visible' : ''}">
+                  ${archivedSagras.map(s => renderSagraCard(s, true)).join('')}
+                </div>
+              </div>
+            `;
+        }
     }
 
     sagraListEl.innerHTML = html;
@@ -972,7 +1047,7 @@ async function loadSagras() {
 
 function toggleArchived() {
     showArchivedState = !showArchivedState;
-    loadSagras();
+    renderSagrasList();
 }
 
 function renderSagraCard(s, isArchived) {
@@ -4027,6 +4102,8 @@ function closeHistory() {
 
 window.selectSagra = selectSagra;
 window.createNewSagra = createNewSagra;
+window.filterSagras = filterSagras;
+window.clearSagraSearch = clearSagraSearch;
 window.archiveSagra = archiveSagra;
 window.unarchiveSagra = unarchiveSagra;
 window.deleteSagra = deleteSagra;

@@ -96,7 +96,14 @@
       <img src="images/logo.png" alt="Proloco Lorenzago" class="login-logo" draggable="false" style="user-select: none; -webkit-user-drag: none;">
       <h1 class="login-title">Gestione Ordini</h1>
       <p class="login-subtitle">Proloco Lorenzago</p>
-      <p class="login-instruction">Seleziona un evento per accedere alla cassa o creane uno nuovo</p>
+      <!-- Sagra Search Bar -->
+      <div class="sagra-search-wrapper" id="sagra-search-container">
+        <span class="material-symbols-rounded sagra-search-icon">search</span>
+        <input type="text" id="sagra-search-input" class="sagra-search-input" placeholder="Cerca evento..." oninput="filterSagras(this.value)" autocomplete="off">
+        <button type="button" class="sagra-search-clear" id="sagra-search-clear-btn" onclick="clearSagraSearch()" title="Cancella ricerca" style="display:none;">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
 
       <div id="sagra-list" class="sagra-list">
         <!-- Injected via JS -->
