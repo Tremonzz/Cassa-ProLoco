@@ -482,12 +482,28 @@ async function init() {
 
     showView('auth');
 
+    // Dismiss initial startup loader smoothly
+    dismissAppInitialLoader();
+
     // Check for post-update Whats New Changelog modal
     checkPostUpdateChangelog();
 
     // Check for updates silently on startup
     checkAppUpdateSilent();
     setTimeout(() => checkAppUpdateSilent(), 300);
+}
+
+function dismissAppInitialLoader() {
+    const loader = document.getElementById('app-initial-loader');
+    if (loader) {
+        loader.style.opacity = '0';
+        loader.style.visibility = 'hidden';
+        setTimeout(() => {
+            if (loader && loader.parentNode) {
+                loader.parentNode.removeChild(loader);
+            }
+        }, 250);
+    }
 }
 
 function updateLiveClock() {

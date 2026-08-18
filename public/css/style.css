@@ -4975,6 +4975,58 @@ img {
   font-size: 0.95rem;
 }
 
+/* --- APP INITIAL STARTUP LOADER --- */
+#app-initial-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 999999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #f4f6f8);
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  user-select: none;
+  pointer-events: all;
+}
+
+[data-theme="dark"] #app-initial-loader {
+  background: #0f172a;
+}
+
+.app-loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.app-loader-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08));
+}
+
+.app-loader-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3.5px solid rgba(0, 0, 0, 0.08);
+  border-top-color: var(--primary, #1e2a4a);
+  border-radius: 50%;
+  animation: appLoaderSpin 0.7s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+}
+
+[data-theme="dark"] .app-loader-spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: #60a5fa;
+}
+
+@keyframes appLoaderSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 
 
 

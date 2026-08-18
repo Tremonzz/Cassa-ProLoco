@@ -13,6 +13,8 @@ function createWindow() {
         center: true,
         resizable: true,
         frame: false,
+        show: false,
+        backgroundColor: '#f4f6f8',
         title: "Gestione Ordini",
         icon: path.join(__dirname, 'public/images/logo.png'),
         webPreferences: {
@@ -23,11 +25,24 @@ function createWindow() {
         autoHideMenuBar: true
     });
 
+    mainWindow.once('ready-to-show', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+        }
+    });
+
+    // Fallback safety to ensure window is shown
+    setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+            mainWindow.show();
+        }
+    }, 1500);
+
     setTimeout(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.loadURL('http://localhost:3000');
         }
-    }, 800);
+    }, 400);
 }
 
 ipcMain.on('close-app', () => {
