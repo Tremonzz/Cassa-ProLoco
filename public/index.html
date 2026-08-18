@@ -1010,36 +1010,37 @@
     </div>
   </div>
 
-  <!-- Modal Importazione Selettiva Eventi da Database -->
-  <div id="import-events-modal" class="modal" style="display:none;">
+  <!-- Modal Unificata Selezione Eventi (Import / Export) -->
+  <div id="events-selection-modal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width: 680px; width: 92%;">
       <div class="modal-header">
         <h2 style="display:flex; align-items:center; gap:8px;">
-          <span class="material-symbols-rounded" style="color:var(--primary);">cloud_download</span>
-          Seleziona Eventi da Importare
+          <span class="material-symbols-rounded" id="events-modal-icon" style="color:var(--primary);">cloud_download</span>
+          <span id="events-modal-title">Seleziona Eventi</span>
         </h2>
-        <span class="close-modal" onclick="closeImportEventsModal()">&times;</span>
+        <span class="close-modal" onclick="closeEventsSelectionModal()">&times;</span>
       </div>
       <div class="modal-body" style="padding: 20px;">
-        <p style="margin-top: 0; margin-bottom: 14px; color: var(--text-light); font-size: 0.92rem; line-height: 1.5;">
-          Seleziona gli eventi presenti nel file database caricato che desideri importare nel sistema attuale:
+        <p style="margin-top: 0; margin-bottom: 14px; color: var(--text-light); font-size: 0.92rem; line-height: 1.5;" id="events-modal-description">
+          Seleziona gli eventi che desideri elaborare:
         </p>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding: 10px 14px; background: var(--subtle-bg); border-radius: 8px; border: 1px solid var(--border-color);">
           <label style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="import-select-all" onchange="toggleSelectAllImportEvents(this.checked)" style="width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary);">
-            <span>Seleziona tutti (<span id="import-selected-count">0</span>/<span id="import-total-count">0</span>)</span>
+            <input type="checkbox" id="events-select-all" onchange="toggleSelectAllEvents(this.checked)" style="width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary);">
+            <span>Seleziona tutti (<span id="events-selected-count">0</span>/<span id="events-total-count">0</span>)</span>
           </label>
         </div>
 
-        <div id="import-events-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px;">
+        <div id="events-selection-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px;">
           <!-- Injected dynamically via JS -->
         </div>
       </div>
       <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-        <button type="button" class="btn-pos-secondary" onclick="closeImportEventsModal()" style="height: 42px; padding: 10px 22px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;">Annulla</button>
-        <button type="button" class="btn-save" id="btn-confirm-import-events" onclick="confirmImportSelectedEvents()" style="height: 42px; padding: 10px 22px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box;">
-          <span class="material-symbols-rounded" style="font-size: 1.15rem;">download</span> Importa Selezionati (<span id="btn-import-count">0</span>)
+        <button type="button" class="btn-pos-secondary" onclick="closeEventsSelectionModal()" style="height: 42px; padding: 10px 22px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;">Annulla</button>
+        <button type="button" class="btn-save" id="btn-confirm-events-selection" onclick="confirmEventsSelection()" style="height: 42px; padding: 10px 22px; font-size: 0.95rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box;">
+          <span class="material-symbols-rounded" id="events-confirm-btn-icon" style="font-size: 1.15rem;">download</span>
+          <span id="events-confirm-btn-text">Conferma</span> (<span id="events-btn-count">0</span>)
         </button>
       </div>
     </div>

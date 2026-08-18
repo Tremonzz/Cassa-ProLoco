@@ -4347,13 +4347,224 @@ function closeReceiptModal() {
 }
 window.closeReceiptModal = closeReceiptModal;
 
-// --- DATABASE FUNCTIONS ---
-window.exportDB = function () {
-    window.location.href = '/api/database/export';
+// --- DATABASE FUNCTIONS (UNIFIED MODAL) ---
+let currentEventsSelectionConfig = null;
+
+function openEventsSelectionModal(config) {
+    currentEventsSelectionConfig = config;
+    const { mode, title, icon, description, confirmBtnText, confirmBtnIcon, events, onConfirm } = config;
+
+    const modal = document.getElementById('events-selection-modal');
+    const modalTitle = document.getElementById('events-modal-title');
+    const modalIcon = document.getElementById('events-modal-icon');
+    const modalDesc = document.getElementById('events-modal-description');
+    const confirmBtn = document.getElementById('btn-confirm-events-selection');
+    const confirmBtnTextEl = document.getElementById('events-confirm-btn-text');
+    const confirmBtnIconEl = document.getElementById('events-confirm-btn-icon');
+    const listEl = document.getElementById('events-selection-list');
+    const selectAllCheckbox = document.getElementById('events-select-all');
+    const totalCountEl = document.getElementById('events-total-count');
+
+    if (modalTitle) modalTitle.innerText = title || "Seleziona Eventi";
+    if (modalIcon) modalIcon.innerText = icon || "cloud_download";
+    if (modalDesc) modalDesc.innerText = description || "Seleziona gli eventi:";
+    if (confirmBtnTextEl) confirmBtnTextEl.innerText = confirmBtnText || "Conferma";
+    if (confirmBtnIconEl) confirmBtnIconEl.innerText = confirmBtnIcon || "check";
+    if (totalCountEl) totalCountEl.innerText = events ? events.length : 0;
+    if (selectAllCheckbox) selectAllCheckbox.checked = true;
+
+    if (listEl) {
+        listEl.innerHTML = (events || []).map(s => {
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+            return `
+                <div class="event-selection-card selected" id="event-card-${s.id}" onclick="toggleEventCard(${s.id})">
+                    <input type="checkbox" class="event-selection-checkbox" id="event-check-${s.id}" value="${s.id}" checked onclick="event.stopPropagation(); updateEventsSelectionCounts();">
+                    <div class="event-selection-info">
+                        <div class="event-selection-header-row">
+                            <span class="event-selection-name">${s.name}</span>
+                        </div>
+                        <div class="event-selection-meta">
+                            ${dateStr ? `<span class="event-selection-meta-item"><span class="material-symbols-rounded">calendar_today</span> ${dateStr}</span>` : ''}
+                            <span class="event-selection-meta-item"><span class="material-symbols-rounded">category</span> ${s.category_count || 0} Categorie</span>
+                            <span class="event-selection-meta-item"><span class="material-symbols-rounded">restaurant_menu</span> ${s.product_count || 0} Prodotti</span>
+                            <span class="event-selection-meta-item"><span class="material-symbols-rounded">receipt_long</span> ${s.order_count || 0} Ordini</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    updateEventsSelectionCounts();
+
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+window.openEventsSelectionModal = openEventsSelectionModal;
+
+function toggleEventCard(id) {
+    const check = document.getElementById(`event-check-${id}`);
+    if (check) {
+        check.checked = !check.checked;
+        updateEventsSelectionCounts();
+    }
+}
+window.toggleEventCard = toggleEventCard;
+
+function toggleSelectAllEvents(isChecked) {
+    const checkboxes = document.querySelectorAll('.event-selection-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+    });
+    updateEventsSelectionCounts();
+}
+window.toggleSelectAllEvents = toggleSelectAllEvents;
+
+function updateEventsSelectionCounts() {
+    const checkboxes = document.querySelectorAll('.event-selection-checkbox');
+    let selectedCount = 0;
+
+    checkboxes.forEach(cb => {
+        const card = document.getElementById(`event-card-${cb.value}`);
+        if (cb.checked) {
+            selectedCount++;
+            if (card) card.classList.add('selected');
+        } else {
+            if (card) card.classList.remove('selected');
+        }
+    });
+
+    const selectedCountEl = document.getElementById('events-selected-count');
+    const btnCountEl = document.getElementById('events-btn-count');
+    const selectAllCheckbox = document.getElementById('events-select-all');
+
+    if (selectedCountEl) selectedCountEl.innerText = selectedCount;
+    if (btnCountEl) btnCountEl.innerText = selectedCount;
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = (selectedCount === checkboxes.length && checkboxes.length > 0);
+    }
+}
+window.updateEventsSelectionCounts = updateEventsSelectionCounts;
+
+function closeEventsSelectionModal() {
+    const modal = document.getElementById('events-selection-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    if (currentEventsSelectionConfig && currentEventsSelectionConfig.mode === 'import') {
+        fetch('/api/database/inspect-cancel', { method: 'POST' }).catch(() => {});
+    }
+    currentEventsSelectionConfig = null;
+}
+window.closeEventsSelectionModal = closeEventsSelectionModal;
+
+async function confirmEventsSelection() {
+    if (!currentEventsSelectionConfig || typeof currentEventsSelectionConfig.onConfirm !== 'function') return;
+
+    const checkboxes = document.querySelectorAll('.event-selection-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+
+    if (selectedIds.length === 0) {
+        showToast("Seleziona almeno un evento per procedere.", "error");
+        return;
+    }
+
+    const btn = document.getElementById('btn-confirm-events-selection');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-rounded" style="animation: spin 1s linear infinite;">sync</span> Elaborazione...';
+    }
+
+    try {
+        await currentEventsSelectionConfig.onConfirm(selectedIds);
+    } catch (e) {
+        console.error("Confirm events selection error:", e);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+window.confirmEventsSelection = confirmEventsSelection;
+
+// --- EXPORT DB CONTROLLER ---
+window.exportDB = async function () {
+    try {
+        showToast("Caricamento eventi in corso...", "info");
+        const res = await fetch('/api/database/export-inspect');
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+            showToast(data.error || "Errore durante il caricamento degli eventi", "error");
+            return;
+        }
+
+        if (!data.sagras || data.sagras.length === 0) {
+            showToast("Nessun evento presente nel database da esportare.", "info");
+            return;
+        }
+
+        openEventsSelectionModal({
+            mode: 'export',
+            title: 'Seleziona Eventi da Esportare',
+            icon: 'cloud_upload',
+            description: 'Seleziona gli eventi del database attuale che desideri includere nel file di esportazione:',
+            confirmBtnText: 'Esporta Selezionati',
+            confirmBtnIcon: 'upload',
+            events: data.sagras,
+            onConfirm: async (selectedIds) => {
+                const res = await fetch('/api/database/export-selected', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selectedSagraIds: selectedIds })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    showToast(errData.error || "Errore durante l'esportazione", "error");
+                    return;
+                }
+
+                const disposition = res.headers.get('Content-Disposition');
+                let filename = '';
+                if (disposition && disposition.includes('filename=')) {
+                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                    if (matches != null && matches[1]) {
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                if (!filename) {
+                    const now = new Date();
+                    const pad = (n) => String(n).padStart(2, '0');
+                    filename = `eventi${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}.db`;
+                }
+
+                const blob = await res.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+
+                closeEventsSelectionModal();
+                const countText = selectedIds.length === 1 ? "1 evento" : `${selectedIds.length} eventi`;
+                showToast(`Esportazione di ${countText} completata con successo!`, "success");
+            }
+        });
+    } catch (e) {
+        console.error("Export inspect error:", e);
+        showToast("Errore di connessione durante la lettura degli eventi", "error");
+    }
 };
 
-let inspectedSagrasList = [];
-
+// --- IMPORT DB CONTROLLER ---
 window.importDB = async function (input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
@@ -4389,7 +4600,39 @@ window.importDB = async function (input) {
                 return;
             }
 
-            openImportEventsModal(data.sagras);
+            openEventsSelectionModal({
+                mode: 'import',
+                title: 'Seleziona Eventi da Importare',
+                icon: 'cloud_download',
+                description: 'Seleziona gli eventi presenti nel file database caricato che desideri importare nel sistema attuale:',
+                confirmBtnText: 'Importa Selezionati',
+                confirmBtnIcon: 'download',
+                events: data.sagras,
+                onConfirm: async (selectedIds) => {
+                    const countText = selectedIds.length === 1 ? "1 evento" : `${selectedIds.length} eventi`;
+                    if (!await showConfirm(`Confermi di voler importare ${countText} nel database attuale?`)) {
+                        return;
+                    }
+
+                    const res = await fetch('/api/database/import-selected', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ selectedSagraIds: selectedIds })
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok && data.success) {
+                        closeEventsSelectionModal();
+                        showToast(`${countText} importati con successo!`, "success");
+                        await loadSagras();
+                    } else {
+                        showToast(data.error || "Errore durante l'importazione degli eventi", "error");
+                    }
+                }
+            });
         } catch (e) {
             console.error("Inspect DB error:", e);
             showToast("Errore di connessione durante la lettura del database", "error");
@@ -4398,152 +4641,6 @@ window.importDB = async function (input) {
         input.value = ''; // Reset input so same file can be chosen again if needed
     }
 };
-
-function openImportEventsModal(sagras) {
-    inspectedSagrasList = sagras || [];
-    const listEl = document.getElementById('import-events-list');
-    const selectAllCheckbox = document.getElementById('import-select-all');
-    const totalCountEl = document.getElementById('import-total-count');
-
-    if (totalCountEl) totalCountEl.innerText = inspectedSagrasList.length;
-    if (selectAllCheckbox) selectAllCheckbox.checked = true;
-
-    if (listEl) {
-        listEl.innerHTML = inspectedSagrasList.map(s => {
-            const dateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
-
-            return `
-                <div class="import-event-card selected" id="import-card-${s.id}" onclick="toggleImportCard(${s.id})">
-                    <input type="checkbox" class="import-event-checkbox" id="import-check-${s.id}" value="${s.id}" checked onclick="event.stopPropagation(); updateImportSelectionCounts();">
-                    <div class="import-event-info">
-                        <div class="import-event-header-row">
-                            <span class="import-event-name">${s.name}</span>
-                        </div>
-                        <div class="import-event-meta">
-                            ${dateStr ? `<span class="import-event-meta-item"><span class="material-symbols-rounded">calendar_today</span> ${dateStr}</span>` : ''}
-                            <span class="import-event-meta-item"><span class="material-symbols-rounded">category</span> ${s.category_count || 0} Categorie</span>
-                            <span class="import-event-meta-item"><span class="material-symbols-rounded">restaurant_menu</span> ${s.product_count || 0} Prodotti</span>
-                            <span class="import-event-meta-item"><span class="material-symbols-rounded">receipt_long</span> ${s.order_count || 0} Ordini</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    updateImportSelectionCounts();
-
-    const modal = document.getElementById('import-events-modal');
-    if (modal) {
-        modal.style.display = 'flex';
-    }
-}
-window.openImportEventsModal = openImportEventsModal;
-
-function toggleImportCard(id) {
-    const check = document.getElementById(`import-check-${id}`);
-    if (check) {
-        check.checked = !check.checked;
-        updateImportSelectionCounts();
-    }
-}
-window.toggleImportCard = toggleImportCard;
-
-function toggleSelectAllImportEvents(isChecked) {
-    const checkboxes = document.querySelectorAll('.import-event-checkbox');
-    checkboxes.forEach(cb => {
-        cb.checked = isChecked;
-    });
-    updateImportSelectionCounts();
-}
-window.toggleSelectAllImportEvents = toggleSelectAllImportEvents;
-
-function updateImportSelectionCounts() {
-    const checkboxes = document.querySelectorAll('.import-event-checkbox');
-    let selectedCount = 0;
-
-    checkboxes.forEach(cb => {
-        const card = document.getElementById(`import-card-${cb.value}`);
-        if (cb.checked) {
-            selectedCount++;
-            if (card) card.classList.add('selected');
-        } else {
-            if (card) card.classList.remove('selected');
-        }
-    });
-
-    const selectedCountEl = document.getElementById('import-selected-count');
-    const btnCountEl = document.getElementById('btn-import-count');
-    const selectAllCheckbox = document.getElementById('import-select-all');
-
-    if (selectedCountEl) selectedCountEl.innerText = selectedCount;
-    if (btnCountEl) btnCountEl.innerText = selectedCount;
-    if (selectAllCheckbox) {
-        selectAllCheckbox.checked = (selectedCount === checkboxes.length && checkboxes.length > 0);
-    }
-}
-window.updateImportSelectionCounts = updateImportSelectionCounts;
-
-function closeImportEventsModal() {
-    const modal = document.getElementById('import-events-modal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-    // Clean up temporary inspected database file on server
-    fetch('/api/database/inspect-cancel', { method: 'POST' }).catch(() => {});
-}
-window.closeImportEventsModal = closeImportEventsModal;
-
-async function confirmImportSelectedEvents() {
-    const checkboxes = document.querySelectorAll('.import-event-checkbox:checked');
-    const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
-
-    if (selectedIds.length === 0) {
-        showToast("Seleziona almeno un evento da importare.", "error");
-        return;
-    }
-
-    const countText = selectedIds.length === 1 ? "1 evento" : `${selectedIds.length} eventi`;
-    if (!await showConfirm(`Confermi di voler importare ${countText} nel database attuale?`)) {
-        return;
-    }
-
-    const btn = document.getElementById('btn-confirm-import-events');
-    const originalText = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-rounded" style="animation: spin 1s linear infinite;">sync</span> Importazione...';
-    }
-
-    try {
-        const res = await fetch('/api/database/import-selected', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ selectedSagraIds: selectedIds })
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.success) {
-            closeImportEventsModal();
-            showToast(`${countText} importati con successo!`, "success");
-            await loadSagras();
-        } else {
-            showToast(data.error || "Errore durante l'importazione degli eventi", "error");
-        }
-    } catch (e) {
-        console.error("Import Selected error:", e);
-        showToast("Errore di rete durante l'importazione", "error");
-    } finally {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        }
-    }
-}
-window.confirmImportSelectedEvents = confirmImportSelectedEvents;
 
 async function checkAppUpdate() {
     const btn = document.getElementById('btn-check-update');

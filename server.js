@@ -84,11 +84,29 @@ function dbRun(sql, params = []) {
   });
 }
 
+function dbGet(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, function (err, row) {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
 function dbAll(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.all(sql, params, function (err, rows) {
       if (err) reject(err);
       else resolve(rows);
+    });
+  });
+}
+
+function queryDbRun(database, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    database.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve(this);
     });
   });
 }
@@ -207,12 +225,157 @@ runMigrations();
 
 // --- DATABASE MANAGEMENT APIs ---
 app.get('/api/database/export', (req, res) => {
-  res.download(dbPath, 'sagra_backup.db', (err) => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const filename = `eventi${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}.db`;
+  res.download(dbPath, filename, (err) => {
     if (err) {
       console.error("Export Error:", err);
-      // res.status(500).send("Error exporting database"); // Can't send after download starts usually
     }
   });
+});
+
+// Inspect active database sagras for selective export
+app.get('/api/database/export-inspect', async (req, res) => {
+  try {
+    const sagrasQuery = `
+      SELECT s.id, s.name, s.status, s.created_at,
+        (SELECT COUNT(*) FROM categories c WHERE c.sagra_id = s.id) as category_count,
+        (SELECT COUNT(*) FROM products p JOIN categories c ON p.category_id = c.id WHERE c.sagra_id = s.id) as product_count,
+        (SELECT COUNT(*) FROM orders o WHERE o.sagra_id = s.id) as order_count,
+        (SELECT COUNT(*) FROM base_products bp WHERE bp.sagra_id = s.id) as base_product_count
+      FROM sagras s
+      ORDER BY s.created_at DESC
+    `;
+    const sagras = await dbAll(sagrasQuery);
+    res.json({ success: true, sagras });
+  } catch (e) {
+    console.error("Export inspect error:", e);
+    res.status(500).json({ error: "Errore durante il caricamento degli eventi: " + e.message });
+  }
+});
+
+// Export selected sagras to a new SQLite database file
+app.post('/api/database/export-selected', async (req, res) => {
+  const { selectedSagraIds } = req.body;
+  if (!Array.isArray(selectedSagraIds) || selectedSagraIds.length === 0) {
+    return res.status(400).json({ error: "Nessun evento selezionato per l'esportazione." });
+  }
+
+  const exportTempPath = path.join(appRoot, `export_temp_${Date.now()}.db`);
+  let exportDb = null;
+
+  try {
+    exportDb = new sqlite3.Database(exportTempPath);
+
+    // Initialize table structure in exportDb
+    await new Promise((resolve, reject) => {
+      exportDb.serialize(() => {
+        exportDb.run(`CREATE TABLE IF NOT EXISTS sagras (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, status TEXT DEFAULT 'active', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+        exportDb.run("PRAGMA foreign_keys=OFF");
+        exportDb.run(`CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, is_hidden INTEGER DEFAULT 0, sagra_id INTEGER DEFAULT 1)`);
+        exportDb.run(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, price REAL NOT NULL, quantity INTEGER DEFAULT NULL, is_composite INTEGER DEFAULT 0, components TEXT DEFAULT NULL, is_selection INTEGER DEFAULT 0, position INTEGER DEFAULT 0, type TEXT DEFAULT 'simple', category_id INTEGER, FOREIGN KEY(category_id) REFERENCES categories(id))`);
+        exportDb.run(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, seq INTEGER DEFAULT 0, total REAL NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, sagra_id INTEGER DEFAULT 1)`);
+        exportDb.run(`CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, product_name TEXT NOT NULL, quantity INTEGER NOT NULL, price REAL NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))`);
+        exportDb.run(`CREATE TABLE IF NOT EXISTS base_products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, quantity INTEGER DEFAULT NULL, sagra_id INTEGER DEFAULT 1)`, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+    });
+
+    for (const sagraId of selectedSagraIds) {
+      const sagra = await dbGet("SELECT * FROM sagras WHERE id = ?", [sagraId]);
+      if (!sagra) continue;
+
+      await queryDbRun(exportDb, "INSERT INTO sagras (id, name, status, created_at) VALUES (?, ?, ?, ?)", [
+        sagra.id,
+        sagra.name,
+        sagra.status || 'active',
+        sagra.created_at || new Date().toISOString()
+      ]);
+
+      const categories = await dbAll("SELECT * FROM categories WHERE sagra_id = ?", [sagraId]);
+      for (const cat of categories) {
+        await queryDbRun(exportDb, "INSERT INTO categories (id, name, is_hidden, sagra_id) VALUES (?, ?, ?, ?)", [
+          cat.id,
+          cat.name,
+          cat.is_hidden || 0,
+          cat.sagra_id
+        ]);
+
+        const products = await dbAll("SELECT * FROM products WHERE category_id = ?", [cat.id]);
+        for (const p of products) {
+          await queryDbRun(exportDb, "INSERT INTO products (id, name, price, quantity, type, is_composite, is_selection, components, category_id, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+            p.id,
+            p.name,
+            p.price,
+            p.quantity,
+            p.type,
+            p.is_composite,
+            p.is_selection,
+            p.components,
+            p.category_id,
+            p.position
+          ]);
+        }
+      }
+
+      const baseProducts = await dbAll("SELECT * FROM base_products WHERE sagra_id = ?", [sagraId]);
+      for (const bp of baseProducts) {
+        await queryDbRun(exportDb, "INSERT INTO base_products (id, name, quantity, sagra_id) VALUES (?, ?, ?, ?)", [
+          bp.id,
+          bp.name,
+          bp.quantity,
+          bp.sagra_id
+        ]);
+      }
+
+      const orders = await dbAll("SELECT * FROM orders WHERE sagra_id = ?", [sagraId]);
+      for (const ord of orders) {
+        await queryDbRun(exportDb, "INSERT INTO orders (id, seq, total, created_at, sagra_id) VALUES (?, ?, ?, ?, ?)", [
+          ord.id,
+          ord.seq,
+          ord.total,
+          ord.created_at,
+          ord.sagra_id
+        ]);
+
+        const orderItems = await dbAll("SELECT * FROM order_items WHERE order_id = ?", [ord.id]);
+        for (const item of orderItems) {
+          await queryDbRun(exportDb, "INSERT INTO order_items (id, order_id, product_name, quantity, price) VALUES (?, ?, ?, ?, ?)", [
+            item.id,
+            item.order_id,
+            item.product_name,
+            item.quantity,
+            item.price
+          ]);
+        }
+      }
+    }
+
+    await closeDb(exportDb);
+
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const filename = `eventi${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}.db`;
+
+    res.download(exportTempPath, filename, (err) => {
+      if (err) console.error("Export download error:", err);
+      if (fs.existsSync(exportTempPath)) {
+        try { fs.unlinkSync(exportTempPath); } catch (e) {}
+      }
+    });
+  } catch (e) {
+    console.error("Export Selected error:", e);
+    if (exportDb) {
+      await closeDb(exportDb);
+    }
+    if (fs.existsSync(exportTempPath)) {
+      try { fs.unlinkSync(exportTempPath); } catch (e) {}
+    }
+    res.status(500).json({ error: "Errore esportazione selettiva: " + e.message });
+  }
 });
 
 app.post('/api/database/import', (req, res) => {
