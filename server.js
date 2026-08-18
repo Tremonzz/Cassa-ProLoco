@@ -266,6 +266,215 @@ app.post('/api/database/import', (req, res) => {
   });
 });
 
+// Helper functions for inspecting external database instance
+function queryDbAll(database, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    database.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+}
+
+function queryDbGet(database, sql, params = []) {
+  return new Promise((resolve, reject) => {
+    database.get(sql, params, (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function closeDb(database) {
+  return new Promise((resolve) => {
+    if (!database) return resolve();
+    database.close((err) => {
+      resolve(err);
+    });
+  });
+}
+
+// Inspect uploaded database and return its sagras/events
+app.post('/api/database/inspect', (req, res) => {
+  const tempPath = path.join(appRoot, 'inspect_temp.db');
+  const writeStream = fs.createWriteStream(tempPath);
+  req.pipe(writeStream);
+
+  writeStream.on('finish', async () => {
+    let inspectDb = null;
+    try {
+      inspectDb = new sqlite3.Database(tempPath);
+
+      // Check if sagras table exists
+      const tableCheck = await queryDbGet(inspectDb, "SELECT name FROM sqlite_master WHERE type='table' AND name='sagras'");
+      if (!tableCheck) {
+        await closeDb(inspectDb);
+        if (fs.existsSync(tempPath)) {
+          try { fs.unlinkSync(tempPath); } catch (e) {}
+        }
+        return res.status(400).json({ error: "Il file selezionato non è un database valido per questa applicazione." });
+      }
+
+      // Check if base_products table exists in inspectDb
+      const baseProdCheck = await queryDbGet(inspectDb, "SELECT name FROM sqlite_master WHERE type='table' AND name='base_products'");
+      const hasBaseProducts = !!baseProdCheck;
+
+      const sagrasQuery = `
+        SELECT s.id, s.name, s.status, s.created_at,
+          (SELECT COUNT(*) FROM categories c WHERE c.sagra_id = s.id) as category_count,
+          (SELECT COUNT(*) FROM products p JOIN categories c ON p.category_id = c.id WHERE c.sagra_id = s.id) as product_count,
+          (SELECT COUNT(*) FROM orders o WHERE o.sagra_id = s.id) as order_count
+          ${hasBaseProducts ? ', (SELECT COUNT(*) FROM base_products bp WHERE bp.sagra_id = s.id) as base_product_count' : ', 0 as base_product_count'}
+        FROM sagras s
+        ORDER BY s.created_at DESC
+      `;
+
+      const sagras = await queryDbAll(inspectDb, sagrasQuery);
+      await closeDb(inspectDb);
+      res.json({ success: true, sagras });
+    } catch (e) {
+      console.error("Inspect DB Error:", e);
+      if (inspectDb) {
+        await closeDb(inspectDb);
+      }
+      if (fs.existsSync(tempPath)) {
+        try { fs.unlinkSync(tempPath); } catch (err) {}
+      }
+      res.status(500).json({ error: "Errore durante la lettura del database: " + e.message });
+    }
+  });
+
+  writeStream.on('error', (err) => {
+    console.error("Upload Stream Error:", err);
+    res.status(500).json({ error: "Caricamento fallito" });
+  });
+});
+
+// Import selected sagras from inspect_temp.db into active db
+app.post('/api/database/import-selected', async (req, res) => {
+  const { selectedSagraIds } = req.body;
+  if (!Array.isArray(selectedSagraIds) || selectedSagraIds.length === 0) {
+    return res.status(400).json({ error: "Nessun evento selezionato per l'importazione." });
+  }
+
+  const tempPath = path.join(appRoot, 'inspect_temp.db');
+  if (!fs.existsSync(tempPath)) {
+    return res.status(400).json({ error: "File database temporaneo non trovato. Ricarica il file." });
+  }
+
+  let inspectDb = null;
+  try {
+    inspectDb = new sqlite3.Database(tempPath);
+    const baseProdCheck = await queryDbGet(inspectDb, "SELECT name FROM sqlite_master WHERE type='table' AND name='base_products'");
+    const hasBaseProducts = !!baseProdCheck;
+
+    await dbRun("BEGIN TRANSACTION");
+
+    for (const sagraId of selectedSagraIds) {
+      const sagra = await queryDbGet(inspectDb, "SELECT * FROM sagras WHERE id = ?", [sagraId]);
+      if (!sagra) continue;
+
+      // Insert Sagra into main DB (always active)
+      const sagraResult = await dbRun("INSERT INTO sagras (name, status, created_at) VALUES (?, 'active', ?)", [
+        sagra.name,
+        sagra.created_at || new Date().toISOString()
+      ]);
+      const newSagraId = sagraResult.lastID;
+
+      // Copy Categories & Products
+      const categories = await queryDbAll(inspectDb, "SELECT * FROM categories WHERE sagra_id = ?", [sagraId]);
+      for (const cat of categories) {
+        const catResult = await dbRun("INSERT INTO categories (name, is_hidden, sagra_id) VALUES (?, ?, ?)", [
+          cat.name,
+          cat.is_hidden || 0,
+          newSagraId
+        ]);
+        const newCatId = catResult.lastID;
+
+        const products = await queryDbAll(inspectDb, "SELECT * FROM products WHERE category_id = ?", [cat.id]);
+        for (const p of products) {
+          await dbRun(
+            "INSERT INTO products (name, price, quantity, type, is_composite, is_selection, components, category_id, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+              p.name,
+              p.price || 0,
+              (p.quantity !== undefined && p.quantity !== null && p.quantity !== '') ? p.quantity : null,
+              p.type || (p.is_composite ? 'composite' : (p.is_selection ? 'selection' : 'simple')),
+              p.is_composite || 0,
+              p.is_selection || 0,
+              p.components || null,
+              newCatId,
+              p.position || 0
+            ]
+          );
+        }
+      }
+
+      // Copy Base Products (if present)
+      if (hasBaseProducts) {
+        const baseProducts = await queryDbAll(inspectDb, "SELECT * FROM base_products WHERE sagra_id = ?", [sagraId]);
+        for (const bp of baseProducts) {
+          await dbRun("INSERT INTO base_products (name, quantity, sagra_id) VALUES (?, ?, ?)", [
+            bp.name,
+            (bp.quantity !== undefined && bp.quantity !== null && bp.quantity !== '') ? bp.quantity : null,
+            newSagraId
+          ]);
+        }
+      }
+
+      // Copy Orders & Order Items
+      const orders = await queryDbAll(inspectDb, "SELECT * FROM orders WHERE sagra_id = ?", [sagraId]);
+      for (const ord of orders) {
+        const ordResult = await dbRun("INSERT INTO orders (seq, total, created_at, sagra_id) VALUES (?, ?, ?, ?)", [
+          ord.seq || 0,
+          ord.total || 0,
+          ord.created_at || new Date().toISOString(),
+          newSagraId
+        ]);
+        const newOrderId = ordResult.lastID;
+
+        const orderItems = await queryDbAll(inspectDb, "SELECT * FROM order_items WHERE order_id = ?", [ord.id]);
+        for (const item of orderItems) {
+          await dbRun("INSERT INTO order_items (order_id, product_name, quantity, price) VALUES (?, ?, ?, ?)", [
+            newOrderId,
+            item.product_name,
+            item.quantity,
+            item.price
+          ]);
+        }
+      }
+    }
+
+    await dbRun("COMMIT");
+
+    await closeDb(inspectDb);
+    if (fs.existsSync(tempPath)) {
+      try { fs.unlinkSync(tempPath); } catch (e) {}
+    }
+
+    res.json({ success: true, importedCount: selectedSagraIds.length });
+  } catch (e) {
+    console.error("Import Selected Events Error:", e);
+    await dbRun("ROLLBACK").catch(() => {});
+    if (inspectDb) {
+      await closeDb(inspectDb);
+    }
+    if (fs.existsSync(tempPath)) {
+      try { fs.unlinkSync(tempPath); } catch (e) {}
+    }
+    res.status(500).json({ error: "Errore durante l'importazione selettiva: " + e.message });
+  }
+});
+
+// Cancel inspection and clean up temp file
+app.post('/api/database/inspect-cancel', (req, res) => {
+  const tempPath = path.join(appRoot, 'inspect_temp.db');
+  if (fs.existsSync(tempPath)) {
+    try { fs.unlinkSync(tempPath); } catch (e) {}
+  }
+  res.json({ success: true });
+});
+
 // RECEIPT CONFIG APIs
 app.get('/api/receipt-config', (req, res) => {
   const { getReceiptConfig } = require('./templates/receipt_header');

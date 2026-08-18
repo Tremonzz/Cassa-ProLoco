@@ -4352,49 +4352,198 @@ window.exportDB = function () {
     window.location.href = '/api/database/export';
 };
 
+let inspectedSagrasList = [];
+
 window.importDB = async function (input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['db', 'sqlite', 'sqlite3'].includes(ext)) {
-            alert("File non valido! Selezionare un file database (.db, .sqlite, .sqlite3)");
+            showToast("File non valido! Selezionare un file database (.db, .sqlite, .sqlite3)", "error");
             input.value = '';
             return;
         }
 
-        if (!await showConfirm("ATTENZIONE: Importando il database, tutti i dati attuali verranno SOVRASCRITTI.\nContinuare?")) {
-            input.value = ''; // Reset
-            return;
-        }
-
-        const formData = new FormData(); // Not used if using raw body, but good practice usually. 
-        // We implemented raw binary upload in server for simplicity without multer.
-
         try {
-            showAlert("Caricamento in corso... attendere.");
+            showToast("Lettura del database in corso...", "info");
 
-            const res = await fetch('/api/database/import', {
+            const res = await fetch('/api/database/inspect', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/octet-stream' // Binary stream
+                    'Content-Type': 'application/octet-stream'
                 },
-                body: file // Send file directly as body
+                body: file
             });
 
-            if (res.ok) {
-                alert("Database importato con successo!\nIl sistema verrà ricaricato.");
-                window.location.reload();
-            } else {
-                alert("Errore durante l'importazione.");
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                showToast(data.error || "Errore durante la lettura del database", "error");
+                input.value = '';
+                return;
             }
+
+            if (!data.sagras || data.sagras.length === 0) {
+                showToast("Nessun evento trovato nel database selezionato.", "info");
+                input.value = '';
+                return;
+            }
+
+            openImportEventsModal(data.sagras);
         } catch (e) {
-            console.error(e);
-            alert("Errore di rete durante l'importazione.");
+            console.error("Inspect DB error:", e);
+            showToast("Errore di connessione durante la lettura del database", "error");
         }
 
-        input.value = ''; // Reset
+        input.value = ''; // Reset input so same file can be chosen again if needed
     }
 };
+
+function openImportEventsModal(sagras) {
+    inspectedSagrasList = sagras || [];
+    const listEl = document.getElementById('import-events-list');
+    const selectAllCheckbox = document.getElementById('import-select-all');
+    const totalCountEl = document.getElementById('import-total-count');
+
+    if (totalCountEl) totalCountEl.innerText = inspectedSagrasList.length;
+    if (selectAllCheckbox) selectAllCheckbox.checked = true;
+
+    if (listEl) {
+        listEl.innerHTML = inspectedSagrasList.map(s => {
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+            return `
+                <div class="import-event-card selected" id="import-card-${s.id}" onclick="toggleImportCard(${s.id})">
+                    <input type="checkbox" class="import-event-checkbox" id="import-check-${s.id}" value="${s.id}" checked onclick="event.stopPropagation(); updateImportSelectionCounts();">
+                    <div class="import-event-info">
+                        <div class="import-event-header-row">
+                            <span class="import-event-name">${s.name}</span>
+                        </div>
+                        <div class="import-event-meta">
+                            ${dateStr ? `<span class="import-event-meta-item"><span class="material-symbols-rounded">calendar_today</span> ${dateStr}</span>` : ''}
+                            <span class="import-event-meta-item"><span class="material-symbols-rounded">category</span> ${s.category_count || 0} Categorie</span>
+                            <span class="import-event-meta-item"><span class="material-symbols-rounded">restaurant_menu</span> ${s.product_count || 0} Prodotti</span>
+                            <span class="import-event-meta-item"><span class="material-symbols-rounded">receipt_long</span> ${s.order_count || 0} Ordini</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    updateImportSelectionCounts();
+
+    const modal = document.getElementById('import-events-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+window.openImportEventsModal = openImportEventsModal;
+
+function toggleImportCard(id) {
+    const check = document.getElementById(`import-check-${id}`);
+    if (check) {
+        check.checked = !check.checked;
+        updateImportSelectionCounts();
+    }
+}
+window.toggleImportCard = toggleImportCard;
+
+function toggleSelectAllImportEvents(isChecked) {
+    const checkboxes = document.querySelectorAll('.import-event-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+    });
+    updateImportSelectionCounts();
+}
+window.toggleSelectAllImportEvents = toggleSelectAllImportEvents;
+
+function updateImportSelectionCounts() {
+    const checkboxes = document.querySelectorAll('.import-event-checkbox');
+    let selectedCount = 0;
+
+    checkboxes.forEach(cb => {
+        const card = document.getElementById(`import-card-${cb.value}`);
+        if (cb.checked) {
+            selectedCount++;
+            if (card) card.classList.add('selected');
+        } else {
+            if (card) card.classList.remove('selected');
+        }
+    });
+
+    const selectedCountEl = document.getElementById('import-selected-count');
+    const btnCountEl = document.getElementById('btn-import-count');
+    const selectAllCheckbox = document.getElementById('import-select-all');
+
+    if (selectedCountEl) selectedCountEl.innerText = selectedCount;
+    if (btnCountEl) btnCountEl.innerText = selectedCount;
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = (selectedCount === checkboxes.length && checkboxes.length > 0);
+    }
+}
+window.updateImportSelectionCounts = updateImportSelectionCounts;
+
+function closeImportEventsModal() {
+    const modal = document.getElementById('import-events-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    // Clean up temporary inspected database file on server
+    fetch('/api/database/inspect-cancel', { method: 'POST' }).catch(() => {});
+}
+window.closeImportEventsModal = closeImportEventsModal;
+
+async function confirmImportSelectedEvents() {
+    const checkboxes = document.querySelectorAll('.import-event-checkbox:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => parseInt(cb.value, 10));
+
+    if (selectedIds.length === 0) {
+        showToast("Seleziona almeno un evento da importare.", "error");
+        return;
+    }
+
+    const countText = selectedIds.length === 1 ? "1 evento" : `${selectedIds.length} eventi`;
+    if (!await showConfirm(`Confermi di voler importare ${countText} nel database attuale?`)) {
+        return;
+    }
+
+    const btn = document.getElementById('btn-confirm-import-events');
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-rounded" style="animation: spin 1s linear infinite;">sync</span> Importazione...';
+    }
+
+    try {
+        const res = await fetch('/api/database/import-selected', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ selectedSagraIds: selectedIds })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            closeImportEventsModal();
+            showToast(`${countText} importati con successo!`, "success");
+            await loadSagras();
+        } else {
+            showToast(data.error || "Errore durante l'importazione degli eventi", "error");
+        }
+    } catch (e) {
+        console.error("Import Selected error:", e);
+        showToast("Errore di rete durante l'importazione", "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+window.confirmImportSelectedEvents = confirmImportSelectedEvents;
 
 async function checkAppUpdate() {
     const btn = document.getElementById('btn-check-update');
