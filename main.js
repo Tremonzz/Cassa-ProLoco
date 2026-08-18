@@ -14,7 +14,7 @@ function createWindow() {
         resizable: true,
         frame: false,
         show: false,
-        backgroundColor: '#f4f6f8',
+        backgroundColor: '#1e2a4a',
         title: "Gestione Ordini",
         icon: path.join(__dirname, 'public/images/logo.png'),
         webPreferences: {
@@ -25,25 +25,37 @@ function createWindow() {
         autoHideMenuBar: true
     });
 
-    mainWindow.once('ready-to-show', () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.show();
-        }
+    // Fallback in case app-ready IPC event is not received
+    mainWindow.webContents.once('did-finish-load', () => {
+        setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+                mainWindow.show();
+            }
+        }, 150);
     });
 
-    // Fallback safety to ensure window is shown
-    setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-            mainWindow.show();
-        }
-    }, 1500);
-
     setTimeout(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.loadURL('http://localhost:3000');
+            mainWindow.show();
         }
-    }, 400);
+    }, 2000);
+
+    const loadApp = () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.loadURL('http://localhost:3000').catch(() => {
+                setTimeout(loadApp, 150);
+            });
+        }
+    };
+
+    setTimeout(loadApp, 200);
 }
+
+ipcMain.on('app-ready', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        mainWindow.show();
+    }
+});
 
 ipcMain.on('close-app', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {

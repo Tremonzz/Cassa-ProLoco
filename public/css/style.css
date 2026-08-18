@@ -1409,6 +1409,31 @@ select.hidden-native-select {
   border-color: var(--danger-border);
 }
 
+.btn-pos-finish {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm);
+  color: #dc2626;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-pos-finish:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+.btn-pos-finish .material-symbols-rounded {
+  font-size: 1.15rem;
+}
+
 .pos-content {
   flex: 1;
   display: flex;
@@ -4216,6 +4241,18 @@ input:checked + .slider:before {
 [data-theme="dark"] .btn-pos-secondary:hover,
 [data-theme="dark"] .btn-pos-home:hover {
   background: var(--subtle-hover) !important;
+}
+
+[data-theme="dark"] .btn-pos-finish {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+[data-theme="dark"] .btn-pos-finish:hover {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
 }
 
 [data-theme="dark"] .dialog-content {

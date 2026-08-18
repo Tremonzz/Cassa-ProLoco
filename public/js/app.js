@@ -57,6 +57,9 @@ async function showView(viewName) {
     if (views[viewName]) {
         views[viewName].classList.add('active');
     }
+    if (viewName === 'pos') {
+        updateFinishEventBtnState();
+    }
     if (viewName !== 'auth') {
         checkAppUpdateSilent();
     }
@@ -481,6 +484,11 @@ async function init() {
     }
 
     showView('auth');
+
+    // Notify Electron that app is completely initialized and rendered
+    if (window.electronAPI && typeof window.electronAPI.appReady === 'function') {
+        window.electronAPI.appReady();
+    }
 
     // Dismiss initial startup loader smoothly
     dismissAppInitialLoader();
@@ -974,7 +982,7 @@ function renderSagraCard(s, isArchived) {
     }) : '';
 
     return `
-    <div class="sagra-card ${isArchived ? 'is-archived' : ''}" onclick="selectSagra(${s.id}, '${safeName}')" oncontextmenu="openSagraOptions(event, ${s.id}, '${safeName}', ${isArchived})">
+    <div class="sagra-card ${isArchived ? 'is-archived' : ''}" onclick="selectSagra(${s.id}, '${safeName}', ${Boolean(isArchived)})" oncontextmenu="openSagraOptions(event, ${s.id}, '${safeName}', ${Boolean(isArchived)})">
       <div class="sagra-card-content">
         <div class="sagra-card-info">
           <span class="sagra-card-title">${s.name} ${isArchived ? '(Archiviata)' : ''}</span>
@@ -1078,6 +1086,38 @@ async function duplicateSagra(eOrId, id) {
 }
 window.duplicateSagra = duplicateSagra;
 
+async function finishCurrentEvent() {
+    if (!STATE.currentSagra) return;
+
+    const sagraId = STATE.currentSagra.id;
+    const sagraName = STATE.currentSagra.name;
+
+    const confirmed = await showDialog({
+        title: "Termina Evento",
+        message: `Sei sicuro di voler terminare e archiviare l'evento "${sagraName}"? Verrai riportato alla schermata iniziale e verranno mostrate le statistiche riassuntive.`,
+        icon: "flag",
+        okText: "Termina Evento",
+        cancelText: "Annulla"
+    });
+    if (!confirmed) return;
+
+    try {
+        await fetch(`/api/sagras/${sagraId}/archive`, { method: 'PUT' });
+        showToast(`Evento "${sagraName}" terminato e archiviato!`, "success");
+        
+        // Return to events list view
+        showLogin();
+        await loadSagras();
+        
+        // Show the statistics modal for the ended event
+        await showStats(sagraId);
+    } catch (e) {
+        console.error("Finish event error:", e);
+        showToast("Errore durante la terminazione dell'evento", "error");
+    }
+}
+window.finishCurrentEvent = finishCurrentEvent;
+
 async function archiveSagra(eOrId, id) {
     const targetId = typeof eOrId === 'number' ? eOrId : id;
     if (eOrId && typeof eOrId === 'object' && eOrId.stopPropagation) eOrId.stopPropagation();
@@ -1155,11 +1195,32 @@ async function createNewSagra() {
     }
 }
 
-async function selectSagra(id, name) {
+function updateFinishEventBtnState() {
+    const finishBtn = document.getElementById('btn-pos-finish-event');
+    if (!finishBtn) return;
+    const isArchived = STATE.currentSagra && STATE.currentSagra.status === 'archived';
+    if (isArchived) {
+        finishBtn.style.setProperty('display', 'none', 'important');
+    } else {
+        finishBtn.style.setProperty('display', 'inline-flex', 'important');
+    }
+}
+
+async function selectSagra(id, name, isArchived) {
     try {
         const decodedName = decodeURIComponent(name);
-        STATE.currentSagra = { id, name: decodedName };
+        const sagraObj = (STATE.sagras || []).find(s => String(s.id) === String(id));
+        let status = 'active';
+        if (typeof isArchived === 'boolean') {
+            status = isArchived ? 'archived' : 'active';
+        } else if (sagraObj && sagraObj.status) {
+            status = sagraObj.status;
+        }
+        STATE.currentSagra = { id, name: decodedName, status };
         document.getElementById('pos-sagra-name').innerText = decodedName;
+
+        updateFinishEventBtnState();
+
         await loadSagraResources();
         showView('pos');
     } catch (e) {
@@ -3865,11 +3926,12 @@ function renderHourlyChart(hourlySales) {
     `;
 }
 
-async function showStats() {
-    if (!STATE.currentSagra) return;
+async function showStats(sagraId) {
+    const targetId = sagraId || (STATE.currentSagra ? STATE.currentSagra.id : null);
+    if (!targetId) return;
 
     try {
-        const res = await fetch(`/api/stats?sagraId=${STATE.currentSagra.id}`);
+        const res = await fetch(`/api/stats?sagraId=${targetId}`);
         const data = await res.json();
 
         const revEl = document.getElementById('stat-revenue');
