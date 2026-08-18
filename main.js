@@ -1,10 +1,24 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 
 // Import and start the server
-require('./server.js');
+const serverModule = require('./server.js');
 
 let mainWindow = null;
+
+function promptAnotherInstance() {
+    const choice = dialog.showMessageBoxSync({
+        type: 'question',
+        title: 'Applicazione già in esecuzione',
+        message: "C'è un'altra istanza dell'app in esecuzione.",
+        detail: "Un'altra sessione del programma o del server è già attiva. Vuoi avviare comunque?",
+        buttons: ['Avvia comunque', 'Chiudi'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true
+    });
+    return choice === 0;
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -69,7 +83,19 @@ ipcMain.on('maximize-app', () => {
     }
 });
 
+const gotLock = app.requestSingleInstanceLock();
+
 app.whenReady().then(() => {
+    const isPortBusy = serverModule.isPortInUse && serverModule.isPortInUse();
+
+    if (!gotLock || isPortBusy) {
+        const shouldLaunch = promptAnotherInstance();
+        if (!shouldLaunch) {
+            app.quit();
+            return;
+        }
+    }
+
     createWindow();
 
     app.on('activate', () => {
@@ -77,6 +103,13 @@ app.whenReady().then(() => {
             createWindow();
         }
     });
+});
+
+app.on('second-instance', () => {
+    if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+    }
 });
 
 app.on('window-all-closed', () => {

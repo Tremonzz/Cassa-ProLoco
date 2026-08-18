@@ -1748,6 +1748,29 @@ app.post('/api/download-and-install', (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Evento App listening at http://localhost:${port}`);
-});
+let portInUse = false;
+let serverInstance = null;
+
+try {
+  serverInstance = app.listen(port, () => {
+    console.log(`Evento App listening at http://localhost:${port}`);
+  });
+
+  serverInstance.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      portInUse = true;
+      console.warn(`[WARN] Port ${port} is already in use by another instance.`);
+    } else {
+      console.error("Server listen error:", err);
+    }
+  });
+} catch (err) {
+  portInUse = true;
+  console.warn(`[WARN] Server listen error:`, err.message);
+}
+
+module.exports = {
+  app,
+  serverInstance,
+  isPortInUse: () => portInUse
+};
