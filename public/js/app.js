@@ -4355,6 +4355,12 @@ window.exportDB = function () {
 window.importDB = async function (input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['db', 'sqlite', 'sqlite3'].includes(ext)) {
+            alert("File non valido! Selezionare un file database (.db, .sqlite, .sqlite3)");
+            input.value = '';
+            return;
+        }
 
         if (!await showConfirm("ATTENZIONE: Importando il database, tutti i dati attuali verranno SOVRASCRITTI.\nContinuare?")) {
             input.value = ''; // Reset
