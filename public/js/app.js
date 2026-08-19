@@ -1058,7 +1058,7 @@ function renderSagraCard(s, isArchived) {
     <div class="sagra-card ${isArchived ? 'is-archived' : ''}" onclick="selectSagra(${s.id}, '${safeName}', ${Boolean(isArchived)})" oncontextmenu="openSagraOptions(event, ${s.id}, '${safeName}', ${Boolean(isArchived)})">
       <div class="sagra-card-content">
         <div class="sagra-card-info">
-          <span class="sagra-card-title">${s.name} ${isArchived ? '(Archiviata)' : ''}</span>
+          <span class="sagra-card-title">${s.name}</span>
           ${dateFormatted ? `<span class="sagra-card-date"><span class="material-symbols-rounded" style="font-size: 0.85rem;">calendar_today</span> Creato il ${dateFormatted}</span>` : ''}
         </div>
       </div>
