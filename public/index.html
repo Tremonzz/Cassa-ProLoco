@@ -164,6 +164,9 @@
         </h2>
       </div>
       <div class="editor-actions">
+        <button type="button" class="btn-pos-secondary" onclick="printCurrentMenu()" title="Stampa il Menu in formato A4">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">print</span> Stampa Menu
+        </button>
         <button type="button" class="btn-reorder" onclick="openProductReorderModal()" title="Riordina il posizionamento dei prodotti">
           <span class="material-symbols-rounded" style="font-size: 1.1rem;">reorder</span> Riordina Prodotti
         </button>
@@ -1077,6 +1080,8 @@
   <!-- Toast Notifications Container -->
   <div id="toast-container" class="toast-container"></div>
 
+  <script src="js/menu-printer.js"></script>
+  <script src="js/menu-templates/template-a4-modern.js"></script>
   <script src="js/app.js"></script>
 </body>
 
