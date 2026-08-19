@@ -1399,7 +1399,10 @@ app.get('/api/current-changelog', async (req, res) => {
     }
 
     if (!cleanNotes) {
-      cleanNotes = `### Novità della versione v${currentVersion}\n- Prestazioni migliorate ed interfaccia utente aggiornata.`;
+      return res.json({
+        version: currentVersion,
+        notes: null
+      });
     }
 
     res.json({
@@ -1409,7 +1412,7 @@ app.get('/api/current-changelog', async (req, res) => {
   } catch (e) {
     res.json({
       version: currentVersion,
-      notes: `### Novità della versione v${currentVersion}\n- Prestazioni migliorate ed interfaccia utente aggiornata.`
+      notes: null
     });
   }
 });

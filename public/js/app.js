@@ -493,9 +493,6 @@ async function init() {
     // Dismiss initial startup loader smoothly
     dismissAppInitialLoader();
 
-    // Check for post-update Whats New Changelog modal
-    checkPostUpdateChangelog();
-
     // Check for updates silently on startup
     checkAppUpdateSilent();
     setTimeout(() => checkAppUpdateSilent(), 300);
@@ -758,6 +755,7 @@ function checkLogin() {
             showView('login');
         }
         checkAppUpdateSilent();
+        checkPostUpdateChangelog();
     } else {
         if (errBanner) errBanner.classList.add('visible');
         if (pwdInput) {
@@ -5195,6 +5193,11 @@ async function checkPostUpdateChangelog() {
 
         if (lastSeenVersion !== currentVersion) {
             localStorage.setItem('lastSeenAppVersion', currentVersion);
+
+            // Only show modal if real changelog notes exist on GitHub
+            if (!data.notes || !data.notes.trim()) {
+                return;
+            }
 
             const modal = document.getElementById('changelog-modal');
             const verEl = document.getElementById('changelog-modal-version');
