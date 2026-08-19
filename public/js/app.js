@@ -4657,7 +4657,7 @@ window.exportDB = async function () {
         }
 
         if (!data.sagras || data.sagras.length === 0) {
-            showToast("Nessun evento presente nel database da esportare.", "info");
+            showToast("Nessun evento disponibile da esportare.", "info");
             return;
         }
 
@@ -4665,7 +4665,7 @@ window.exportDB = async function () {
             mode: 'export',
             title: 'Seleziona Eventi da Esportare',
             icon: 'cloud_upload',
-            description: 'Seleziona gli eventi del database attuale che desideri includere nel file di esportazione:',
+            description: 'Seleziona gli eventi che desideri esportare e salvare:',
             confirmBtnText: 'Esporta Selezionati',
             confirmBtnIcon: 'upload',
             events: data.sagras,
@@ -4723,13 +4723,13 @@ window.importDB = async function (input) {
         const file = input.files[0];
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['db', 'sqlite', 'sqlite3'].includes(ext)) {
-            showToast("File non valido! Selezionare un file database (.db, .sqlite, .sqlite3)", "error");
+            showToast("File non valido! Selezionare un file eventi valido (.db, .sqlite, .sqlite3)", "error");
             input.value = '';
             return;
         }
 
         try {
-            showToast("Lettura del database in corso...", "info");
+            showToast("Lettura del file eventi in corso...", "info");
 
             const res = await fetch('/api/database/inspect', {
                 method: 'POST',
@@ -4742,13 +4742,13 @@ window.importDB = async function (input) {
             const data = await res.json();
 
             if (!res.ok || !data.success) {
-                showToast(data.error || "Errore durante la lettura del database", "error");
+                showToast(data.error || "Errore durante la lettura del file eventi", "error");
                 input.value = '';
                 return;
             }
 
             if (!data.sagras || data.sagras.length === 0) {
-                showToast("Nessun evento trovato nel database selezionato.", "info");
+                showToast("Nessun evento trovato nel file selezionato.", "info");
                 input.value = '';
                 return;
             }
@@ -4757,13 +4757,13 @@ window.importDB = async function (input) {
                 mode: 'import',
                 title: 'Seleziona Eventi da Importare',
                 icon: 'cloud_download',
-                description: 'Seleziona gli eventi presenti nel file database caricato che desideri importare nel sistema attuale:',
+                description: 'Seleziona gli eventi del file caricato che desideri importare:',
                 confirmBtnText: 'Importa Selezionati',
                 confirmBtnIcon: 'download',
                 events: data.sagras,
                 onConfirm: async (selectedIds) => {
                     const countText = selectedIds.length === 1 ? "1 evento" : `${selectedIds.length} eventi`;
-                    if (!await showConfirm(`Confermi di voler importare ${countText} nel database attuale?`)) {
+                    if (!await showConfirm(`Confermi di voler importare ${countText} nell'applicazione?`)) {
                         return;
                     }
 
@@ -4788,7 +4788,7 @@ window.importDB = async function (input) {
             });
         } catch (e) {
             console.error("Inspect DB error:", e);
-            showToast("Errore di connessione durante la lettura del database", "error");
+            showToast("Errore durante la lettura del file eventi", "error");
         }
 
         input.value = ''; // Reset input so same file can be chosen again if needed

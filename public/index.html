@@ -535,14 +535,14 @@
           </div>
 
           <div class="form-group">
-            <label style="margin: 0; font-size: 0.95rem;">Gestione Database</label>
-            <span class="settings-card-sub">Backup ed esportazione/importazione dati</span>
+            <label style="margin: 0; font-size: 0.95rem;">Importa / Esporta Eventi</label>
+            <span class="settings-card-sub">Salva o trasferisci gli eventi su un altro computer</span>
             <div class="db-actions-row">
               <button type="button" class="btn-db-action" onclick="exportDB()">
-                <span class="material-symbols-rounded">download</span> Esporta DB
+                <span class="material-symbols-rounded">download</span> Esporta Eventi
               </button>
               <button type="button" class="btn-db-action" onclick="document.getElementById('db-upload').click()">
-                <span class="material-symbols-rounded">upload</span> Importa DB
+                <span class="material-symbols-rounded">upload</span> Importa Eventi
               </button>
               <input type="file" id="db-upload" accept=".db,.sqlite,.sqlite3" style="display:none" onchange="importDB(this)">
             </div>
