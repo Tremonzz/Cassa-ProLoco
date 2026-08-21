@@ -51,7 +51,7 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 10mm 12mm 10mm 12mm;
+            margin: 0;
         }
 
         * {
@@ -63,22 +63,28 @@
         }
 
         html, body {
+            width: 100%;
             height: 100%;
+            margin: 0;
+            padding: 0;
             background: #ffffff;
             color: #0f172a;
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.35;
+            box-sizing: border-box;
         }
 
         .menu-page-container {
             width: 100%;
-            min-height: calc(297mm - 20mm);
+            height: 100%;
+            min-height: 100%;
             border: 3px solid #1e2a4a;
             padding: 0;
             background: #ffffff;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
+            box-sizing: border-box;
         }
 
         /* Top Header - seamless connection with outer border */

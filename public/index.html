@@ -1079,7 +1079,7 @@
 
   <!-- MODAL: MENU TEMPLATE SELECTOR -->
   <div id="menu-template-modal" class="modal">
-    <div class="modal-content" style="max-width: 520px; border-radius: 14px;">
+    <div class="modal-content" style="max-width: 840px; border-radius: 14px;">
       <div class="modal-header">
         <h2 style="display:flex; align-items:center; gap:8px; margin:0; font-size:1.25rem;">
           <span class="material-symbols-rounded" style="color:var(--primary);">format_paint</span>
@@ -1088,16 +1088,16 @@
         <span class="close-modal" onclick="closeMenuTemplateModal()">&times;</span>
       </div>
       <div class="modal-body" style="padding: 20px;">
-        <p style="margin-top: 0; margin-bottom: 16px; color: var(--text-light); font-size: 0.92rem;">
+        <p style="margin-top: 0; margin-bottom: 16px; color: var(--text-light); font-size: 0.95rem;">
           Seleziona il modello grafico da utilizzare per la stampa del menu:
         </p>
-        <div id="menu-templates-list" style="display: flex; flex-direction: column; gap: 12px;">
-          <!-- Dynamically populated from MENU_TEMPLATES -->
+        <div id="menu-templates-list" class="menu-templates-grid">
+          <!-- Dynamically populated from MENU_TEMPLATES with live preview -->
         </div>
       </div>
       <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-        <button type="button" class="btn-pos-secondary" onclick="closeMenuTemplateModal()" style="height: 42px; padding: 10px 20px; font-weight: 600;">Annulla</button>
-        <button type="button" class="btn-save" onclick="confirmMenuPrint()" style="height: 42px; padding: 10px 24px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <button type="button" class="btn-pos-secondary" onclick="closeMenuTemplateModal()" style="height: 42px; padding: 10px 22px; font-weight: 600;">Annulla</button>
+        <button type="button" class="btn-save" onclick="confirmMenuPrint()" style="height: 42px; padding: 10px 26px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
           <span class="material-symbols-rounded" style="font-size: 1.15rem;">print</span>
           <span>Stampa</span>
         </button>

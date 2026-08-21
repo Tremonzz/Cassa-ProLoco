@@ -81,20 +81,24 @@
         html, body {
             width: 100%;
             height: 100%;
+            margin: 0;
+            padding: 0;
             background: #ffffff;
             color: #1a1615;
             font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
             line-height: 1.35;
+            box-sizing: border-box;
         }
 
         .vintage-page-container {
-            width: 210mm;
-            height: 297mm;
-            min-height: 297mm;
+            width: 100%;
+            height: 100%;
+            min-height: 100%;
             margin: 0 auto;
             position: relative;
-            background: #fdfbf7;
+            background: #ffffff;
             overflow: hidden;
+            box-sizing: border-box;
         }
 
         /* Clean 4-corner frame background */
@@ -102,8 +106,8 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: 210mm;
-            height: 297mm;
+            width: 100%;
+            height: 100%;
             object-fit: fill;
             z-index: 1;
             pointer-events: none;
@@ -113,11 +117,12 @@
         .vintage-content-wrapper {
             position: relative;
             z-index: 2;
-            padding: 22mm 24mm 20mm 24mm;
+            padding: 7% 9% 7% 9%;
             height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
+            box-sizing: border-box;
         }
 
         /* Top Header */

@@ -137,15 +137,28 @@ function openMenuTemplateModal() {
         selectedMenuTemplateId = templateKeys[0];
     }
 
+    const menuData = extractMenuData();
+
     listEl.innerHTML = templateKeys.map(key => {
         const t = MENU_TEMPLATES[key];
         const isSel = (key === selectedMenuTemplateId);
+
+        let renderedHtml = "";
+        try {
+            renderedHtml = t.render(menuData);
+        } catch (e) {
+            console.error("Error rendering preview for template:", key, e);
+        }
+
+        const srcdocAttr = renderedHtml ? renderedHtml.replace(/"/g, '&quot;') : '';
+
         return `
-            <div class="menu-template-card ${isSel ? 'selected' : ''}" onclick="selectMenuTemplate('${t.id}')">
-                <input type="radio" name="menuTemplateChoice" value="${t.id}" class="menu-template-radio" ${isSel ? 'checked' : ''}>
-                <div class="menu-template-info">
+            <div class="menu-template-card ${isSel ? 'selected' : ''}" data-template-id="${t.id}" onclick="selectMenuTemplate('${t.id}')">
+                <div class="menu-template-preview-box">
+                    <iframe class="menu-template-mini-frame" srcdoc="${srcdocAttr}"></iframe>
+                </div>
+                <div class="menu-template-footer">
                     <span class="menu-template-name">${escapeMenuHtml(t.name)}</span>
-                    <span class="menu-template-desc">${escapeMenuHtml(t.description || '')}</span>
                 </div>
             </div>
         `;
@@ -159,9 +172,7 @@ function selectMenuTemplate(templateId) {
     localStorage.setItem('preferredMenuTemplate', templateId);
     const cards = document.querySelectorAll('.menu-template-card');
     cards.forEach(c => {
-        const radio = c.querySelector('input[type="radio"]');
-        if (radio && radio.value === templateId) {
-            radio.checked = true;
+        if (c.getAttribute('data-template-id') === templateId) {
             c.classList.add('selected');
         } else {
             c.classList.remove('selected');
