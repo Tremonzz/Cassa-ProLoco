@@ -117,10 +117,77 @@ async function printMenu(templateId = 'a4_modern_clean', customData = null) {
     }, 250);
 }
 
+let selectedMenuTemplateId = localStorage.getItem('preferredMenuTemplate') || 'a4_modern_clean';
+
+function openMenuTemplateModal() {
+    const modal = document.getElementById('menu-template-modal');
+    const listEl = document.getElementById('menu-templates-list');
+    
+    const templateKeys = Object.keys(MENU_TEMPLATES);
+    if (templateKeys.length === 0) {
+        showToast("Nessun template di stampa disponibile", "error");
+        return;
+    }
+
+    if (!modal || !listEl) {
+        return printMenu(selectedMenuTemplateId);
+    }
+
+    if (!MENU_TEMPLATES[selectedMenuTemplateId]) {
+        selectedMenuTemplateId = templateKeys[0];
+    }
+
+    listEl.innerHTML = templateKeys.map(key => {
+        const t = MENU_TEMPLATES[key];
+        const isSel = (key === selectedMenuTemplateId);
+        return `
+            <div class="menu-template-card ${isSel ? 'selected' : ''}" onclick="selectMenuTemplate('${t.id}')">
+                <input type="radio" name="menuTemplateChoice" value="${t.id}" class="menu-template-radio" ${isSel ? 'checked' : ''}>
+                <div class="menu-template-info">
+                    <span class="menu-template-name">${escapeMenuHtml(t.name)}</span>
+                    <span class="menu-template-desc">${escapeMenuHtml(t.description || '')}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    modal.style.display = 'flex';
+}
+
+function selectMenuTemplate(templateId) {
+    selectedMenuTemplateId = templateId;
+    localStorage.setItem('preferredMenuTemplate', templateId);
+    const cards = document.querySelectorAll('.menu-template-card');
+    cards.forEach(c => {
+        const radio = c.querySelector('input[type="radio"]');
+        if (radio && radio.value === templateId) {
+            radio.checked = true;
+            c.classList.add('selected');
+        } else {
+            c.classList.remove('selected');
+        }
+    });
+}
+
+function closeMenuTemplateModal() {
+    const modal = document.getElementById('menu-template-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function confirmMenuPrint() {
+    closeMenuTemplateModal();
+    printMenu(selectedMenuTemplateId);
+}
+
 window.registerMenuTemplate = registerMenuTemplate;
 window.MENU_TEMPLATES = MENU_TEMPLATES;
 window.extractMenuData = extractMenuData;
 window.printMenu = printMenu;
 window.printCurrentMenu = () => printMenu('a4_modern_clean');
+window.openMenuTemplateModal = openMenuTemplateModal;
+window.selectMenuTemplate = selectMenuTemplate;
+window.closeMenuTemplateModal = closeMenuTemplateModal;
+window.confirmMenuPrint = confirmMenuPrint;
 window.escapeMenuHtml = escapeMenuHtml;
+
 
