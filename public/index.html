@@ -1096,11 +1096,119 @@
         </div>
       </div>
       <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-        <button type="button" class="btn-pos-secondary" onclick="closeMenuTemplateModal()" style="height: 42px; padding: 10px 22px; font-weight: 600;">Annulla</button>
-        <button type="button" class="btn-save" onclick="confirmMenuPrint()" style="height: 42px; padding: 10px 26px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
-          <span class="material-symbols-rounded" style="font-size: 1.15rem;">print</span>
-          <span>Stampa</span>
+        <button type="button" class="btn-pos-secondary" onclick="closeMenuTemplateModal()" style="height: 42px; padding: 10px 22px; font-weight: 600;">Chiudi</button>
+        <button type="button" class="btn-save" onclick="goToMenuCustomizer()" style="height: 42px; padding: 10px 26px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+          <span>Continua</span>
+          <span class="material-symbols-rounded" style="font-size: 1.15rem;">arrow_forward</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MENU CUSTOMIZER & FULL PREVIEW -->
+  <div id="menu-customizer-modal" class="modal">
+    <div class="modal-content menu-customizer-modal-content">
+      <div class="modal-header">
+        <h2 style="display:flex; align-items:center; gap:8px; margin:0; font-size:1.25rem;">
+          <span class="material-symbols-rounded" style="color:var(--primary);">tune</span>
+          <span>Personalizza & Anteprima Menu</span>
+        </h2>
+        <span class="close-modal" onclick="closeMenuCustomizerModal()">&times;</span>
+      </div>
+
+      <div class="modal-body menu-customizer-body">
+        <!-- LEFT PANEL: CONTROLS -->
+        <div class="menu-customizer-controls">
+          <!-- SECTION: TITLES -->
+          <div class="menu-custom-section">
+            <h3 class="menu-custom-section-title">
+              <span class="material-symbols-rounded">title</span>
+              <span>Intestazione</span>
+            </h3>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="menu-custom-toplabel" class="menu-custom-label">Dicitura Superiore</label>
+              <input type="text" id="menu-custom-toplabel" class="form-control menu-custom-input" placeholder="Es. MENU EVENTO" oninput="onCustomizerFieldChange('topLabel', this.value)">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="menu-custom-eventname" class="menu-custom-label">Nome Evento / Titolo</label>
+              <input type="text" id="menu-custom-eventname" class="form-control menu-custom-input" placeholder="Nome dell'evento" oninput="onCustomizerFieldChange('eventName', this.value)">
+            </div>
+          </div>
+
+          <!-- SECTION: SPACING & DENSITY -->
+          <div class="menu-custom-section">
+            <h3 class="menu-custom-section-title">
+              <span class="material-symbols-rounded">density_medium</span>
+              <span>Dimensione e Spaziatura</span>
+            </h3>
+            <div class="menu-density-selector">
+              <button type="button" class="btn-density" data-density="compact" onclick="onCustomizerDensityChange('compact')">Compatto</button>
+              <button type="button" class="btn-density active" data-density="normal" onclick="onCustomizerDensityChange('normal')">Normale</button>
+              <button type="button" class="btn-density" data-density="spacious" onclick="onCustomizerDensityChange('spacious')">Ampio</button>
+            </div>
+          </div>
+
+          <!-- SECTION: CATEGORIES & ITEMS INCLUSION -->
+          <div class="menu-custom-section" style="display: flex; flex-direction: column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <h3 class="menu-custom-section-title" style="margin: 0;">
+                <span class="material-symbols-rounded">checklist</span>
+                <span>Piatti da Includere</span>
+              </h3>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="btn-link-action" onclick="selectAllCustomizerProducts(true)">Tutti</button>
+                <span style="color:var(--text-light)">|</span>
+                <button type="button" class="btn-link-action" onclick="selectAllCustomizerProducts(false)">Nessuno</button>
+              </div>
+            </div>
+            <div id="menu-custom-products-list" class="menu-custom-products-tree">
+              <!-- Dynamically populated categories & products with checkboxes -->
+            </div>
+          </div>
+
+          <!-- SECTION: NOTES & FOOTER -->
+          <div class="menu-custom-section">
+            <h3 class="menu-custom-section-title">
+              <span class="material-symbols-rounded">notes</span>
+              <span>Note a Piè di Pagina</span>
+            </h3>
+            <div class="form-group" style="margin-bottom: 0;">
+              <textarea id="menu-custom-notes" class="form-control menu-custom-textarea" rows="2" placeholder="Es. Coperto compreso - Per allergeni rivolgersi al personale" oninput="onCustomizerFieldChange('notes', this.value)"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT PANEL: FULL A4 LIVE PREVIEW -->
+        <div class="menu-customizer-preview-container">
+          <div class="menu-customizer-preview-header">
+            <span style="font-weight:600; font-size:0.9rem; color:var(--text-light);">Anteprima Foglio A4</span>
+            <span id="menu-customizer-template-badge" class="badge-template-name">A4 Moderno</span>
+          </div>
+          <div class="menu-full-a4-viewport">
+            <div class="menu-full-a4-sheet">
+              <iframe id="menu-customizer-iframe" class="menu-full-a4-iframe" src="about:blank"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div class="modal-footer menu-customizer-footer">
+        <button type="button" class="btn-pos-secondary" onclick="backToTemplateSelector()" style="height: 44px; padding: 10px 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+          <span class="material-symbols-rounded">arrow_back</span>
+          <span>Indietro</span>
+        </button>
+
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <button type="button" class="btn-pos-secondary" onclick="exportMenuToPDF()" style="height: 44px; padding: 10px 22px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; border-color: var(--primary); color: var(--primary);">
+            <span class="material-symbols-rounded">picture_as_pdf</span>
+            <span>Esporta PDF</span>
+          </button>
+          <button type="button" class="btn-save" onclick="printCustomMenu()" style="height: 44px; padding: 10px 26px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;">
+            <span class="material-symbols-rounded">print</span>
+            <span>Stampa Menu</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

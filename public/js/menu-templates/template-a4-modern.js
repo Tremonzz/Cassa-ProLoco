@@ -15,11 +15,26 @@
         pageSize: 'A4 portrait',
         render: function (data) {
             const eventName = data.eventName || 'Menu Evento';
+            const topLabel = data.topLabel || 'MENU EVENTO';
             const logoUrl = data.logoUrl || 'images/logo.png';
-            const categories = data.categories || [];
+            const showLogo = (data.showLogo !== false);
+            const notes = (data.notes || '').trim();
+            const density = data.density || 'normal';
+
+            const excludedCats = new Set((data.excludedCategoryIds || []).map(String));
+            const excludedProds = new Set((data.excludedProductIds || []).map(String));
+
+            const rawCategories = data.categories || [];
+            const categories = rawCategories
+                .filter(cat => !excludedCats.has(String(cat.id)))
+                .map(cat => {
+                    const validProducts = (cat.products || []).filter(p => !excludedProds.has(String(p.id)));
+                    return { ...cat, products: validProducts };
+                })
+                .filter(cat => cat.products.length > 0);
 
             const categoriesHtml = categories.map(cat => {
-                const productsHtml = (cat.products || []).map(p => `
+                const productsHtml = cat.products.map(p => `
                     <div class="menu-item-row">
                         <span class="menu-item-name">${escapeMenuHtml(p.name)}</span>
                         <span class="menu-item-leader"></span>
@@ -38,6 +53,33 @@
                     </div>
                 `;
             }).join('');
+
+            const notesHtml = notes ? `
+                <div class="menu-footer-notes">
+                    <p>${escapeMenuHtml(notes).replace(/\n/g, '<br>')}</p>
+                </div>
+            ` : '';
+
+            // Density multipliers
+            let bodyGap = '22px';
+            let catHeaderFontSize = '1.35rem';
+            let itemFontSize = '1.45rem';
+            let priceFontSize = '1.55rem';
+            let itemGap = '10px';
+
+            if (density === 'compact') {
+                bodyGap = '14px';
+                catHeaderFontSize = '1.15rem';
+                itemFontSize = '1.25rem';
+                priceFontSize = '1.35rem';
+                itemGap = '6px';
+            } else if (density === 'spacious') {
+                bodyGap = '28px';
+                catHeaderFontSize = '1.5rem';
+                itemFontSize = '1.65rem';
+                priceFontSize = '1.75rem';
+                itemGap = '14px';
+            }
 
             return `
 <!DOCTYPE html>
@@ -66,7 +108,7 @@
             width: 100%;
             height: 100%;
             margin: 0;
-            padding: 0;
+            padding: 14px 16px;
             background: #ffffff;
             color: #0f172a;
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -78,7 +120,8 @@
             width: 100%;
             height: 100%;
             min-height: 100%;
-            border: 3px solid #1e2a4a;
+            border: 3.5px solid #1e2a4a;
+            border-radius: 4px;
             padding: 0;
             background: #ffffff;
             display: flex;
@@ -91,25 +134,25 @@
         .menu-top-header {
             display: flex;
             align-items: stretch;
-            border-bottom: 3px solid #1e2a4a;
+            border-bottom: 3.5px solid #1e2a4a;
             margin: 0;
             padding: 0;
             background: #ffffff;
         }
 
         .menu-logo-box {
-            display: flex;
+            display: ${showLogo ? 'flex' : 'none'};
             align-items: center;
             justify-content: center;
             padding: 16px 24px;
-            border-right: 3px solid #1e2a4a;
-            width: 180px;
-            min-width: 180px;
+            border-right: 3.5px solid #1e2a4a;
+            width: 170px;
+            min-width: 170px;
         }
 
         .menu-logo-img {
-            max-height: 88px;
-            max-width: 140px;
+            max-height: 84px;
+            max-width: 130px;
             object-fit: contain;
         }
 
@@ -118,12 +161,12 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            padding: 16px 28px;
+            padding: 18px 28px;
             gap: 2px;
         }
 
         .menu-top-title {
-            font-size: 1.35rem;
+            font-size: 1.3rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -141,55 +184,54 @@
 
         /* Category & Content Section */
         .menu-body-content {
-            padding: 28px 32px;
+            padding: 26px 30px;
             display: flex;
             flex-direction: column;
-            gap: 24px;
-            justify-content: flex-start;
+            gap: ${bodyGap};
+            flex: 1;
         }
 
         .menu-category-section {
             break-inside: avoid;
             page-break-inside: avoid;
-            margin-bottom: 6px;
         }
 
         .menu-category-header {
             background: #1e2a4a;
             color: #ffffff;
-            display: inline-block;
-            padding: 7px 22px;
-            border-radius: 4px;
-            font-size: 1.45rem;
+            padding: 5px 16px;
+            font-size: ${catHeaderFontSize};
             font-weight: 800;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
             text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border-radius: 5px;
+            margin-bottom: ${itemGap};
+            display: inline-block;
         }
 
         .menu-category-items {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: ${itemGap};
             padding: 0 4px;
         }
 
         .menu-item-row {
             display: flex;
             align-items: baseline;
-            gap: 10px;
-            font-size: 1.55rem;
+            gap: 8px;
+            font-size: ${itemFontSize};
         }
 
         .menu-item-name {
-            font-weight: 700;
-            color: #0f172a;
+            font-weight: 600;
+            color: #1e293b;
             white-space: nowrap;
         }
 
         .menu-item-leader {
             flex: 1;
-            border-bottom: 3px dotted #94a3b8;
+            border-bottom: 2px dotted #94a3b8;
             margin: 0 4px;
             min-width: 20px;
             position: relative;
@@ -199,18 +241,20 @@
         .menu-item-price {
             font-weight: 800;
             color: #0f172a;
-            font-size: 1.65rem;
+            font-size: ${priceFontSize};
             white-space: nowrap;
         }
 
-        @media screen {
-            body {
-                background: #e2e8f0;
-                padding: 20px;
-            }
-            .menu-page-container {
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-            }
+        .menu-footer-notes {
+            margin-top: auto;
+            padding-top: 14px;
+            border-top: 1.5px dashed #cbd5e1;
+            font-size: 0.95rem;
+            color: #64748b;
+            font-style: italic;
+            text-align: center;
+            white-space: pre-line;
+            line-height: 1.45;
         }
     </style>
 </head>
@@ -218,16 +262,17 @@
     <div class="menu-page-container">
         <div class="menu-top-header">
             <div class="menu-logo-box">
-                <img src="${logoUrl}" alt="Logo" class="menu-logo-img">
+                <img src="${escapeMenuHtml(logoUrl)}" alt="Logo" class="menu-logo-img" onerror="this.parentElement.style.display='none'">
             </div>
             <div class="menu-title-box">
-                <span class="menu-top-title">MENU EVENTO</span>
+                <span class="menu-top-title">${escapeMenuHtml(topLabel)}</span>
                 <h1 class="menu-event-name">${escapeMenuHtml(eventName)}</h1>
             </div>
         </div>
 
         <div class="menu-body-content">
-            ${categoriesHtml}
+            ${categoriesHtml || '<div style="color:#94a3b8;text-align:center;padding:40px;">Nessun piatto selezionato</div>'}
+            ${notesHtml}
         </div>
     </div>
 </body>

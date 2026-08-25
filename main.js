@@ -83,6 +83,66 @@ ipcMain.on('maximize-app', () => {
     }
 });
 
+ipcMain.handle('export-pdf', async (event, { html, defaultFileName }) => {
+    let printWin = null;
+    let tempFilePath = null;
+    try {
+        const os = require('os');
+        const fs = require('fs');
+        const path = require('path');
+
+        tempFilePath = path.join(os.tmpdir(), `menu_export_${Date.now()}.html`);
+        const resolvedHtml = html.replace(/src="images\//g, 'src="http://localhost:3000/images/');
+        fs.writeFileSync(tempFilePath, resolvedHtml, 'utf8');
+
+        printWin = new BrowserWindow({
+            show: false,
+            width: 794,
+            height: 1123,
+            webPreferences: {
+                offscreen: true,
+                nodeIntegration: false,
+                contextIsolation: true
+            }
+        });
+
+        await printWin.loadFile(tempFilePath);
+        await new Promise(r => setTimeout(r, 500));
+
+        const pdfData = await printWin.webContents.printToPDF({
+            pageSize: 'A4',
+            printBackground: true,
+            margins: {
+                marginType: 'none'
+            }
+        });
+
+        printWin.close();
+        printWin = null;
+        try { fs.unlinkSync(tempFilePath); } catch(e){}
+
+        const { canceled, filePath } = await dialog.showSaveDialog(mainWindow || null, {
+            title: 'Salva Menu come PDF',
+            defaultPath: defaultFileName || 'Menu_Evento.pdf',
+            filters: [
+                { name: 'Documenti PDF (*.pdf)', extensions: ['pdf'] }
+            ]
+        });
+
+        if (canceled || !filePath) {
+            return { canceled: true };
+        }
+
+        fs.writeFileSync(filePath, pdfData);
+        return { success: true, filePath };
+    } catch (err) {
+        if (printWin && !printWin.isDestroyed()) printWin.close();
+        if (tempFilePath) { try { require('fs').unlinkSync(tempFilePath); } catch(e){} }
+        console.error("Error generating PDF:", err);
+        return { success: false, error: err.message };
+    }
+});
+
 const gotLock = app.requestSingleInstanceLock();
 
 app.whenReady().then(() => {

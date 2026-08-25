@@ -15,10 +15,24 @@
         pageSize: 'A4 portrait',
         render: function (data) {
             const eventName = data.eventName || 'Menu Evento';
-            const categories = data.categories || [];
+            const topLabel = data.topLabel || 'MENU EVENTO';
+            const notes = (data.notes || '').trim();
+            const density = data.density || 'normal';
+
+            const excludedCats = new Set((data.excludedCategoryIds || []).map(String));
+            const excludedProds = new Set((data.excludedProductIds || []).map(String));
+
+            const rawCategories = data.categories || [];
+            const categories = rawCategories
+                .filter(cat => !excludedCats.has(String(cat.id)))
+                .map(cat => {
+                    const validProducts = (cat.products || []).filter(p => !excludedProds.has(String(p.id)));
+                    return { ...cat, products: validProducts };
+                })
+                .filter(cat => cat.products.length > 0);
 
             const categoriesHtml = categories.map(cat => {
-                const productsHtml = (cat.products || []).map(p => `
+                const productsHtml = cat.products.map(p => `
                     <div class="vintage-item-row">
                         <span class="vintage-item-name">${escapeMenuHtml(p.name)}</span>
                         <span class="vintage-item-leader"></span>
@@ -53,6 +67,33 @@
                     </div>
                 `;
             }).join('');
+
+            const notesHtml = notes ? `
+                <div class="vintage-footer-notes">
+                    <p>${escapeMenuHtml(notes).replace(/\n/g, '<br>')}</p>
+                </div>
+            ` : '';
+
+            // Density settings
+            let bodyGap = '24px';
+            let catTitleFontSize = '1.65rem';
+            let itemFontSize = '1.5rem';
+            let priceFontSize = '1.65rem';
+            let itemGap = '11px';
+
+            if (density === 'compact') {
+                bodyGap = '16px';
+                catTitleFontSize = '1.35rem';
+                itemFontSize = '1.3rem';
+                priceFontSize = '1.45rem';
+                itemGap = '7px';
+            } else if (density === 'spacious') {
+                bodyGap = '30px';
+                catTitleFontSize = '1.85rem';
+                itemFontSize = '1.7rem';
+                priceFontSize = '1.85rem';
+                itemGap = '15px';
+            }
 
             return `
 <!DOCTYPE html>
@@ -116,7 +157,7 @@
         .vintage-content-wrapper {
             position: relative;
             z-index: 2;
-            padding: 7% 9% 7% 9%;
+            padding: 7% 9% 6% 9%;
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -127,14 +168,14 @@
         /* Top Header */
         .vintage-header {
             text-align: center;
-            padding-bottom: 14px;
-            margin-bottom: 22px;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
             border-bottom: 1.5px solid rgba(88, 28, 45, 0.25);
         }
 
         .vintage-top-label {
             font-family: 'Cinzel', serif;
-            font-size: 1.4rem;
+            font-size: 1.35rem;
             font-weight: 800;
             color: #581c2d;
             letter-spacing: 3px;
@@ -144,7 +185,7 @@
         }
 
         .vintage-event-name {
-            font-size: 2.8rem;
+            font-size: 2.7rem;
             font-weight: 900;
             color: #581c2d;
             letter-spacing: 1px;
@@ -156,8 +197,9 @@
         .vintage-body-content {
             display: flex;
             flex-direction: column;
-            gap: 26px;
+            gap: ${bodyGap};
             justify-content: flex-start;
+            flex: 1;
         }
 
         .vintage-category-section {
@@ -170,14 +212,14 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             text-align: center;
             gap: 4px;
         }
 
         .vintage-category-title {
             font-family: 'Cinzel', serif;
-            font-size: 1.65rem;
+            font-size: ${catTitleFontSize};
             font-weight: 800;
             color: #581c2d;
             letter-spacing: 2.5px;
@@ -196,7 +238,7 @@
         .vintage-category-items {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: ${itemGap};
             padding: 0 10px;
         }
 
@@ -204,7 +246,7 @@
             display: flex;
             align-items: baseline;
             gap: 10px;
-            font-size: 1.55rem;
+            font-size: ${itemFontSize};
         }
 
         .vintage-item-name {
@@ -226,18 +268,20 @@
             font-family: 'Playfair Display', Georgia, serif;
             font-weight: 900;
             color: #581c2d;
-            font-size: 1.65rem;
+            font-size: ${priceFontSize};
             white-space: nowrap;
         }
 
-        @media screen {
-            body {
-                background: #e2e8f0;
-                padding: 20px;
-            }
-            .vintage-page-container {
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-            }
+        .vintage-footer-notes {
+            margin-top: auto;
+            padding-top: 14px;
+            border-top: 1.5px dashed rgba(88, 28, 45, 0.3);
+            font-size: 0.95rem;
+            color: #581c2d;
+            font-style: italic;
+            text-align: center;
+            white-space: pre-line;
+            line-height: 1.45;
         }
     </style>
 </head>
@@ -246,12 +290,13 @@
         <img src="images/menu-templates/a4-vintage-bg.jpeg" alt="Cornice Vintage" class="vintage-bg-frame">
         <div class="vintage-content-wrapper">
             <div class="vintage-header">
-                <span class="vintage-top-label">MENU EVENTO</span>
+                <span class="vintage-top-label">${escapeMenuHtml(topLabel)}</span>
                 <h1 class="vintage-event-name">${escapeMenuHtml(eventName)}</h1>
             </div>
 
             <div class="vintage-body-content">
-                ${categoriesHtml}
+                ${categoriesHtml || '<div style="color:#8c6d75;text-align:center;padding:40px;">Nessun piatto selezionato</div>'}
+                ${notesHtml}
             </div>
         </div>
     </div>
