@@ -1,5 +1,5 @@
 /**
- * Template: A4 Moderno Istituzionale
+ * Template: A4 Moderno
  * Formato: A4 Verticale
  */
 (function () {
@@ -9,9 +9,9 @@
     }
 
     registerMenuTemplate({
-        id: 'a4_modern_clean',
-        name: 'A4 Moderno Istituzionale',
-        description: 'Layout pulito ed elegante per fogli A4 con box di categoria navy e prezzi allineati',
+        id: 'a4_modern',
+        name: 'A4 Moderno',
+        description: 'Layout moderno ed elegante per fogli A4 con box di categoria e prezzi allineati',
         pageSize: 'A4 portrait',
         render: function (data) {
             const eventName = data.eventName || 'Menu Evento';

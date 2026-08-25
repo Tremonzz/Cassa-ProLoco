@@ -72,11 +72,11 @@ function extractMenuData(options = {}) {
 
 /**
  * General function to render and trigger printing of the menu.
- * @param {string} [templateId='a4_modern_clean'] - Template ID to use
+ * @param {string} [templateId='a4_modern'] - Template ID to use
  * @param {Object} [customData] - Optional explicit data override
  */
-async function printMenu(templateId = 'a4_modern_clean', customData = null) {
-    const template = MENU_TEMPLATES[templateId] || MENU_TEMPLATES['a4_modern_clean'];
+async function printMenu(templateId = 'a4_modern', customData = null) {
+    const template = MENU_TEMPLATES[templateId] || MENU_TEMPLATES['a4_modern'] || Object.values(MENU_TEMPLATES)[0];
     if (!template) {
         showToast("Template di stampa non trovato", "error");
         return;
@@ -117,7 +117,7 @@ async function printMenu(templateId = 'a4_modern_clean', customData = null) {
     }, 250);
 }
 
-let selectedMenuTemplateId = localStorage.getItem('preferredMenuTemplate') || 'a4_modern_clean';
+let selectedMenuTemplateId = localStorage.getItem('preferredMenuTemplate') || 'a4_modern';
 
 function openMenuTemplateModal() {
     const modal = document.getElementById('menu-template-modal');
@@ -194,7 +194,7 @@ window.registerMenuTemplate = registerMenuTemplate;
 window.MENU_TEMPLATES = MENU_TEMPLATES;
 window.extractMenuData = extractMenuData;
 window.printMenu = printMenu;
-window.printCurrentMenu = () => printMenu('a4_modern_clean');
+window.printCurrentMenu = () => printMenu('a4_modern');
 window.openMenuTemplateModal = openMenuTemplateModal;
 window.selectMenuTemplate = selectMenuTemplate;
 window.closeMenuTemplateModal = closeMenuTemplateModal;

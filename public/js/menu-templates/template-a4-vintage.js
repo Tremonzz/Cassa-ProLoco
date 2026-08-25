@@ -1,7 +1,6 @@
 /**
- * Template: Vintage Trattoria Classica
+ * Template: A4 Vintage
  * Formato: A4 Verticale
- * Ispirato allo stile trattoria d'epoca con cornice sobria a 4 angoli decorati
  */
 (function () {
     if (typeof registerMenuTemplate !== 'function') {
@@ -10,9 +9,9 @@
     }
 
     registerMenuTemplate({
-        id: 'vintage_trattoria',
-        name: 'Vintage Trattoria Classica',
-        description: 'Stile sobrio ed elegante con sottile doppia linea bordeaux, 4 angoli decorati e font classici',
+        id: 'a4_vintage',
+        name: 'A4 Vintage',
+        description: 'Stile vintage ed elegante con sottile doppia linea bordeaux, 4 angoli decorati e font classici',
         pageSize: 'A4 portrait',
         render: function (data) {
             const eventName = data.eventName || 'Menu Evento';
@@ -244,7 +243,7 @@
 </head>
 <body>
     <div class="vintage-page-container">
-        <img src="images/menu-templates/vintage-trattoria-bg.jpeg" alt="Cornice Vintage" class="vintage-bg-frame">
+        <img src="images/menu-templates/a4-vintage-bg.jpeg" alt="Cornice Vintage" class="vintage-bg-frame">
         <div class="vintage-content-wrapper">
             <div class="vintage-header">
                 <span class="vintage-top-label">MENU EVENTO</span>
