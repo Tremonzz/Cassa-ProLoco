@@ -1600,6 +1600,36 @@ app.get('/api/check-update', (req, res) => {
     tryWebFallback();
   });
 });
+// CLEANUP OLD TEMP UPDATE FILES
+function cleanupOldUpdateFiles(currentFileToKeep = null) {
+  try {
+    const tempDir = os.tmpdir();
+    if (!fs.existsSync(tempDir)) return;
+    const files = fs.readdirSync(tempDir);
+    const now = Date.now();
+    files.forEach(f => {
+      if (f.startsWith('GestioneOrdini_Update_') && (f.endsWith('.exe') || f.endsWith('.progress.json'))) {
+        const fullPath = path.join(tempDir, f);
+        if (currentFileToKeep && path.resolve(fullPath) === path.resolve(currentFileToKeep)) {
+          return;
+        }
+        try {
+          const stat = fs.statSync(fullPath);
+          // Delete files older than 2 minutes
+          if (now - stat.mtimeMs > 2 * 60 * 1000) {
+            fs.unlinkSync(fullPath);
+            console.log(`[CLEANUP] Deleted old update temp file: ${f}`);
+          }
+        } catch (err) {}
+      }
+    });
+  } catch (err) {
+    console.warn("[CLEANUP] Error during temp update files cleanup:", err.message);
+  }
+}
+
+// Clean old temporary installers on server start
+cleanupOldUpdateFiles();
 
 // DOWNLOAD & AUTO-INSTALL UPDATE API
 let updateProgress = { status: 'idle', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
@@ -1618,8 +1648,9 @@ app.post('/api/cancel-update', (req, res) => {
   if (activeDownloadPath) {
     try { if (fs.existsSync(activeDownloadPath)) fs.unlinkSync(activeDownloadPath); } catch(e){}
     activeDownloadPath = null;
-}
+  }
   updateProgress = { status: 'idle', percent: 0, downloadedMb: '0.0', totalMb: '0.0', error: null };
+  cleanupOldUpdateFiles();
   res.json({ success: true, message: 'Download annullato' });
 });
 
@@ -1630,6 +1661,8 @@ app.post('/api/download-and-install', (req, res) => {
   if (!downloadUrl.endsWith('.exe')) {
     return res.json({ success: false, redirectUrl: downloadUrl, message: 'Reindirizzamento alla pagina di release' });
   }
+
+  cleanupOldUpdateFiles();
 
   let totalBytesKnown = parseInt(totalBytes, 10) || 0;
 
@@ -1709,18 +1742,29 @@ app.post('/api/download-and-install', (req, res) => {
 
       if (!res.headersSent) res.json({ success: true, message: 'Download completato. Avvio installatore...' });
 
+      // Launch downloaded installer directly & gracefully close application
       setTimeout(() => {
         try {
-          const child = spawn('cmd.exe', ['/c', `start /wait "" "${destPath}" & del /f /q "${destPath}"`], {
-            detached: true, stdio: 'ignore', windowsHide: true
+          const child = spawn(destPath, [], {
+            detached: true,
+            stdio: 'ignore'
           });
           child.unref();
+
+          setTimeout(() => {
+            try {
+              const { app: electronApp } = require('electron');
+              if (electronApp) electronApp.quit(); else process.exit(0);
+            } catch(e) { process.exit(0); }
+          }, 600);
+        } catch(e) {
+          console.error("Errore avvio installer:", e);
           try {
             const { app: electronApp } = require('electron');
             if (electronApp) electronApp.quit(); else process.exit(0);
           } catch(e) { process.exit(0); }
-        } catch(e) { console.error("Errore avvio installer:", e); }
-      }, 800);
+        }
+      }, 500);;
 
     } else {
       // Read size BEFORE deleting
