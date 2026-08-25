@@ -82,6 +82,10 @@
 
     <!-- Top Right Header Buttons -->
     <div class="top-header-buttons">
+      <button class="btn-top-reports" onclick="openReportsView()" title="Resoconti e Statistiche Globali">
+        <span class="material-symbols-rounded">analytics</span>
+        <span>Resoconti</span>
+      </button>
       <button class="btn-top-settings" onclick="openSettings()">
         <span class="material-symbols-rounded">settings</span>
         <span>Impostazioni</span>
@@ -365,6 +369,276 @@
 
         <div id="top-products">
           <!-- Injected JS by category -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 5: GLOBAL REPORTS & ANALYTICS -->
+  <div id="view-reports" class="view">
+    <!-- Top Header Bar -->
+    <div class="reports-header-bar">
+      <!-- LEFT: Title & Subtitle -->
+      <div class="reports-header-left">
+        <div class="reports-header-icon-wrap">
+          <span class="material-symbols-rounded">analytics</span>
+        </div>
+        <div>
+          <h1 class="reports-header-title">Resoconti &amp; Statistiche</h1>
+          <p class="reports-header-subtitle">Analisi globale aggregata di tutti gli eventi</p>
+        </div>
+      </div>
+
+      <!-- RIGHT: Date Range Filter & Back to Home Button -->
+      <div class="reports-header-right">
+        <button type="button" id="reports-daterange-btn" class="reports-daterange-btn" onclick="openReportsDateRangeModal()" title="Filtra per periodo temporale">
+          <span class="material-symbols-rounded">calendar_month</span>
+          <span id="reports-daterange-btn-text">Quest'anno</span>
+          <span class="material-symbols-rounded" style="font-size: 18px; margin-left: 2px;">expand_more</span>
+        </button>
+        <button type="button" class="reports-header-back-btn" onclick="closeReportsView()" title="Torna alla schermata iniziale">
+          <span class="material-symbols-rounded">arrow_back</span>
+          <span>Torna alla Home</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Reports Container: Left Sidebar + Main Content -->
+    <div class="reports-layout-container">
+      <!-- Left Sidebar -->
+      <aside class="reports-sidebar">
+        <div class="reports-sidebar-nav">
+          <div class="reports-sidebar-section-label">Sezioni</div>
+          <button type="button" class="reports-nav-item active" data-tab="overview" onclick="switchReportsTab('overview')">
+            <span class="material-symbols-rounded">dashboard</span>
+            <span>Panoramica</span>
+          </button>
+          <button type="button" class="reports-nav-item" data-tab="events" onclick="switchReportsTab('events')">
+            <span class="material-symbols-rounded">festival</span>
+            <span>Dettaglio Eventi</span>
+            <span class="reports-nav-pill">Prossimamente</span>
+          </button>
+          <button type="button" class="reports-nav-item" data-tab="products" onclick="switchReportsTab('products')">
+            <span class="material-symbols-rounded">restaurant_menu</span>
+            <span>Classifica Piatti</span>
+            <span class="reports-nav-pill">Prossimamente</span>
+          </button>
+          <button type="button" class="reports-nav-item" data-tab="hourly" onclick="switchReportsTab('hourly')">
+            <span class="material-symbols-rounded">pace</span>
+            <span>Fasce Orarie</span>
+            <span class="reports-nav-pill">Prossimamente</span>
+          </button>
+          <button type="button" class="reports-nav-item" data-tab="raw-materials" onclick="switchReportsTab('raw-materials')">
+            <span class="material-symbols-rounded">inventory_2</span>
+            <span>Consumi Base</span>
+            <span class="reports-nav-pill">Prossimamente</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="reports-main-content">
+        <!-- TAB 1: PANORAMICA GLOBALE -->
+        <div id="reports-tab-overview" class="reports-tab-section">
+          <!-- KPI Summary Cards (5-column balanced grid) -->
+          <div class="reports-kpi-grid">
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-primary">
+                <span class="material-symbols-rounded">payments</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Incasso Totale</div>
+                <div id="rep-kpi-total-revenue" class="reports-kpi-value">€ 0,00</div>
+                <div class="reports-kpi-sub">Totale incassato da tutti gli ordini</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-slate">
+                <span class="material-symbols-rounded">receipt_long</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Scontrini Emessi</div>
+                <div id="rep-kpi-total-orders" class="reports-kpi-value">0</div>
+                <div class="reports-kpi-sub">Ordini complessivi registrati</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-primary">
+                <span class="material-symbols-rounded">calculate</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Scontrino Medio</div>
+                <div id="rep-kpi-avg-order" class="reports-kpi-value">€ 0,00</div>
+                <div class="reports-kpi-sub">Media spesa per singolo scontrino</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-slate">
+                <span class="material-symbols-rounded">festival</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Eventi Totali</div>
+                <div id="rep-kpi-total-sagras" class="reports-kpi-value">0</div>
+                <div class="reports-kpi-sub">Sagre registrate a sistema</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-amber">
+                <span class="material-symbols-rounded">military_tech</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Piatto Più Venduto</div>
+                <div id="rep-kpi-bestseller-name" class="reports-kpi-value kpi-value-text">-</div>
+                <div id="rep-kpi-bestseller-qty" class="reports-kpi-sub kpi-sub-highlight">0 venduti</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sales Wave Chart Card -->
+          <div class="reports-card-box reports-timeline-card">
+            <div class="reports-card-header">
+              <div class="reports-card-title">
+                <span class="material-symbols-rounded">show_chart</span>
+                <span>Andamento Vendite nel Tempo</span>
+              </div>
+              <div class="reports-timeframe-selector">
+                <button type="button" id="rep-timeframe-btn-day" class="reports-timeframe-btn" data-period="day" onclick="changeReportsTimelinePeriod('day')">Giorno</button>
+                <button type="button" id="rep-timeframe-btn-week" class="reports-timeframe-btn" data-period="week" onclick="changeReportsTimelinePeriod('week')">Settimana</button>
+                <button type="button" id="rep-timeframe-btn-month" class="reports-timeframe-btn active" data-period="month" onclick="changeReportsTimelinePeriod('month')">Mese</button>
+              </div>
+            </div>
+            <div class="reports-card-body" style="position: relative; padding: 16px 20px 24px 20px;">
+              <div id="reports-sales-chart-container" class="reports-sales-chart-container">
+                <!-- SVG Wave Chart injected via JS -->
+              </div>
+              <div id="reports-chart-tooltip" class="reports-chart-tooltip"></div>
+            </div>
+          </div>
+
+          <!-- Visual Comparison Row: Sagras Revenue + Category Breakdown -->
+          <div class="reports-charts-grid">
+            <!-- Box: Confronto Incassi per Evento -->
+            <div class="reports-card-box">
+              <div class="reports-card-header">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded">bar_chart</span>
+                  <span>Confronto Incassi per Evento</span>
+                </div>
+              </div>
+              <div class="reports-card-body">
+                <div id="rep-chart-sagras-bars" class="reports-sagras-bars-container">
+                  <!-- Dynamically populated bars -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Box: Ripartizione per Categoria -->
+            <div class="reports-card-box">
+              <div class="reports-card-header">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded">pie_chart</span>
+                  <span>Ripartizione Incassi per Categoria</span>
+                </div>
+              </div>
+              <div class="reports-card-body">
+                <div id="rep-chart-categories-list" class="reports-categories-list-container">
+                  <!-- Dynamically populated category progress bars -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder Sections for Subsequent Steps -->
+        <div id="reports-tab-events" class="reports-tab-section" style="display: none;">
+          <div class="reports-placeholder-box">
+            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">festival</span>
+            <h3>Dettaglio &amp; Confronto Eventi</h3>
+            <p>Questa sezione verrà implementata nei prossimi step.</p>
+          </div>
+        </div>
+
+        <div id="reports-tab-products" class="reports-tab-section" style="display: none;">
+          <div class="reports-placeholder-box">
+            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">restaurant_menu</span>
+            <h3>Classifica Completa Piatti</h3>
+            <p>Questa sezione verrà implementata nei prossimi step.</p>
+          </div>
+        </div>
+
+        <div id="reports-tab-hourly" class="reports-tab-section" style="display: none;">
+          <div class="reports-placeholder-box">
+            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">pace</span>
+            <h3>Analisi Fasce Orarie &amp; Affluenza</h3>
+            <p>Questa sezione verrà implementata nei prossimi step.</p>
+          </div>
+        </div>
+
+        <div id="reports-tab-raw-materials" class="reports-tab-section" style="display: none;">
+          <div class="reports-placeholder-box">
+            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">inventory_2</span>
+            <h3>Consumi Materie Prime</h3>
+            <p>Questa sezione verrà implementata nei prossimi step.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="reports-loading-overlay" class="reports-loading-overlay" style="display: none;">
+      <div class="reports-loading-spinner"></div>
+      <div style="font-weight: 600; font-size: 1rem;">Caricamento resoconti in corso...</div>
+    </div>
+
+    <!-- Date Range Selector Modal -->
+    <div id="reports-daterange-modal" class="modal" style="display: none;">
+      <div class="modal-content reports-daterange-modal-content">
+        <div class="modal-header">
+          <h2>
+            <span class="material-symbols-rounded">calendar_month</span>
+            <span>Filtra Periodo Temporale</span>
+          </h2>
+          <span class="close-modal" onclick="closeReportsDateRangeModal()">&times;</span>
+        </div>
+        <div class="modal-body" style="padding: 22px 24px;">
+          <!-- Quick Presets -->
+          <div class="reports-presets-label">Scorciatoie Rapide</div>
+          <div class="reports-presets-grid">
+            <button type="button" class="reports-preset-btn active" data-preset="this_year" onclick="selectReportsPreset('this_year')">Quest'anno</button>
+            <button type="button" class="reports-preset-btn" data-preset="prev_year" onclick="selectReportsPreset('prev_year')">Anno Precedente</button>
+            <button type="button" class="reports-preset-btn" data-preset="this_week" onclick="selectReportsPreset('this_week')">Questa Settimana</button>
+            <button type="button" class="reports-preset-btn" data-preset="this_month" onclick="selectReportsPreset('this_month')">Mese Corrente</button>
+            <button type="button" class="reports-preset-btn" data-preset="prev_month" onclick="selectReportsPreset('prev_month')">Mese Precedente</button>
+            <button type="button" class="reports-preset-btn" data-preset="last_30_days" onclick="selectReportsPreset('last_30_days')">Ultimi 30 giorni</button>
+            <button type="button" class="reports-preset-btn" data-preset="last_3_months" onclick="selectReportsPreset('last_3_months')">Ultimi 3 mesi</button>
+            <button type="button" class="reports-preset-btn" data-preset="last_6_months" onclick="selectReportsPreset('last_6_months')">Ultimi 6 mesi</button>
+            <button type="button" class="reports-preset-btn" data-preset="all_time" onclick="selectReportsPreset('all_time')">Tutto lo Storico</button>
+          </div>
+
+          <div class="reports-divider-label"><span>oppure intervallo personalizzato</span></div>
+
+          <!-- Date Inputs -->
+          <div class="reports-date-inputs-row">
+            <div class="reports-date-field">
+              <label for="rep-filter-start-date">Data Inizio</label>
+              <input type="date" id="rep-filter-start-date" class="form-input" onchange="onCustomDateInputChanged()">
+            </div>
+            <div class="reports-date-field">
+              <label for="rep-filter-end-date">Data Fine</label>
+              <input type="date" id="rep-filter-end-date" class="form-input" onchange="onCustomDateInputChanged()">
+            </div>
+          </div>
+        </div>
+        <div class="reports-modal-footer">
+          <button type="button" class="reports-modal-cancel-btn" onclick="closeReportsDateRangeModal()">Annulla</button>
+          <button type="button" class="reports-modal-apply-btn" onclick="applyReportsDateFilter()">
+            <span class="material-symbols-rounded">check</span>
+            <span>Applica Filtro</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1219,6 +1493,7 @@
   <script src="js/menu-printer.js"></script>
   <script src="js/menu-templates/template-a4-modern.js"></script>
   <script src="js/menu-templates/template-a4-vintage.js"></script>
+  <script src="js/reports-manager.js"></script>
   <script src="js/app.js"></script>
 </body>
 

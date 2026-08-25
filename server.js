@@ -1228,6 +1228,229 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+// GLOBAL REPORTS API - OVERVIEW
+app.get('/api/reports/overview', async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+    let orderWhereClause = "";
+    const orderParams = [];
+
+    if (start_date && end_date) {
+      orderWhereClause = "WHERE DATE(datetime(created_at, 'localtime')) BETWEEN ? AND ?";
+      orderParams.push(start_date, end_date);
+    } else if (start_date) {
+      orderWhereClause = "WHERE DATE(datetime(created_at, 'localtime')) >= ?";
+      orderParams.push(start_date);
+    } else if (end_date) {
+      orderWhereClause = "WHERE DATE(datetime(created_at, 'localtime')) <= ?";
+      orderParams.push(end_date);
+    }
+
+    // 1. Global totals across filtered orders
+    const totalsRow = await new Promise((resolve, reject) => {
+      db.get(`SELECT COUNT(id) as totalOrders, COALESCE(SUM(total), 0) as totalRevenue FROM orders ${orderWhereClause}`, orderParams, (err, row) => {
+        if (err) reject(err); else resolve(row || { totalOrders: 0, totalRevenue: 0 });
+      });
+    });
+
+    const totalOrders = totalsRow.totalOrders || 0;
+    const totalRevenue = totalsRow.totalRevenue || 0;
+    const averageOrderValue = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
+
+    // 2. Sagras breakdown
+    let sagraOrderJoin = "";
+    let sagraOrderParams = [];
+    if (start_date && end_date) {
+      sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?`;
+      sagraOrderParams = [start_date, end_date];
+    } else if (start_date) {
+      sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id AND DATE(datetime(o.created_at, 'localtime')) >= ?`;
+      sagraOrderParams = [start_date];
+    } else if (end_date) {
+      sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id AND DATE(datetime(o.created_at, 'localtime')) <= ?`;
+      sagraOrderParams = [end_date];
+    } else {
+      sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id`;
+    }
+
+    const sagrasList = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          s.id, 
+          s.name, 
+          s.status, 
+          s.created_at,
+          COUNT(o.id) as orders_count,
+          COALESCE(SUM(o.total), 0) as revenue
+        FROM sagras s
+        ${sagraOrderJoin}
+        GROUP BY s.id
+        ORDER BY revenue DESC, s.id DESC
+      `, sagraOrderParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    // 3. Top products sold across filtered orders
+    let topProdWhere = "WHERE (c.name IS NULL OR c.name != 'Prodotti Base')";
+    let topProdParams = [];
+    if (start_date && end_date) {
+      topProdWhere += " AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+      topProdParams.push(start_date, end_date);
+    } else if (start_date) {
+      topProdWhere += " AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+      topProdParams.push(start_date);
+    } else if (end_date) {
+      topProdWhere += " AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+      topProdParams.push(end_date);
+    }
+
+    const topProducts = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          oi.product_name,
+          COALESCE(c.name, 'Altro') as category_name,
+          SUM(oi.quantity) as total_qty,
+          SUM(oi.price * oi.quantity) as total_revenue
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN (
+          SELECT p.name, p.category_id, cat.sagra_id 
+          FROM products p 
+          JOIN categories cat ON p.category_id = cat.id
+          GROUP BY p.name, cat.sagra_id
+        ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        ${topProdWhere}
+        GROUP BY oi.product_name
+        ORDER BY total_qty DESC
+        LIMIT 15
+      `, topProdParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    // 4. Category revenue breakdown
+    let catWhere = "WHERE (c.name IS NULL OR c.name != 'Prodotti Base')";
+    let catParams = [];
+    if (start_date && end_date) {
+      catWhere += " AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+      catParams.push(start_date, end_date);
+    } else if (start_date) {
+      catWhere += " AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+      catParams.push(start_date);
+    } else if (end_date) {
+      catWhere += " AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+      catParams.push(end_date);
+    }
+
+    const categoryBreakdown = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          COALESCE(c.name, 'Generale') as category_name,
+          SUM(oi.quantity) as total_qty,
+          SUM(oi.price * oi.quantity) as total_revenue
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN (
+          SELECT p.name, p.category_id, cat.sagra_id 
+          FROM products p 
+          JOIN categories cat ON p.category_id = cat.id
+          GROUP BY p.name, cat.sagra_id
+        ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        ${catWhere}
+        GROUP BY COALESCE(c.name, 'Generale')
+        ORDER BY total_revenue DESC
+      `, catParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    // 5. Sales timelines: By Day, By Week, By Month
+    let timelineWhere = orderWhereClause ? `${orderWhereClause}` : "";
+    let timelineParams = [...orderParams];
+
+    const timelineDay = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          strftime('%Y-%m-%d', datetime(created_at, 'localtime')) as time_key,
+          strftime('%d/%m/%Y', datetime(created_at, 'localtime')) as label,
+          strftime('%d/%m', datetime(created_at, 'localtime')) as short_label,
+          COUNT(id) as orders_count,
+          SUM(total) as revenue
+        FROM orders
+        ${timelineWhere}
+        GROUP BY time_key
+        ORDER BY time_key ASC
+      `, timelineParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    const timelineWeek = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          strftime('%Y-W%W', datetime(created_at, 'localtime')) as time_key,
+          'Sett. ' || strftime('%W', datetime(created_at, 'localtime')) || ' (' || strftime('%Y', datetime(created_at, 'localtime')) || ')' as label,
+          'Sett. ' || strftime('%W', datetime(created_at, 'localtime')) as short_label,
+          COUNT(id) as orders_count,
+          SUM(total) as revenue
+        FROM orders
+        ${timelineWhere}
+        GROUP BY time_key
+        ORDER BY time_key ASC
+      `, timelineParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    const timelineMonth = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          strftime('%Y-%m', datetime(created_at, 'localtime')) as time_key,
+          strftime('%m/%Y', datetime(created_at, 'localtime')) as label,
+          strftime('%m/%Y', datetime(created_at, 'localtime')) as short_label,
+          COUNT(id) as orders_count,
+          SUM(total) as revenue
+        FROM orders
+        ${timelineWhere}
+        GROUP BY time_key
+        ORDER BY time_key ASC
+      `, timelineParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    res.json({
+      success: true,
+      filter: {
+        start_date: start_date || null,
+        end_date: end_date || null
+      },
+      totals: {
+        totalOrders,
+        totalRevenue,
+        averageOrderValue,
+        totalSagras: sagrasList.filter(s => (s.orders_count > 0 || s.revenue > 0)).length || sagrasList.length,
+        activeSagras: sagrasList.filter(s => s.status === 'active').length,
+        bestSeller: topProducts.length > 0 ? topProducts[0] : null
+      },
+      sagras: sagrasList,
+      topProducts,
+      categoryBreakdown,
+      timeline: {
+        day: timelineDay,
+        week: timelineWeek,
+        month: timelineMonth
+      }
+    });
+  } catch (err) {
+    console.error("Reports overview error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // LIST PRINTERS API
 app.get('/api/printers', (req, res) => {
   const cmd = `powershell "Get-Printer | Select-Object Name | ConvertTo-Json"`;

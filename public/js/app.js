@@ -17,7 +17,8 @@ const views = {
     auth: document.getElementById('view-auth'),
     login: document.getElementById('view-login'),
     editor: document.getElementById('view-editor'),
-    pos: document.getElementById('view-pos')
+    pos: document.getElementById('view-pos'),
+    reports: document.getElementById('view-reports')
 };
 
 const sagraListEl = document.getElementById('sagra-list');
