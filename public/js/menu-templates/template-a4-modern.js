@@ -15,7 +15,7 @@
         pageSize: 'A4 portrait',
         render: function (data) {
             const eventName = data.eventName || 'Menu Evento';
-            const topLabel = data.topLabel || 'MENU EVENTO';
+            const topLabel = (data.topLabel !== undefined) ? String(data.topLabel).trim() : 'MENU EVENTO';
             const logoUrl = data.logoUrl || 'images/logo.png';
             const showLogo = (data.showLogo !== false);
             const notes = (data.notes || '').trim();
@@ -265,7 +265,7 @@
                 <img src="${escapeMenuHtml(logoUrl)}" alt="Logo" class="menu-logo-img" onerror="this.parentElement.style.display='none'">
             </div>
             <div class="menu-title-box">
-                <span class="menu-top-title">${escapeMenuHtml(topLabel)}</span>
+                ${topLabel ? `<span class="menu-top-title">${escapeMenuHtml(topLabel)}</span>` : ''}
                 <h1 class="menu-event-name">${escapeMenuHtml(eventName)}</h1>
             </div>
         </div>

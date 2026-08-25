@@ -433,7 +433,7 @@ function getCustomizedMenuData() {
     const baseData = extractMenuData();
     return {
         ...baseData,
-        topLabel: customMenuState.topLabel || 'MENU EVENTO',
+        topLabel: (customMenuState.topLabel !== undefined) ? customMenuState.topLabel : 'MENU EVENTO',
         eventName: customMenuState.eventName || baseData.eventName,
         notes: customMenuState.notes || '',
         density: customMenuState.density || 'normal',

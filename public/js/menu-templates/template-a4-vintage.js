@@ -15,7 +15,7 @@
         pageSize: 'A4 portrait',
         render: function (data) {
             const eventName = data.eventName || 'Menu Evento';
-            const topLabel = data.topLabel || 'MENU EVENTO';
+            const topLabel = (data.topLabel !== undefined) ? String(data.topLabel).trim() : 'MENU EVENTO';
             const notes = (data.notes || '').trim();
             const density = data.density || 'normal';
 
@@ -290,7 +290,7 @@
         <img src="images/menu-templates/a4-vintage-bg.jpeg" alt="Cornice Vintage" class="vintage-bg-frame">
         <div class="vintage-content-wrapper">
             <div class="vintage-header">
-                <span class="vintage-top-label">${escapeMenuHtml(topLabel)}</span>
+                ${topLabel ? `<span class="vintage-top-label">${escapeMenuHtml(topLabel)}</span>` : ''}
                 <h1 class="vintage-event-name">${escapeMenuHtml(eventName)}</h1>
             </div>
 
