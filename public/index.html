@@ -623,20 +623,46 @@
                 <span>Confronto Orario Incassi tra Eventi</span>
               </div>
               <div class="reports-compare-selectors-wrap">
-                <div class="reports-select-group">
-                  <span class="reports-select-indicator indicator-event-1"></span>
-                  <label for="rep-compare-select-1">Evento 1:</label>
-                  <select id="rep-compare-select-1" class="reports-select" onchange="onCompareEventsSelectionChanged()">
-                    <!-- Options populated via JS -->
-                  </select>
+                <!-- Custom Dropdown Event 1 -->
+                <div class="reports-custom-select-container" id="rep-custom-select-wrap-1">
+                  <span class="reports-select-label">Evento 1:</span>
+                  <div class="reports-custom-select-box">
+                    <button type="button" class="reports-custom-select-btn" id="rep-custom-select-btn-1" onclick="toggleCompareDropdown(1, event)">
+                      <span class="reports-select-indicator indicator-event-1"></span>
+                      <span class="reports-custom-select-text" id="rep-custom-select-text-1">Seleziona evento...</span>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-dropdown-chevron-1">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rep-custom-dropdown-1" style="display: none;">
+                      <div class="reports-dropdown-search-box">
+                        <span class="material-symbols-rounded">search</span>
+                        <input type="text" id="rep-dropdown-search-1" placeholder="Cerca evento..." oninput="filterCompareDropdownItems(1, this.value)" onclick="event.stopPropagation()">
+                      </div>
+                      <div class="reports-dropdown-options-list" id="rep-dropdown-options-1">
+                        <!-- Populated via JS -->
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="reports-select-group">
-                  <span class="reports-select-indicator indicator-event-2"></span>
-                  <label for="rep-compare-select-2">Evento 2:</label>
-                  <select id="rep-compare-select-2" class="reports-select" onchange="onCompareEventsSelectionChanged()">
-                    <option value="none">Nessun confronto</option>
-                    <!-- Options populated via JS -->
-                  </select>
+
+                <!-- Custom Dropdown Event 2 -->
+                <div class="reports-custom-select-container" id="rep-custom-select-wrap-2">
+                  <span class="reports-select-label">Evento 2:</span>
+                  <div class="reports-custom-select-box">
+                    <button type="button" class="reports-custom-select-btn" id="rep-custom-select-btn-2" onclick="toggleCompareDropdown(2, event)">
+                      <span class="reports-select-indicator indicator-event-2"></span>
+                      <span class="reports-custom-select-text" id="rep-custom-select-text-2">Nessun confronto</span>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-dropdown-chevron-2">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rep-custom-dropdown-2" style="display: none;">
+                      <div class="reports-dropdown-search-box">
+                        <span class="material-symbols-rounded">search</span>
+                        <input type="text" id="rep-dropdown-search-2" placeholder="Cerca evento..." oninput="filterCompareDropdownItems(2, this.value)" onclick="event.stopPropagation()">
+                      </div>
+                      <div class="reports-dropdown-options-list" id="rep-dropdown-options-2">
+                        <!-- Populated via JS -->
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1069,7 +1069,7 @@
         updateSortHeaderIcons();
         renderNextEventsChunk(true);
 
-        // Populate comparison selectors
+        // Populate custom comparison dropdowns
         populateCompareEventSelectors(list);
     }
 
@@ -1180,58 +1180,188 @@
     }
 
     /**
-     * Populate Event 1 and Event 2 comparison selectors.
+     * Populate Custom Dropdown Selectors for Event 1 and Event 2.
      */
     function populateCompareEventSelectors(sagras) {
-        const select1 = document.getElementById('rep-compare-select-1');
-        const select2 = document.getElementById('rep-compare-select-2');
-        if (!select1 || !select2) return;
-
         const list = sagras || [];
 
         if (list.length === 0) {
-            select1.innerHTML = '<option value="">Nessun evento</option>';
-            select2.innerHTML = '<option value="none">Nessun confronto</option>';
+            const text1 = document.getElementById('rep-custom-select-text-1');
+            const text2 = document.getElementById('rep-custom-select-text-2');
+            if (text1) text1.innerText = 'Nessun evento';
+            if (text2) text2.innerText = 'Nessun confronto';
+            compareState.event1Id = null;
+            compareState.event2Id = 'none';
             renderCompareEmptyState("Nessun evento disponibile nel periodo selezionato.");
             return;
         }
 
-        const prev1 = select1.value;
-        const prev2 = select2.value;
-
-        // Build options
-        const optionsHtml1 = list.map(s => `
-            <option value="${s.id}">${escapeHtml(s.name)}</option>
-        `).join('');
-
-        const optionsHtml2 = `
-            <option value="none">Nessun confronto</option>
-            ${list.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
-        `;
-
-        select1.innerHTML = optionsHtml1;
-        select2.innerHTML = optionsHtml2;
-
-        // Restore or default selection
-        if (list.some(s => String(s.id) === String(prev1))) {
-            select1.value = prev1;
-        } else {
-            select1.value = list[0].id;
+        // Validate or set default Event 1
+        if (!compareState.event1Id || !list.some(s => String(s.id) === String(compareState.event1Id))) {
+            compareState.event1Id = list[0].id;
         }
 
-        if (prev2 === 'none' || list.some(s => String(s.id) === String(prev2))) {
-            select2.value = prev2 || 'none';
-        } else {
-            select2.value = 'none';
+        // Validate Event 2
+        if (compareState.event2Id !== 'none' && !list.some(s => String(s.id) === String(compareState.event2Id))) {
+            compareState.event2Id = 'none';
         }
 
+        renderCompareDropdownOptions(1, list, '');
+        renderCompareDropdownOptions(2, list, '');
+        updateCompareButtonLabels();
         loadAndRenderEventComparison();
     }
 
     /**
-     * Triggered when selection changes in either Event 1 or Event 2 dropdown.
+     * Render the items inside a custom comparison dropdown list.
      */
-    function onCompareEventsSelectionChanged() {
+    function renderCompareDropdownOptions(index, list, query) {
+        const container = document.getElementById(`rep-dropdown-options-${index}`);
+        if (!container) return;
+
+        const cleanQuery = (query || '').trim().toLowerCase();
+        let filtered = list;
+        if (cleanQuery) {
+            filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(cleanQuery)));
+        }
+
+        let html = '';
+
+        // For Event 2, include "Nessun confronto" option
+        if (index === 2) {
+            const isNoneActive = compareState.event2Id === 'none';
+            if (!cleanQuery || 'nessun confronto'.includes(cleanQuery)) {
+                html += `
+                    <button type="button" class="reports-dropdown-option ${isNoneActive ? 'active' : ''}" onclick="selectCompareDropdownOption(2, 'none')">
+                        <div class="reports-dropdown-option-left">
+                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--text-light);">block</span>
+                            <span class="option-name">Nessun confronto</span>
+                        </div>
+                    </button>
+                `;
+            }
+        }
+
+        if (filtered.length === 0 && (!html || index === 1)) {
+            container.innerHTML = '<div class="reports-dropdown-empty">Nessun evento trovato</div>';
+            return;
+        }
+
+        const selectedId = index === 1 ? compareState.event1Id : compareState.event2Id;
+
+        html += filtered.map(s => {
+            const isActive = String(s.id) === String(selectedId);
+            const rev = Number(s.revenue) || 0;
+            return `
+                <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectCompareDropdownOption(${index}, ${s.id})">
+                    <div class="reports-dropdown-option-left">
+                        <span class="material-symbols-rounded" style="font-size:18px; color:${index === 1 ? '#2563eb' : '#8b5cf6'};">festival</span>
+                        <span class="option-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+                    </div>
+                    <span class="reports-dropdown-option-right">${formatCurrency(rev)}</span>
+                </button>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    /**
+     * Update trigger button labels based on compareState.
+     */
+    function updateCompareButtonLabels() {
+        const text1 = document.getElementById('rep-custom-select-text-1');
+        const text2 = document.getElementById('rep-custom-select-text-2');
+        const list = eventsTableState.rawList || [];
+
+        if (text1) {
+            const s1 = list.find(s => String(s.id) === String(compareState.event1Id));
+            text1.innerText = s1 ? s1.name : 'Seleziona evento...';
+        }
+
+        if (text2) {
+            if (compareState.event2Id === 'none') {
+                text2.innerText = 'Nessun confronto';
+            } else {
+                const s2 = list.find(s => String(s.id) === String(compareState.event2Id));
+                text2.innerText = s2 ? s2.name : 'Nessun confronto';
+            }
+        }
+    }
+
+    /**
+     * Toggle custom dropdown open/close state.
+     */
+    function toggleCompareDropdown(index, e) {
+        if (e) e.stopPropagation();
+
+        const panel = document.getElementById(`rep-custom-dropdown-${index}`);
+        const btn = document.getElementById(`rep-custom-select-btn-${index}`);
+        const otherIndex = index === 1 ? 2 : 1;
+        const otherPanel = document.getElementById(`rep-custom-dropdown-${otherIndex}`);
+        const otherBtn = document.getElementById(`rep-custom-select-btn-${otherIndex}`);
+
+        if (otherPanel) otherPanel.style.display = 'none';
+        if (otherBtn) otherBtn.classList.remove('open');
+
+        if (!panel || !btn) return;
+
+        const isOpen = panel.style.display === 'flex';
+        if (isOpen) {
+            panel.style.display = 'none';
+            btn.classList.remove('open');
+        } else {
+            panel.style.display = 'flex';
+            btn.classList.add('open');
+
+            // Reset search input and re-render full list
+            const searchInput = document.getElementById(`rep-dropdown-search-${index}`);
+            if (searchInput) {
+                searchInput.value = '';
+                setTimeout(() => searchInput.focus(), 50);
+            }
+            renderCompareDropdownOptions(index, eventsTableState.rawList || [], '');
+        }
+    }
+
+    /**
+     * Close all custom comparison dropdowns.
+     */
+    function closeAllCompareDropdowns() {
+        [1, 2].forEach(idx => {
+            const panel = document.getElementById(`rep-custom-dropdown-${idx}`);
+            const btn = document.getElementById(`rep-custom-select-btn-${idx}`);
+            if (panel) panel.style.display = 'none';
+            if (btn) btn.classList.remove('open');
+        });
+    }
+
+    // Close custom dropdowns on clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.reports-custom-select-box')) {
+            closeAllCompareDropdowns();
+        }
+    });
+
+    /**
+     * Filter items inside a custom dropdown by search query.
+     */
+    function filterCompareDropdownItems(index, query) {
+        renderCompareDropdownOptions(index, eventsTableState.rawList || [], query);
+    }
+
+    /**
+     * Select an option in a custom comparison dropdown.
+     */
+    function selectCompareDropdownOption(index, id) {
+        if (index === 1) {
+            compareState.event1Id = id;
+        } else {
+            compareState.event2Id = id;
+        }
+
+        closeAllCompareDropdowns();
+        updateCompareButtonLabels();
         loadAndRenderEventComparison();
     }
 
@@ -1239,14 +1369,12 @@
      * Load stats for selected events and render dual wave chart.
      */
     async function loadAndRenderEventComparison() {
-        const select1 = document.getElementById('rep-compare-select-1');
-        const select2 = document.getElementById('rep-compare-select-2');
         const container = document.getElementById('reports-compare-chart-container');
         const summaryBar = document.getElementById('reports-compare-summary-bar');
-        if (!select1 || !container) return;
+        if (!container) return;
 
-        const id1 = select1.value;
-        const id2 = select2 ? select2.value : 'none';
+        const id1 = compareState.event1Id;
+        const id2 = compareState.event2Id;
 
         if (!id1) {
             renderCompareEmptyState("Seleziona almeno un evento per visualizzare il grafico.");
@@ -1573,5 +1701,7 @@
     window.openEventStatsModal = openEventStatsModal;
     window.sortReportsEventsBy = sortReportsEventsBy;
     window.handleEventsTableScroll = handleEventsTableScroll;
-    window.onCompareEventsSelectionChanged = onCompareEventsSelectionChanged;
+    window.toggleCompareDropdown = toggleCompareDropdown;
+    window.filterCompareDropdownItems = filterCompareDropdownItems;
+    window.selectCompareDropdownOption = selectCompareDropdownOption;
 })();
