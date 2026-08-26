@@ -2175,17 +2175,19 @@
                 } catch (e) {}
             }
 
+            const ochreDot = `<span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #d97706; margin-left: 6px; vertical-align: middle;" title="Prodotto Esaurito"></span>`;
+
             return `
                 <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}', ${p.sagra_id}, '${escapeHtml(p.sagra_name)}')" title="Clicca per visualizzare le statistiche del piatto per ${escapeHtml(sagraName)}">
                     <div class="reports-topflop-rank rank-other">${rank}</div>
                     <div class="reports-topflop-info">
                         <div class="reports-topflop-name-row">
-                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
-                            <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 700;">${soldQty.toLocaleString('it-IT')} pz venduti</span>
+                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}${ochreDot}</span>
+                            <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 700;">0 pz rimasti</span>
                         </div>
                         <div class="reports-topflop-sub-row">
                             <span>${escapeHtml(cat)} • ${escapeHtml(sagraName)}</span>
-                            <span style="font-weight: 600; color: var(--text-light); font-size: 0.76rem;">${exhaustedTimeStr}</span>
+                            <span style="font-weight: 600; color: var(--text-light); font-size: 0.76rem;">${soldQty.toLocaleString('it-IT')} venduti (${exhaustedTimeStr})</span>
                         </div>
                     </div>
                 </div>
@@ -3459,7 +3461,10 @@
             const isExhausted = remaining <= 0;
 
             let statusSub = '';
+            let ochreDot = '';
+
             if (isExhausted) {
+                ochreDot = `<span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #d97706; margin-left: 6px; vertical-align: middle;" title="Prodotto Esaurito"></span>`;
                 let timeStr = 'Esaurito';
                 if (p.exhausted_at) {
                     try {
@@ -3467,7 +3472,7 @@
                         timeStr = `Esaurito ore ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                     } catch(e){}
                 }
-                statusSub = `<span style="font-weight: 600; color: var(--text-light);">${timeStr}</span>`;
+                statusSub = `<span style="font-weight: 600; color: var(--text-light);">${soldQty} venduti (${timeStr})</span>`;
             } else {
                 const unsoldPct = Number(p.unsold_pct) || 0;
                 statusSub = `<span style="font-weight: 600; color: var(--text-light);">${soldQty} venduti (${unsoldPct}% invenduto)</span>`;
@@ -3478,9 +3483,9 @@
                     <div class="reports-topflop-rank rank-other">${rank}</div>
                     <div class="reports-topflop-info">
                         <div class="reports-topflop-name-row">
-                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
+                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}${ochreDot}</span>
                             <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 700;">
-                                ${isExhausted ? `${soldQty} pz venduti` : `${remaining} pz rimasti`}
+                                ${remaining} pz rimasti
                             </span>
                         </div>
                         <div class="reports-topflop-sub-row">
