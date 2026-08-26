@@ -1231,7 +1231,7 @@ app.get('/api/stats', async (req, res) => {
       });
     });
 
-    const hourlySales = await new Promise((resolve, reject) => {
+    const rawHourly = await new Promise((resolve, reject) => {
       db.all(`
             SELECT 
               strftime('%H:00', datetime(created_at, 'localtime')) as hour_slot, 
@@ -1245,6 +1245,37 @@ app.get('/api/stats', async (req, res) => {
         if (err) reject(err); else resolve(rows || []);
       });
     });
+
+    let hourlySales = [];
+    if (rawHourly && rawHourly.length > 0) {
+      const slotMap = new Map();
+      let minH = 24;
+      let maxH = 0;
+
+      rawHourly.forEach(r => {
+        const h = parseInt(String(r.hour_slot).split(':')[0], 10);
+        if (!isNaN(h)) {
+          if (h < minH) minH = h;
+          if (h > maxH) maxH = h;
+          slotMap.set(r.hour_slot, {
+            hour_slot: r.hour_slot,
+            orders_count: Number(r.orders_count) || 0,
+            revenue: Number(r.revenue) || 0
+          });
+        }
+      });
+
+      if (minH <= maxH) {
+        for (let h = minH; h <= maxH; h++) {
+          const key = `${String(h).padStart(2, '0')}:00`;
+          hourlySales.push(slotMap.get(key) || {
+            hour_slot: key,
+            orders_count: 0,
+            revenue: 0
+          });
+        }
+      }
+    }
 
     const categories = await new Promise((resolve, reject) => {
       db.all(`

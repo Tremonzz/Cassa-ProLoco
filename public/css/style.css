@@ -5974,21 +5974,34 @@ img {
   display: none !important;
 }
 
-/* KPI Cards Grid (5-column balanced row) */
+/* KPI Cards Grid */
 .reports-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+  width: 100%;
+}
+
+.reports-kpi-grid.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.reports-kpi-grid.grid-5 {
+  grid-template-columns: repeat(5, 1fr);
 }
 
 @media (max-width: 1200px) {
-  .reports-kpi-grid {
-    grid-template-columns: repeat(3, 1fr);
+  .reports-kpi-grid,
+  .reports-kpi-grid.grid-4,
+  .reports-kpi-grid.grid-5 {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
 }
 
 @media (max-width: 800px) {
-  .reports-kpi-grid {
+  .reports-kpi-grid,
+  .reports-kpi-grid.grid-4,
+  .reports-kpi-grid.grid-5 {
     grid-template-columns: repeat(2, 1fr);
   }
 }

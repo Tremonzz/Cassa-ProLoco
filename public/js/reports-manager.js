@@ -3153,16 +3153,6 @@
             if (avgEl) avgEl.innerText = formatCurrency(avgTicket);
             if (qtyEl) qtyEl.innerText = `${totalQty.toLocaleString('it-IT')} pz`;
 
-            // Payment method split if available
-            const pmSplitEl = document.getElementById('rep-inspect-kpi-payments-split');
-            if (pmSplitEl && statsData.paymentMethods) {
-                const cash = Number(statsData.paymentMethods.cash_revenue) || 0;
-                const pos = Number(statsData.paymentMethods.pos_revenue) || 0;
-                pmSplitEl.innerText = `Contanti: ${formatCurrency(cash)} • POS: ${formatCurrency(pos)}`;
-            } else if (pmSplitEl) {
-                pmSplitEl.innerText = `${ordersCount} transazioni completate`;
-            }
-
             // Render hourly chart
             renderInspectHourlyChart(statsData.hourlySales || []);
 
@@ -3196,10 +3186,38 @@
             return;
         }
 
+        // Fill gap hours between earliest and latest hour
+        const slotMap = new Map();
+        let minHour = 24;
+        let maxHour = 0;
+
+        hourlySales.forEach(s => {
+            const h = parseInt(String(s.hour_slot).split(':')[0], 10);
+            if (!isNaN(h)) {
+                if (h < minHour) minHour = h;
+                if (h > maxHour) maxHour = h;
+                slotMap.set(s.hour_slot, s);
+            }
+        });
+
+        const fullHourly = [];
+        if (minHour <= maxHour) {
+            for (let h = minHour; h <= maxHour; h++) {
+                const key = `${String(h).padStart(2, '0')}:00`;
+                fullHourly.push(slotMap.get(key) || {
+                    hour_slot: key,
+                    orders_count: 0,
+                    revenue: 0
+                });
+            }
+        } else {
+            fullHourly.push(...hourlySales);
+        }
+
         let maxRev = 0;
         let maxOrders = 0;
         let peakSlot = '';
-        hourlySales.forEach(s => {
+        fullHourly.forEach(s => {
             const rev = Number(s.revenue) || 0;
             const ords = Number(s.orders_count) || 0;
             if (rev > maxRev) {
@@ -3213,7 +3231,7 @@
             peakBadge.innerText = peakSlot ? `Picco: Ore ${peakSlot} (${formatCurrency(maxRev)})` : 'Picco: --:--';
         }
 
-        const count = hourlySales.length;
+        const count = fullHourly.length;
         const svgWidth = 800;
         const svgHeight = 140;
         const paddingLeft = 40;
@@ -3223,13 +3241,15 @@
         const chartAreaWidth = svgWidth - paddingLeft - paddingRight;
         const chartAreaHeight = svgHeight - paddingTop - paddingBottom;
 
-        const points = hourlySales.map((slot, index) => {
+        const baselineY = svgHeight - paddingBottom;
+
+        const points = fullHourly.map((slot, index) => {
             const rev = Number(slot.revenue) || 0;
             const x = count === 1
                 ? paddingLeft + chartAreaWidth / 2
                 : paddingLeft + (index / (count - 1)) * chartAreaWidth;
             const normalizedY = maxRev > 0 ? rev / maxRev : 0;
-            const y = svgHeight - paddingBottom - (normalizedY * chartAreaHeight);
+            const y = baselineY - (normalizedY * chartAreaHeight);
             return { x, y, slot };
         });
 
@@ -3244,21 +3264,37 @@
                 const p2 = points[i + 1];
                 const p3 = i < points.length - 2 ? points[i + 2] : p2;
 
-                const cp1x = p1.x + (p2.x - p0.x) * 0.18;
-                const cp1y = p1.y + (p2.y - p0.y) * 0.18;
-                const cp2x = p2.x - (p3.x - p1.x) * 0.18;
-                const cp2y = p2.y - (p3.y - p1.y) * 0.18;
+                const r1 = Number(p1.slot.revenue) || 0;
+                const r2 = Number(p2.slot.revenue) || 0;
 
-                linePath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+                if (r1 === 0 && r2 === 0) {
+                    linePath += ` L ${p2.x.toFixed(1)} ${baselineY.toFixed(1)}`;
+                } else {
+                    let cp1x = p1.x + (p2.x - p0.x) * 0.18;
+                    let cp1y = p1.y + (p2.y - p0.y) * 0.18;
+                    let cp2x = p2.x - (p3.x - p1.x) * 0.18;
+                    let cp2y = p2.y - (p3.y - p1.y) * 0.18;
+
+                    if (r1 === 0) cp1y = baselineY;
+                    if (r2 === 0) cp2y = baselineY;
+
+                    cp1y = Math.max(paddingTop, Math.min(baselineY, cp1y));
+                    cp2y = Math.max(paddingTop, Math.min(baselineY, cp2y));
+
+                    linePath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+                }
             }
         }
 
         const firstX = points[0].x;
         const lastX = points[points.length - 1].x;
-        const bottomY = svgHeight - paddingBottom + 8;
-        const areaPath = `${linePath} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+        const areaPath = `${linePath} L ${lastX.toFixed(1)} ${baselineY} L ${firstX.toFixed(1)} ${baselineY} Z`;
 
         const dotsHtml = points.map(pt => {
+            const rev = Number(pt.slot.revenue) || 0;
+            const orders = Number(pt.slot.orders_count) || 0;
+            if (orders === 0 && rev === 0) return '';
+
             const isPeak = (pt.slot.hour_slot === peakSlot && maxRev > 0);
             const leftPct = (pt.x / svgWidth * 100).toFixed(2);
             const topPct = (pt.y / svgHeight * 100).toFixed(2);
