@@ -614,6 +614,41 @@
               </div>
             </div>
           </div>
+
+          <!-- Event Hourly Comparison Card -->
+          <div class="reports-card-box reports-compare-card">
+            <div class="reports-card-header">
+              <div class="reports-card-title">
+                <span class="material-symbols-rounded">compare_arrows</span>
+                <span>Confronto Orario Incassi tra Eventi</span>
+              </div>
+              <div class="reports-compare-selectors-wrap">
+                <div class="reports-select-group">
+                  <span class="reports-select-indicator indicator-event-1"></span>
+                  <label for="rep-compare-select-1">Evento 1:</label>
+                  <select id="rep-compare-select-1" class="reports-select" onchange="onCompareEventsSelectionChanged()">
+                    <!-- Options populated via JS -->
+                  </select>
+                </div>
+                <div class="reports-select-group">
+                  <span class="reports-select-indicator indicator-event-2"></span>
+                  <label for="rep-compare-select-2">Evento 2:</label>
+                  <select id="rep-compare-select-2" class="reports-select" onchange="onCompareEventsSelectionChanged()">
+                    <option value="none">Nessun confronto</option>
+                    <!-- Options populated via JS -->
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="reports-card-body" style="position: relative; padding: 18px 24px 28px 24px;">
+              <!-- Summary badges bar for Event 1 & Event 2 -->
+              <div id="reports-compare-summary-bar" class="reports-compare-summary-bar"></div>
+              <div id="reports-compare-chart-container" class="reports-sales-chart-container">
+                <!-- SVG Dual Wave Chart injected via JS -->
+              </div>
+              <div id="reports-compare-tooltip" class="reports-chart-tooltip"></div>
+            </div>
+          </div>
         </div>
 
         <div id="reports-tab-products" class="reports-tab-section" style="display: none;">

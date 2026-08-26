@@ -31,6 +31,14 @@
         isLoadingMore: false
     };
 
+    let compareState = {
+        event1Id: null,
+        event2Id: 'none',
+        event1Data: null,
+        event2Data: null,
+        isLoading: false
+    };
+
     /**
      * Compute start date, end date and label for quick presets.
      */
@@ -671,6 +679,7 @@
         const tangents = [slopes[0]];
         for (let i = 1; i < n - 1; i++) {
             if (slopes[i - 1] * slopes[i] <= 0) {
+                // If slope changes sign or either is flat, clamp tangent to 0 (flat horizontal)
                 tangents.push(0);
             } else {
                 tangents.push((slopes[i - 1] + slopes[i]) / 2);
@@ -864,7 +873,7 @@
         renderSagrasRevenueChart(sagras, totals.totalRevenue);
         renderCategoryBreakdown(categoryBreakdown, totals.totalRevenue);
 
-        // 4. Events Tab Section Table
+        // 4. Events Tab Section Table & Comparison
         renderEventsTabSection(sagras);
     }
 
@@ -1059,6 +1068,9 @@
 
         updateSortHeaderIcons();
         renderNextEventsChunk(true);
+
+        // Populate comparison selectors
+        populateCompareEventSelectors(list);
     }
 
     /**
@@ -1168,6 +1180,361 @@
     }
 
     /**
+     * Populate Event 1 and Event 2 comparison selectors.
+     */
+    function populateCompareEventSelectors(sagras) {
+        const select1 = document.getElementById('rep-compare-select-1');
+        const select2 = document.getElementById('rep-compare-select-2');
+        if (!select1 || !select2) return;
+
+        const list = sagras || [];
+
+        if (list.length === 0) {
+            select1.innerHTML = '<option value="">Nessun evento</option>';
+            select2.innerHTML = '<option value="none">Nessun confronto</option>';
+            renderCompareEmptyState("Nessun evento disponibile nel periodo selezionato.");
+            return;
+        }
+
+        const prev1 = select1.value;
+        const prev2 = select2.value;
+
+        // Build options
+        const optionsHtml1 = list.map(s => `
+            <option value="${s.id}">${escapeHtml(s.name)}</option>
+        `).join('');
+
+        const optionsHtml2 = `
+            <option value="none">Nessun confronto</option>
+            ${list.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
+        `;
+
+        select1.innerHTML = optionsHtml1;
+        select2.innerHTML = optionsHtml2;
+
+        // Restore or default selection
+        if (list.some(s => String(s.id) === String(prev1))) {
+            select1.value = prev1;
+        } else {
+            select1.value = list[0].id;
+        }
+
+        if (prev2 === 'none' || list.some(s => String(s.id) === String(prev2))) {
+            select2.value = prev2 || 'none';
+        } else {
+            select2.value = 'none';
+        }
+
+        loadAndRenderEventComparison();
+    }
+
+    /**
+     * Triggered when selection changes in either Event 1 or Event 2 dropdown.
+     */
+    function onCompareEventsSelectionChanged() {
+        loadAndRenderEventComparison();
+    }
+
+    /**
+     * Load stats for selected events and render dual wave chart.
+     */
+    async function loadAndRenderEventComparison() {
+        const select1 = document.getElementById('rep-compare-select-1');
+        const select2 = document.getElementById('rep-compare-select-2');
+        const container = document.getElementById('reports-compare-chart-container');
+        const summaryBar = document.getElementById('reports-compare-summary-bar');
+        if (!select1 || !container) return;
+
+        const id1 = select1.value;
+        const id2 = select2 ? select2.value : 'none';
+
+        if (!id1) {
+            renderCompareEmptyState("Seleziona almeno un evento per visualizzare il grafico.");
+            return;
+        }
+
+        compareState.isLoading = true;
+        container.innerHTML = '<div class="reports-loading-spinner" style="margin: 40px auto;"></div>';
+
+        try {
+            const dateParams = new URLSearchParams();
+            if (reportsState.dateFilter.startDate) dateParams.append('start_date', reportsState.dateFilter.startDate);
+            if (reportsState.dateFilter.endDate) dateParams.append('end_date', reportsState.dateFilter.endDate);
+            const dateQuery = dateParams.toString() ? `&${dateParams.toString()}` : '';
+
+            // Fetch Event 1 stats
+            const res1 = await fetch(`/api/stats?sagraId=${id1}${dateQuery}`);
+            const data1 = await res1.json();
+
+            let data2 = null;
+            if (id2 && id2 !== 'none' && String(id2) !== String(id1)) {
+                const res2 = await fetch(`/api/stats?sagraId=${id2}${dateQuery}`);
+                data2 = await res2.json();
+            }
+
+            const sagra1 = (eventsTableState.rawList || []).find(s => String(s.id) === String(id1)) || { name: `Evento #${id1}` };
+            const sagra2 = data2 ? ((eventsTableState.rawList || []).find(s => String(s.id) === String(id2)) || { name: `Evento #${id2}` }) : null;
+
+            // Render summary badges bar
+            if (summaryBar) {
+                let summaryHtml = `
+                    <div class="reports-compare-pill pill-event-1">
+                        <span class="pill-dot" style="background:#2563eb;"></span>
+                        <span>${escapeHtml(sagra1.name)}:</span>
+                        <span class="pill-stat">${formatCurrency(data1.totalRevenue || 0)}</span>
+                        <span style="opacity:0.8;font-size:0.75rem;">(${data1.ordersCount || 0} ordini)</span>
+                    </div>
+                `;
+                if (sagra2 && data2) {
+                    summaryHtml += `
+                        <div class="reports-compare-pill pill-event-2">
+                            <span class="pill-dot" style="background:#8b5cf6;"></span>
+                            <span>${escapeHtml(sagra2.name)}:</span>
+                            <span class="pill-stat">${formatCurrency(data2.totalRevenue || 0)}</span>
+                            <span style="opacity:0.8;font-size:0.75rem;">(${data2.ordersCount || 0} ordini)</span>
+                        </div>
+                    `;
+                }
+                summaryBar.innerHTML = summaryHtml;
+            }
+
+            renderCompareDualWaveChart(data1, sagra1.name, data2, sagra2 ? sagra2.name : null);
+        } catch (err) {
+            console.error("Comparison chart load error:", err);
+            renderCompareEmptyState("Errore nel caricamento del confronto.");
+        } finally {
+            compareState.isLoading = false;
+        }
+    }
+
+    /**
+     * Render empty state for compare container.
+     */
+    function renderCompareEmptyState(message) {
+        const container = document.getElementById('reports-compare-chart-container');
+        const summaryBar = document.getElementById('reports-compare-summary-bar');
+        if (summaryBar) summaryBar.innerHTML = '';
+        if (container) {
+            container.innerHTML = `<div class="reports-empty-state">${escapeHtml(message)}</div>`;
+        }
+    }
+
+    /**
+     * Show custom tooltip for comparison chart.
+     */
+    function showCompareChartTooltip(e, hourLabel, name1, rev1, name2, rev2) {
+        const tooltip = document.getElementById('reports-compare-tooltip');
+        if (!tooltip) return;
+
+        let contentHtml = `<div class="reports-tooltip-time">Ore ${escapeHtml(hourLabel)}</div>`;
+        contentHtml += `
+            <div class="reports-tooltip-val" style="color:#2563eb; font-size: 0.86rem; margin-bottom: 2px;">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2563eb;margin-right:6px;"></span>
+                <span>${escapeHtml(name1)}: ${formatCurrency(rev1)}</span>
+            </div>
+        `;
+        if (name2) {
+            contentHtml += `
+                <div class="reports-tooltip-val" style="color:#8b5cf6; font-size: 0.86rem;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b5cf6;margin-right:6px;"></span>
+                    <span>${escapeHtml(name2)}: ${formatCurrency(rev2)}</span>
+                </div>
+            `;
+        }
+
+        tooltip.innerHTML = contentHtml;
+
+        const dot = e.target;
+        const container = tooltip.closest('.reports-compare-card');
+        if (dot && container) {
+            const dotRect = dot.getBoundingClientRect();
+            const cardRect = container.getBoundingClientRect();
+
+            const left = dotRect.left - cardRect.left + (dotRect.width / 2);
+            const top = dotRect.top - cardRect.top;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }
+
+        tooltip.classList.add('visible');
+    }
+
+    /**
+     * Hide custom tooltip for comparison chart.
+     */
+    function hideCompareChartTooltip() {
+        const tooltip = document.getElementById('reports-compare-tooltip');
+        if (tooltip) tooltip.classList.remove('visible');
+    }
+
+    /**
+     * Render the Dual Wave Chart for hourly comparison.
+     */
+    function renderCompareDualWaveChart(data1, name1, data2, name2) {
+        const container = document.getElementById('reports-compare-chart-container');
+        if (!container) return;
+
+        hideCompareChartTooltip();
+
+        const hourly1 = (data1 && data1.hourlySales) ? data1.hourlySales : [];
+        const hourly2 = (data2 && data2.hourlySales) ? data2.hourlySales : [];
+
+        // Build hour map from 00 to 23
+        const map1 = new Map();
+        hourly1.forEach(h => {
+            const slotHour = parseInt(h.hour_slot.split(':')[0], 10);
+            map1.set(slotHour, (map1.get(slotHour) || 0) + (Number(h.revenue) || 0));
+        });
+
+        const map2 = new Map();
+        hourly2.forEach(h => {
+            const slotHour = parseInt(h.hour_slot.split(':')[0], 10);
+            map2.set(slotHour, (map2.get(slotHour) || 0) + (Number(h.revenue) || 0));
+        });
+
+        // Determine active range of hours (e.g. from 09:00 to 23:00 or active min to max)
+        const activeHours = [];
+        for (let h = 0; h <= 23; h++) {
+            if ((map1.get(h) || 0) > 0 || (map2.get(h) || 0) > 0) {
+                activeHours.push(h);
+            }
+        }
+
+        let startHour = 9;
+        let endHour = 23;
+        if (activeHours.length > 0) {
+            startHour = Math.max(0, Math.min(...activeHours) - 1);
+            endHour = Math.min(23, Math.max(...activeHours) + 1);
+            if (endHour - startHour < 8) {
+                endHour = Math.min(23, startHour + 8);
+                if (endHour === 23) startHour = Math.max(0, endHour - 8);
+            }
+        }
+
+        // Build continuous hourly slots
+        const slots = [];
+        let maxRevenue = 0;
+
+        for (let h = startHour; h <= endHour; h++) {
+            const hourLabel = `${String(h).padStart(2, '0')}:00`;
+            const rev1 = map1.get(h) || 0;
+            const rev2 = map2.get(h) || 0;
+            if (rev1 > maxRevenue) maxRevenue = rev1;
+            if (rev2 > maxRevenue) maxRevenue = rev2;
+            slots.push({ hour: h, label: hourLabel, rev1, rev2 });
+        }
+
+        if (slots.length === 0) {
+            container.innerHTML = '<div class="reports-empty-state">Nessuna fascia oraria disponibile.</div>';
+            return;
+        }
+
+        const svgWidth = 900;
+        const svgHeight = 170;
+        const paddingX = 45;
+        const paddingTop = 25;
+        const paddingBottom = 30;
+
+        const count = slots.length;
+        const usableWidth = svgWidth - (paddingX * 2);
+        const usableHeight = svgHeight - paddingTop - paddingBottom;
+        const baselineY = svgHeight - paddingBottom;
+
+        // Points for Wave 1
+        const points1 = slots.map((slot, i) => {
+            const x = count === 1 ? svgWidth / 2 : paddingX + (i * (usableWidth / (count - 1)));
+            const ratio = maxRevenue > 0 ? (slot.rev1 / maxRevenue) : 0;
+            const y = baselineY - (ratio * usableHeight);
+            return { x, y, slot };
+        });
+
+        // Points for Wave 2
+        const points2 = slots.map((slot, i) => {
+            const x = count === 1 ? svgWidth / 2 : paddingX + (i * (usableWidth / (count - 1)));
+            const ratio = maxRevenue > 0 ? (slot.rev2 / maxRevenue) : 0;
+            const y = baselineY - (ratio * usableHeight);
+            return { x, y, slot };
+        });
+
+        // Spline paths
+        const linePath1 = buildMonotoneSplinePath(points1, baselineY);
+        const firstX = points1[0].x;
+        const lastX = points1[points1.length - 1].x;
+        const bottomY = baselineY + 8;
+        const areaPath1 = `${linePath1} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+
+        let wave2Markup = '';
+        if (data2 && name2) {
+            const linePath2 = buildMonotoneSplinePath(points2, baselineY);
+            const areaPath2 = `${linePath2} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+
+            const dots2 = points2.map(pt => {
+                if (pt.slot.rev2 <= 0) return '';
+                return `
+                    <circle class="reports-wave-dot compare-dot-2" 
+                            cx="${pt.x.toFixed(1)}" 
+                            cy="${pt.y.toFixed(1)}"
+                            style="fill:#8b5cf6; stroke:#ffffff; stroke-width:2;"
+                            onmouseenter="showCompareChartTooltip(event, '${escapeHtml(pt.slot.label)}', '${escapeHtml(name1)}', ${pt.slot.rev1}, '${escapeHtml(name2)}', ${pt.slot.rev2})"
+                            onmouseleave="hideCompareChartTooltip()">
+                    </circle>
+                `;
+            }).join('');
+
+            wave2Markup = `
+                <path class="reports-wave-area-path" d="${areaPath2}" style="fill:url(#compareGradient2);" />
+                <path class="reports-wave-line-path" d="${linePath2}" style="stroke:#8b5cf6;" />
+                ${dots2}
+            `;
+        }
+
+        const dots1 = points1.map((pt, i) => {
+            if (pt.slot.rev1 <= 0 && (!data2 || points2[i].slot.rev2 <= 0)) return '';
+            return `
+                <circle class="reports-wave-dot compare-dot-1" 
+                        cx="${pt.x.toFixed(1)}" 
+                        cy="${pt.y.toFixed(1)}"
+                        style="fill:#2563eb; stroke:#ffffff; stroke-width:2;"
+                        onmouseenter="showCompareChartTooltip(event, '${escapeHtml(pt.slot.label)}', '${escapeHtml(name1)}', ${pt.slot.rev1}, ${name2 ? `'${escapeHtml(name2)}'` : 'null'}, ${points2[i].slot.rev2})"
+                        onmouseleave="hideCompareChartTooltip()">
+                </circle>
+            `;
+        }).join('');
+
+        const labelsHtml = slots.map((slot, idx) => {
+            const x = count === 1 ? svgWidth / 2 : paddingX + (idx * (usableWidth / (count - 1)));
+            return `
+                <span class="reports-wave-label" style="position: absolute; left: ${(x / svgWidth * 100).toFixed(2)}%; transform: translateX(-50%);">
+                    ${escapeHtml(slot.label)}
+                </span>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <svg class="reports-wave-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="compareGradient1" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#2563eb" stop-opacity="0.28" />
+                        <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
+                    </linearGradient>
+                    <linearGradient id="compareGradient2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.25" />
+                        <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.0" />
+                    </linearGradient>
+                </defs>
+                ${wave2Markup}
+                <path class="reports-wave-area-path" d="${areaPath1}" style="fill:url(#compareGradient1);" />
+                <path class="reports-wave-line-path" d="${linePath1}" style="stroke:#2563eb;" />
+                ${dots1}
+            </svg>
+            <div class="reports-wave-labels-wrap">
+                ${labelsHtml}
+            </div>
+        `;
+    }
+
+    /**
      * Open the existing POS statistics modal for the selected event.
      */
     function openEventStatsModal(sagraId) {
@@ -1195,6 +1562,8 @@
     window.changeReportsTimelinePeriod = changeReportsTimelinePeriod;
     window.showReportsChartTooltip = showReportsChartTooltip;
     window.hideReportsChartTooltip = hideReportsChartTooltip;
+    window.showCompareChartTooltip = showCompareChartTooltip;
+    window.hideCompareChartTooltip = hideCompareChartTooltip;
     window.openReportsDateRangeModal = openReportsDateRangeModal;
     window.closeReportsDateRangeModal = closeReportsDateRangeModal;
     window.selectReportsPreset = selectReportsPreset;
@@ -1204,4 +1573,5 @@
     window.openEventStatsModal = openEventStatsModal;
     window.sortReportsEventsBy = sortReportsEventsBy;
     window.handleEventsTableScroll = handleEventsTableScroll;
+    window.onCompareEventsSelectionChanged = onCompareEventsSelectionChanged;
 })();
