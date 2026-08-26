@@ -1209,7 +1209,7 @@ app.get('/api/stats', async (req, res) => {
             FROM order_items 
             WHERE order_id IN (SELECT id FROM orders WHERE sagra_id = ? ${dateFilter})
             GROUP BY product_name 
-            ORDER BY qty DESC
+            ORDER BY revenue DESC, qty DESC
         `, params, (err, rows) => {
         if (err) reject(err); else resolve(rows);
       });
@@ -1231,11 +1231,44 @@ app.get('/api/stats', async (req, res) => {
       });
     });
 
+    let catDateFilter = "";
+    if (start_date && end_date) {
+      catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+    } else if (start_date) {
+      catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+    } else if (end_date) {
+      catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+    }
+
+    const categories = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          COALESCE(c.name, 'Generale') as category_name,
+          SUM(oi.quantity) as total_qty,
+          SUM(oi.price * oi.quantity) as total_revenue
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN (
+          SELECT p.name, p.category_id, cat.sagra_id 
+          FROM products p 
+          JOIN categories cat ON p.category_id = cat.id
+          GROUP BY p.name, cat.sagra_id
+        ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE o.sagra_id = ? ${catDateFilter}
+        GROUP BY COALESCE(c.name, 'Generale')
+        ORDER BY total_revenue DESC
+      `, params, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
     res.json({
       ordersCount: totalRow.count || 0,
       totalRevenue: totalRow.revenue || 0,
       topItems: topItems || [],
-      hourlySales: hourlySales || []
+      hourlySales: hourlySales || [],
+      categories: categories || []
     });
 
   } catch (e) {

@@ -1427,6 +1427,8 @@
             }
 
             renderCompareDualWaveChart(data1, sagra1.name, data2, sagra2 ? sagra2.name : null);
+            renderCompareTopProducts(data1, sagra1.name, data2, sagra2 ? sagra2.name : null);
+            renderCompareCategories(data1, sagra1.name, data2, sagra2 ? sagra2.name : null);
         } catch (err) {
             console.error("Comparison chart load error:", err);
             renderCompareEmptyState("Errore nel caricamento del confronto.");
@@ -1441,10 +1443,12 @@
     function renderCompareEmptyState(message) {
         const container = document.getElementById('reports-compare-chart-container');
         const summaryBar = document.getElementById('reports-compare-summary-bar');
+        const prodContainer = document.getElementById('rep-compare-products-list');
+        const catContainer = document.getElementById('rep-compare-categories-list');
         if (summaryBar) summaryBar.innerHTML = '';
-        if (container) {
-            container.innerHTML = `<div class="reports-empty-state">${escapeHtml(message)}</div>`;
-        }
+        if (container) container.innerHTML = `<div class="reports-empty-state">${escapeHtml(message)}</div>`;
+        if (prodContainer) prodContainer.innerHTML = `<div class="reports-empty-state">${escapeHtml(message)}</div>`;
+        if (catContainer) catContainer.innerHTML = `<div class="reports-empty-state">${escapeHtml(message)}</div>`;
     }
 
     /**
@@ -1660,6 +1664,206 @@
                 ${labelsHtml}
             </div>
         `;
+    }
+
+    /**
+     * Helper to render a Top 3 Podium column for an event.
+     */
+    function renderPodiumColumn(topItems, eventName, colorHex, gradientCss, totalEventRevenue) {
+        if (!topItems || topItems.length === 0) {
+            return `
+                <div class="reports-compare-podium-col">
+                    <div class="reports-podium-col-header" style="color: ${colorHex};">
+                        <span class="reports-podium-event-name" title="${escapeHtml(eventName)}">${escapeHtml(eventName)}</span>
+                    </div>
+                    <div class="reports-empty-state" style="padding: 24px 8px; font-size: 0.8rem;">Nessun piatto venduto</div>
+                </div>
+            `;
+        }
+
+        const totalRev = Number(totalEventRevenue) || 0;
+
+        const itemsHtml = topItems.map((p, idx) => {
+            const rank = idx + 1;
+            const rev = Number(p.revenue) || 0;
+            const qty = Number(p.qty) || 0;
+            const pct = totalRev > 0 ? Math.min(100, Math.round((rev / totalRev) * 100)) : 0;
+            const shareText = totalRev > 0 ? `${((rev / totalRev) * 100).toFixed(1)}%` : '0%';
+
+            return `
+                <div class="reports-podium-item">
+                    <div class="reports-podium-rank">#${rank}</div>
+                    <div class="reports-podium-info">
+                        <div class="reports-podium-title-row">
+                            <span class="reports-podium-item-name" title="${escapeHtml(p.product_name)}">${escapeHtml(p.product_name)}</span>
+                            <span class="reports-podium-item-rev">${formatCurrency(rev)}</span>
+                        </div>
+                        <div class="reports-podium-sub-row">
+                            <div class="reports-progress-track" style="height: 5px; flex: 1;">
+                                <div class="reports-progress-fill" style="width: ${Math.max(pct, rev > 0 ? 1 : 0)}%; background: ${gradientCss};"></div>
+                            </div>
+                            <span class="reports-podium-item-qty">${qty.toLocaleString('it-IT')} pz • ${shareText}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <div class="reports-compare-podium-col">
+                <div class="reports-podium-col-header" style="color: ${colorHex};">
+                    <span class="reports-podium-event-name" title="${escapeHtml(eventName)}">${escapeHtml(eventName)}</span>
+                </div>
+                <div class="reports-podium-list">
+                    ${itemsHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render Top 3 Products per Event inside the comparison card.
+     */
+    function renderCompareTopProducts(data1, name1, data2, name2) {
+        const container = document.getElementById('rep-compare-products-list');
+        if (!container) return;
+
+        const items1 = (data1 && data1.topItems) ? [...data1.topItems].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0)).slice(0, 3) : [];
+        const isDual = (data2 && name2);
+
+        if (!isDual) {
+            // Single event mode: render top 3 of Event 1
+            const col1 = renderPodiumColumn(items1, name1, '#2563eb', 'linear-gradient(90deg, #2563eb, #3b82f6)', data1?.totalRevenue);
+            container.innerHTML = `
+                <div class="reports-compare-podium-grid">
+                    ${col1}
+                </div>
+            `;
+            return;
+        }
+
+        // Dual comparison mode: render podium for Event 1 and podium for Event 2 stacked vertically
+        const items2 = (data2 && data2.topItems) ? [...data2.topItems].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0)).slice(0, 3) : [];
+        const col1 = renderPodiumColumn(items1, name1, '#2563eb', 'linear-gradient(90deg, #2563eb, #3b82f6)', data1?.totalRevenue);
+        const col2 = renderPodiumColumn(items2, name2, '#8b5cf6', 'linear-gradient(90deg, #8b5cf6, #a855f7)', data2?.totalRevenue);
+
+        container.innerHTML = `
+            <div class="reports-compare-podium-grid">
+                ${col1}
+                ${col2}
+            </div>
+        `;
+    }
+
+    /**
+     * Render Categories Comparison progress bars (Dual or Single).
+     */
+    function renderCompareCategories(data1, name1, data2, name2) {
+        const container = document.getElementById('rep-compare-categories-list');
+        if (!container) return;
+
+        const cats1 = (data1 && data1.categories) ? data1.categories : [];
+        const cats2 = (data2 && data2.categories) ? data2.categories : [];
+
+        const tot1 = Number(data1?.totalRevenue) || 0;
+        const tot2 = Number(data2?.totalRevenue) || 0;
+
+        // Build category maps
+        const map1 = new Map();
+        cats1.forEach(c => {
+            map1.set(c.category_name, { qty: Number(c.total_qty) || 0, revenue: Number(c.total_revenue) || 0 });
+        });
+
+        const map2 = new Map();
+        cats2.forEach(c => {
+            map2.set(c.category_name, { qty: Number(c.total_qty) || 0, revenue: Number(c.total_revenue) || 0 });
+        });
+
+        // Combined unique category names
+        const allNames = Array.from(new Set([...map1.keys(), ...map2.keys()]));
+
+        if (allNames.length === 0) {
+            container.innerHTML = '<div class="reports-empty-state">Nessun dato per categorie nel periodo selezionato</div>';
+            return;
+        }
+
+        // Sort by total combined revenue descending
+        allNames.sort((a, b) => {
+            const revA = (map1.get(a)?.revenue || 0) + (map2.get(a)?.revenue || 0);
+            const revB = (map1.get(b)?.revenue || 0) + (map2.get(b)?.revenue || 0);
+            return revB - revA;
+        });
+
+        const isDual = (data2 && name2);
+
+        const html = allNames.map(catName => {
+            const c1 = map1.get(catName) || { qty: 0, revenue: 0 };
+            const c2 = map2.get(catName) || { qty: 0, revenue: 0 };
+
+            const pct1 = tot1 > 0 ? Math.min(100, Math.round((c1.revenue / tot1) * 100)) : 0;
+            const pct2 = tot2 > 0 ? Math.min(100, Math.round((c2.revenue / tot2) * 100)) : 0;
+            const share1 = tot1 > 0 ? `${((c1.revenue / tot1) * 100).toFixed(1)}%` : '0%';
+            const share2 = tot2 > 0 ? `${((c2.revenue / tot2) * 100).toFixed(1)}%` : '0%';
+
+            if (!isDual) {
+                // Single event mode: styled with Event 1 blue theme
+                return `
+                    <div class="reports-progress-item">
+                        <div class="reports-progress-header">
+                            <span class="reports-progress-title" title="${escapeHtml(catName)}">${escapeHtml(catName)}</span>
+                            <div class="reports-progress-values">
+                                <span class="reports-progress-amount">${formatCurrency(c1.revenue)}</span>
+                                <span class="reports-progress-sub">(${c1.qty.toLocaleString('it-IT')} pezzi • ${share1})</span>
+                            </div>
+                        </div>
+                        <div class="reports-progress-track">
+                            <div class="reports-progress-fill" style="width: ${Math.max(pct1, c1.revenue > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Dual comparison mode
+            return `
+                <div class="reports-compare-item">
+                    <div class="reports-compare-item-title" title="${escapeHtml(catName)}">${escapeHtml(catName)}</div>
+                    
+                    <!-- Bar 1: Event 1 -->
+                    <div class="reports-compare-bar-row">
+                        <div class="reports-compare-bar-header">
+                            <span class="reports-compare-bar-name" style="color: #2563eb;">
+                                <span>${escapeHtml(name1)}</span>
+                            </span>
+                            <div class="reports-compare-bar-vals">
+                                <span class="reports-compare-bar-amt">${formatCurrency(c1.revenue)}</span>
+                                <span class="reports-compare-bar-sub">(${c1.qty.toLocaleString('it-IT')} pz • ${share1})</span>
+                            </div>
+                        </div>
+                        <div class="reports-progress-track">
+                            <div class="reports-progress-fill" style="width: ${Math.max(pct1, c1.revenue > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Bar 2: Event 2 -->
+                    <div class="reports-compare-bar-row">
+                        <div class="reports-compare-bar-header">
+                            <span class="reports-compare-bar-name" style="color: #8b5cf6;">
+                                <span>${escapeHtml(name2)}</span>
+                            </span>
+                            <div class="reports-compare-bar-vals">
+                                <span class="reports-compare-bar-amt">${formatCurrency(c2.revenue)}</span>
+                                <span class="reports-compare-bar-sub">(${c2.qty.toLocaleString('it-IT')} pz • ${share2})</span>
+                            </div>
+                        </div>
+                        <div class="reports-progress-track">
+                            <div class="reports-progress-fill" style="width: ${Math.max(pct2, c2.revenue > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #8b5cf6, #a855f7);"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
     }
 
     /**
