@@ -1945,6 +1945,8 @@
     const productsTableState = {
         rawList: [],
         filteredList: [],
+        exhaustedList: [],
+        surplusList: [],
         renderedCount: 0,
         isLoadingMore: false,
         sortKey: 'revenue',
@@ -1983,6 +1985,8 @@
             }
 
             productsTableState.rawList = data.products || [];
+            productsTableState.exhaustedList = data.exhaustedProducts || [];
+            productsTableState.surplusList = data.surplusProducts || [];
             productsTableState.grandTotalRevenue = Number(data.grandTotalRevenue) || 0;
             productsTableState.grandTotalQty = Number(data.grandTotalQty) || 0;
 
@@ -1996,6 +2000,8 @@
             renderProdCatDropdownOptions('');
             updateProdCatButtonLabel();
             renderTopAndFlopProducts();
+            renderExhaustedProducts();
+            renderSurplusProducts();
         } catch (e) {
             console.error("Error loading products breakdown:", e);
             if (tbody) {
@@ -2109,6 +2115,119 @@
     }
 
     /**
+     * Render the list of products with exhausted stock.
+     */
+    /**
+     * Render the list of products with exhausted stock.
+     */
+    function renderExhaustedProducts() {
+        const container = document.getElementById('rep-products-exhausted-list');
+        if (!container) return;
+
+        let list = productsTableState.exhaustedList || [];
+        if (productsTableState.selectedCategory && productsTableState.selectedCategory !== 'all') {
+            list = list.filter(p => (p.category_name || 'Altro').trim() === productsTableState.selectedCategory);
+        }
+
+        if (list.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 18px 12px; color: var(--text-light);">
+                    <span class="material-symbols-rounded" style="font-size: 28px; color: var(--success, #10b981); display: block; margin-bottom: 4px;">check_circle</span>
+                    <strong style="color: var(--text-main); font-size: 0.88rem;">Nessun prodotto esaurito</strong>
+                    <div style="font-size: 0.78rem; margin-top: 2px;">Tutti i prodotti con limite di scorte sono ancora disponibili.</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = list.map((p, idx) => {
+            const rank = idx + 1;
+            const soldQty = Number(p.total_sold_qty) || 0;
+            const cat = (p.category_name || 'Altro').trim();
+            const sagraName = p.sagra_name || 'Evento';
+
+            let exhaustedTimeStr = 'Orario non disp.';
+            if (p.exhausted_at) {
+                try {
+                    const d = new Date(p.exhausted_at);
+                    if (!isNaN(d.getTime())) {
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const mm = String(d.getMinutes()).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        exhaustedTimeStr = `Esaurito ore ${hh}:${mm} (${day}/${month})`;
+                    }
+                } catch (e) {}
+            }
+
+            return `
+                <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}', ${p.sagra_id}, '${escapeHtml(p.sagra_name)}')" title="Clicca per visualizzare le statistiche del piatto per ${escapeHtml(sagraName)}">
+                    <div class="reports-topflop-rank rank-other">${rank}</div>
+                    <div class="reports-topflop-info">
+                        <div class="reports-topflop-name-row">
+                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
+                            <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 700;">${soldQty.toLocaleString('it-IT')} pz venduti</span>
+                        </div>
+                        <div class="reports-topflop-sub-row">
+                            <span>${escapeHtml(cat)} • ${escapeHtml(sagraName)}</span>
+                            <span style="font-weight: 600; color: var(--text-light); font-size: 0.76rem;">${exhaustedTimeStr}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Render the list of products with high remaining stock relative to sales.
+     */
+    function renderSurplusProducts() {
+        const container = document.getElementById('rep-products-surplus-list');
+        if (!container) return;
+
+        let list = productsTableState.surplusList || [];
+        if (productsTableState.selectedCategory && productsTableState.selectedCategory !== 'all') {
+            list = list.filter(p => (p.category_name || 'Altro').trim() === productsTableState.selectedCategory);
+        }
+
+        if (list.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 18px 12px; color: var(--text-light);">
+                    <span class="material-symbols-rounded" style="font-size: 28px; color: var(--text-light); display: block; margin-bottom: 4px;">inventory_2</span>
+                    <strong style="color: var(--text-main); font-size: 0.88rem;">Nessun prodotto con scorte tracciate</strong>
+                    <div style="font-size: 0.78rem; margin-top: 2px;">Nessun articolo con quantità configurata nel periodo selezionato.</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = list.map((p, idx) => {
+            const rank = idx + 1;
+            const remaining = Number(p.remaining_stock) || 0;
+            const soldQty = Number(p.total_sold_qty) || 0;
+            const unsoldPct = Number(p.unsold_pct) || 0;
+            const cat = (p.category_name || 'Altro').trim();
+            const sagraName = p.sagra_name || 'Evento';
+
+            return `
+                <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}', ${p.sagra_id}, '${escapeHtml(p.sagra_name)}')" title="Clicca per visualizzare le statistiche del piatto per ${escapeHtml(sagraName)}">
+                    <div class="reports-topflop-rank rank-other">${rank}</div>
+                    <div class="reports-topflop-info">
+                        <div class="reports-topflop-name-row">
+                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
+                            <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 700;">${remaining.toLocaleString('it-IT')} pz rimasti</span>
+                        </div>
+                        <div class="reports-topflop-sub-row">
+                            <span>${escapeHtml(cat)} • ${escapeHtml(sagraName)}</span>
+                            <span style="font-weight: 600; color: var(--text-light); font-size: 0.76rem;">${soldQty.toLocaleString('it-IT')} venduti (${unsoldPct}% invenduto)</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
      * Filter products by category and search input query and re-render.
      */
     function filterReportsProductsList() {
@@ -2135,6 +2254,8 @@
         }
 
         renderTopAndFlopProducts();
+        renderExhaustedProducts();
+        renderSurplusProducts();
         renderNextProductsChunk(true);
 
         const wrapper = document.getElementById('rep-products-table-wrapper');
@@ -2719,7 +2840,7 @@
     /**
      * Open product detail modal.
      */
-    async function openReportsProductModal(productName) {
+    async function openReportsProductModal(productName, overrideEventId = null, overrideEventName = null) {
         const modal = document.getElementById('reports-product-modal');
         if (!modal) return;
 
@@ -2737,8 +2858,10 @@
             params.append('product_name', productName);
             if (reportsState.dateFilter.startDate) params.append('start_date', reportsState.dateFilter.startDate);
             if (reportsState.dateFilter.endDate) params.append('end_date', reportsState.dateFilter.endDate);
-            if (productsTableState.selectedEventId && productsTableState.selectedEventId !== 'all') {
-                params.append('sagra_id', productsTableState.selectedEventId);
+            
+            const effectiveEventId = overrideEventId || (productsTableState.selectedEventId !== 'all' ? productsTableState.selectedEventId : null);
+            if (effectiveEventId) {
+                params.append('sagra_id', effectiveEventId);
             }
 
             const res = await fetch(`/api/reports/product-detail?${params.toString()}`);
@@ -2758,9 +2881,11 @@
             document.getElementById('rep-prod-modal-qty').innerText = `${qty.toLocaleString('it-IT')} pz`;
             document.getElementById('rep-prod-modal-price').innerText = formatCurrency(avgPrice);
             document.getElementById('rep-prod-modal-category').innerText = cat;
-            document.getElementById('rep-prod-modal-scope-badge').innerText = (productsTableState.selectedEventId === 'all')
-                ? 'Tutti gli eventi'
-                : (document.getElementById('rep-prod-event-select-text')?.innerText || 'Evento selezionato');
+            document.getElementById('rep-prod-modal-scope-badge').innerText = overrideEventName
+                ? overrideEventName
+                : (productsTableState.selectedEventId === 'all'
+                    ? 'Tutti gli eventi'
+                    : (document.getElementById('rep-prod-event-select-text')?.innerText || 'Evento selezionato'));
 
             const catLower = cat.toLowerCase();
             let catIcon = 'restaurant';

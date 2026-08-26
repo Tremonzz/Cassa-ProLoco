@@ -6683,6 +6683,87 @@ img {
   transition: width 0.4s ease;
 }
 
+/* Exhausted Stock Products List */
+.reports-exhausted-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reports-exhausted-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-subtle, rgba(239, 68, 68, 0.03));
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  transition: background 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+
+.reports-exhausted-item:hover {
+  background: rgba(239, 68, 68, 0.07);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .reports-exhausted-item {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .reports-exhausted-item:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.reports-exhausted-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1.2;
+}
+
+.reports-exhausted-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-main);
+  flex: 1;
+}
+
+.reports-exhausted-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  text-align: right;
+  flex: 1;
+}
+
+.reports-exhausted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .reports-exhausted-badge {
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
 /* Sortable Table Headers */
 .reports-sortable-th {
   cursor: pointer;

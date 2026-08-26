@@ -848,6 +848,39 @@
               </div>
             </div>
           </div>
+
+          <!-- Stock Analytics 2-Card Grid: Prodotti Esauriti & Prodotti con Tante Scorte Rimaste -->
+          <div class="reports-products-topflop-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-top: 20px;">
+            <!-- Card 1: Prodotti Esauriti -->
+            <div class="reports-card-box" style="margin-bottom: 0;">
+              <div class="reports-card-header" style="padding: 14px 20px;">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded" style="color: var(--danger, #ef4444);">block</span>
+                  <span>Prodotti Esauriti</span>
+                </div>
+              </div>
+              <div class="reports-card-body" style="padding: 10px 16px 14px 16px;">
+                <div id="rep-products-exhausted-list" class="reports-topflop-list">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Prodotti con Scorte Eccedenti / Tante Scorte Rimaste -->
+            <div class="reports-card-box" style="margin-bottom: 0;">
+              <div class="reports-card-header" style="padding: 14px 20px;">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded" style="color: var(--warning, #f59e0b);">inventory</span>
+                  <span>Scorte Rimanenti Elevate</span>
+                </div>
+              </div>
+              <div class="reports-card-body" style="padding: 10px 16px 14px 16px;">
+                <div id="rep-products-surplus-list" class="reports-topflop-list">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div id="reports-tab-hourly" class="reports-tab-section" style="display: none;">

@@ -1570,6 +1570,202 @@ app.get('/api/reports/products', async (req, res) => {
       grandTotalQty += Number(p.total_qty) || 0;
     });
 
+    // Fetch all products with their categories and sagra
+    let allProductsWhere = "WHERE 1=1";
+    const allProductsParams = [];
+    if (sagra_id && sagra_id !== 'all') {
+      allProductsWhere += " AND s.id = ?";
+      allProductsParams.push(sagra_id);
+    }
+
+    const allDbProducts = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          p.id as product_id,
+          p.name as product_name,
+          p.price,
+          p.quantity as remaining_stock,
+          p.type,
+          p.is_composite,
+          p.is_selection,
+          p.components,
+          COALESCE(c.name, 'Altro') as category_name,
+          s.id as sagra_id,
+          s.name as sagra_name
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
+        JOIN sagras s ON c.sagra_id = s.id
+        ${allProductsWhere}
+      `, allProductsParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    // Helper to parse components
+    function parseProductComponents(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return parsed;
+          } catch (e) {}
+        }
+        return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return [];
+    }
+
+    // Map products by sagra and name
+    const sagraProductsMap = {};
+    allDbProducts.forEach(p => {
+      if (!sagraProductsMap[p.sagra_id]) sagraProductsMap[p.sagra_id] = {};
+      sagraProductsMap[p.sagra_id][p.product_name] = p;
+    });
+
+    // Helper to recursively get leaf components for a product
+    function getLeafComponents(prodName, sagraId, visited = new Set()) {
+      if (!prodName || visited.has(prodName)) return [];
+      visited.add(prodName);
+
+      const prod = sagraProductsMap[sagraId]?.[prodName];
+      if (!prod) return [];
+
+      const comps = parseProductComponents(prod.components);
+      if (!comps || comps.length === 0) {
+        return [];
+      }
+
+      const leaves = [];
+      for (const c of comps) {
+        const subLeaves = getLeafComponents(c, sagraId, visited);
+        if (subLeaves.length > 0) {
+          leaves.push(...subLeaves);
+        } else {
+          leaves.push(c);
+        }
+      }
+      return leaves;
+    }
+
+    // Fetch order items matching date & sagra filters
+    let orderItemsWhere = "WHERE 1=1";
+    const orderItemsParams = [];
+    if (sagra_id && sagra_id !== 'all') {
+      orderItemsWhere += " AND o.sagra_id = ?";
+      orderItemsParams.push(sagra_id);
+    }
+    if (start_date && end_date) {
+      orderItemsWhere += " AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+      orderItemsParams.push(start_date, end_date);
+    } else if (start_date) {
+      orderItemsWhere += " AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+      orderItemsParams.push(start_date);
+    } else if (end_date) {
+      orderItemsWhere += " AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+      orderItemsParams.push(end_date);
+    }
+
+    const orderItems = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          oi.product_name,
+          oi.quantity,
+          oi.price,
+          o.sagra_id,
+          datetime(o.created_at, 'localtime') as order_time
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        ${orderItemsWhere}
+      `, orderItemsParams, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    // Accumulate sales and component usage per (sagra_id, product_name)
+    const productStats = {};
+    function getStatObj(sagraId, prodName) {
+      const key = `${sagraId}_${prodName}`;
+      if (!productStats[key]) {
+        productStats[key] = { sold_qty: 0, last_sale_at: null, total_revenue: 0 };
+      }
+      return productStats[key];
+    }
+
+    orderItems.forEach(oi => {
+      const qty = Number(oi.quantity) || 0;
+      const price = Number(oi.price) || 0;
+      const sagraId = oi.sagra_id;
+      const prodName = oi.product_name;
+      const orderTime = oi.order_time;
+
+      // 1. Direct sale attribution
+      const directStat = getStatObj(sagraId, prodName);
+      directStat.sold_qty += qty;
+      directStat.total_revenue += price * qty;
+      if (!directStat.last_sale_at || orderTime > directStat.last_sale_at) {
+        directStat.last_sale_at = orderTime;
+      }
+
+      // 2. Sub-component / Base products attribution
+      const leafComps = getLeafComponents(prodName, sagraId);
+      leafComps.forEach(compName => {
+        const compStat = getStatObj(sagraId, compName);
+        compStat.sold_qty += qty;
+        if (!compStat.last_sale_at || orderTime > compStat.last_sale_at) {
+          compStat.last_sale_at = orderTime;
+        }
+      });
+    });
+
+    // Now populate stock analytics for products with limited quantity
+    const exhaustedProducts = [];
+    const surplusProducts = [];
+
+    allDbProducts.forEach(item => {
+      if (item.remaining_stock === null || item.remaining_stock === undefined) return;
+
+      const stat = productStats[`${item.sagra_id}_${item.product_name}`] || { sold_qty: 0, last_sale_at: null, total_revenue: 0 };
+      const remaining = Number(item.remaining_stock) || 0;
+      const sold = Number(stat.sold_qty) || 0;
+      const initial = remaining + sold;
+      const unsoldPct = initial > 0 ? (remaining / initial) * 100 : 0;
+      const soldPct = initial > 0 ? (sold / initial) * 100 : 0;
+
+      const obj = {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        category_name: item.category_name,
+        sagra_id: item.sagra_id,
+        sagra_name: item.sagra_name,
+        remaining_stock: remaining,
+        total_sold_qty: sold,
+        total_revenue: stat.total_revenue,
+        initial_stock: initial,
+        unsold_pct: Number(unsoldPct.toFixed(1)),
+        sold_pct: Number(soldPct.toFixed(1)),
+        exhausted_at: stat.last_sale_at
+      };
+
+      if (remaining <= 0) {
+        exhaustedProducts.push(obj);
+      } else {
+        surplusProducts.push(obj);
+      }
+    });
+
+    exhaustedProducts.sort((a, b) => {
+      const timeA = a.exhausted_at ? new Date(a.exhausted_at).getTime() : 0;
+      const timeB = b.exhausted_at ? new Date(b.exhausted_at).getTime() : 0;
+      return timeB - timeA || b.total_sold_qty - a.total_sold_qty;
+    });
+
+    surplusProducts.sort((a, b) => {
+      return b.unsold_pct - a.unsold_pct || b.remaining_stock - a.remaining_stock;
+    });
+
     res.json({
       success: true,
       filter: {
@@ -1579,7 +1775,9 @@ app.get('/api/reports/products', async (req, res) => {
       },
       grandTotalRevenue,
       grandTotalQty,
-      products
+      products,
+      exhaustedProducts,
+      surplusProducts
     });
   } catch (err) {
     console.error("Reports products breakdown error:", err);
@@ -1595,8 +1793,36 @@ app.get('/api/reports/product-detail', async (req, res) => {
       return res.status(400).json({ success: false, error: "Nome prodotto obbligatorio" });
     }
 
-    let whereClause = "WHERE oi.product_name = ?";
-    const params = [product_name];
+    // Find all composite products in the sagra (or all sagras) that have product_name in components
+    const containingProds = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT p.name, p.components 
+        FROM products p 
+        JOIN categories c ON p.category_id = c.id
+        WHERE p.components IS NOT NULL
+        ${sagra_id && sagra_id !== 'all' ? ' AND c.sagra_id = ?' : ''}
+      `, sagra_id && sagra_id !== 'all' ? [sagra_id] : [], (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    const matchedProdNames = new Set([product_name]);
+    containingProds.forEach(p => {
+      try {
+        const comps = typeof p.components === 'string' ? JSON.parse(p.components) : p.components;
+        if (Array.isArray(comps) && comps.includes(product_name)) {
+          matchedProdNames.add(p.name);
+        }
+      } catch (e) {
+        if (typeof p.components === 'string' && p.components.includes(product_name)) {
+          matchedProdNames.add(p.name);
+        }
+      }
+    });
+
+    const placeholders = Array.from(matchedProdNames).map(() => '?').join(',');
+    let whereClause = `WHERE oi.product_name IN (${placeholders})`;
+    const params = Array.from(matchedProdNames);
 
     if (start_date && end_date) {
       whereClause += " AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
@@ -1614,11 +1840,24 @@ app.get('/api/reports/product-detail', async (req, res) => {
       params.push(sagra_id);
     }
 
+    // Fetch product category info directly if needed
+    const prodDbInfo = await new Promise((resolve) => {
+      db.get(`
+        SELECT p.name, COALESCE(c.name, 'Altro') as category_name, p.price
+        FROM products p
+        JOIN categories c ON p.category_id = c.id
+        WHERE p.name = ?
+        ${sagra_id && sagra_id !== 'all' ? ' AND c.sagra_id = ?' : ''}
+        LIMIT 1
+      `, sagra_id && sagra_id !== 'all' ? [product_name, sagra_id] : [product_name], (err, row) => {
+        resolve(row || null);
+      });
+    });
+
     // 1. Overall stats for this product
     const stats = await new Promise((resolve, reject) => {
       db.get(`
         SELECT 
-          oi.product_name,
           COALESCE(c.name, 'Altro') as category_name,
           SUM(oi.quantity) as total_qty,
           SUM(oi.price * oi.quantity) as total_revenue,
@@ -1634,9 +1873,15 @@ app.get('/api/reports/product-detail', async (req, res) => {
         ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
         LEFT JOIN categories c ON p.category_id = c.id
         ${whereClause}
-        GROUP BY oi.product_name
       `, params, (err, row) => {
-        if (err) reject(err); else resolve(row || { product_name, category_name: 'Altro', total_qty: 0, total_revenue: 0, avg_price: 0, orders_count: 0 });
+        if (err) reject(err); else {
+          const finalStat = row || { total_qty: 0, total_revenue: 0, avg_price: 0, orders_count: 0 };
+          finalStat.product_name = product_name;
+          if ((!finalStat.category_name || finalStat.category_name === 'Altro') && prodDbInfo?.category_name) {
+            finalStat.category_name = prodDbInfo.category_name;
+          }
+          resolve(finalStat);
+        }
       });
     });
 
