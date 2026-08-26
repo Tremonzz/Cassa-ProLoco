@@ -1514,6 +1514,182 @@ app.get('/api/reports/overview', async (req, res) => {
   }
 });
 
+// GLOBAL REPORTS API - PRODUCTS BREAKDOWN
+app.get('/api/reports/products', async (req, res) => {
+  try {
+    const { start_date, end_date, sagra_id } = req.query;
+    let whereClause = "WHERE 1=1";
+    const params = [];
+
+    if (start_date && end_date) {
+      whereClause += " AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+      params.push(start_date, end_date);
+    } else if (start_date) {
+      whereClause += " AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+      params.push(start_date);
+    } else if (end_date) {
+      whereClause += " AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+      params.push(end_date);
+    }
+
+    if (sagra_id && sagra_id !== 'all') {
+      whereClause += " AND o.sagra_id = ?";
+      params.push(sagra_id);
+    }
+
+    const products = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          oi.product_name,
+          COALESCE(c.name, 'Altro') as category_name,
+          SUM(oi.quantity) as total_qty,
+          SUM(oi.price * oi.quantity) as total_revenue,
+          AVG(oi.price) as avg_price,
+          COUNT(DISTINCT oi.order_id) as orders_count
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN (
+          SELECT p.name, p.category_id, cat.sagra_id 
+          FROM products p 
+          JOIN categories cat ON p.category_id = cat.id
+          GROUP BY p.name, cat.sagra_id
+        ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        ${whereClause}
+        GROUP BY oi.product_name, COALESCE(c.name, 'Altro')
+        ORDER BY total_revenue DESC, total_qty DESC
+      `, params, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    let grandTotalRevenue = 0;
+    let grandTotalQty = 0;
+    products.forEach(p => {
+      grandTotalRevenue += Number(p.total_revenue) || 0;
+      grandTotalQty += Number(p.total_qty) || 0;
+    });
+
+    res.json({
+      success: true,
+      filter: {
+        start_date: start_date || null,
+        end_date: end_date || null,
+        sagra_id: sagra_id || 'all'
+      },
+      grandTotalRevenue,
+      grandTotalQty,
+      products
+    });
+  } catch (err) {
+    console.error("Reports products breakdown error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GLOBAL REPORTS API - SINGLE PRODUCT DETAIL
+app.get('/api/reports/product-detail', async (req, res) => {
+  try {
+    const { product_name, start_date, end_date, sagra_id } = req.query;
+    if (!product_name) {
+      return res.status(400).json({ success: false, error: "Nome prodotto obbligatorio" });
+    }
+
+    let whereClause = "WHERE oi.product_name = ?";
+    const params = [product_name];
+
+    if (start_date && end_date) {
+      whereClause += " AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+      params.push(start_date, end_date);
+    } else if (start_date) {
+      whereClause += " AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+      params.push(start_date);
+    } else if (end_date) {
+      whereClause += " AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+      params.push(end_date);
+    }
+
+    if (sagra_id && sagra_id !== 'all') {
+      whereClause += " AND o.sagra_id = ?";
+      params.push(sagra_id);
+    }
+
+    // 1. Overall stats for this product
+    const stats = await new Promise((resolve, reject) => {
+      db.get(`
+        SELECT 
+          oi.product_name,
+          COALESCE(c.name, 'Altro') as category_name,
+          SUM(oi.quantity) as total_qty,
+          SUM(oi.price * oi.quantity) as total_revenue,
+          AVG(oi.price) as avg_price,
+          COUNT(DISTINCT oi.order_id) as orders_count
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        LEFT JOIN (
+          SELECT p.name, p.category_id, cat.sagra_id 
+          FROM products p 
+          JOIN categories cat ON p.category_id = cat.id
+          GROUP BY p.name, cat.sagra_id
+        ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
+        LEFT JOIN categories c ON p.category_id = c.id
+        ${whereClause}
+        GROUP BY oi.product_name
+      `, params, (err, row) => {
+        if (err) reject(err); else resolve(row || { product_name, category_name: 'Altro', total_qty: 0, total_revenue: 0, avg_price: 0, orders_count: 0 });
+      });
+    });
+
+    // 2. Hourly breakdown for this product
+    const hourlySales = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          strftime('%H:00', datetime(o.created_at, 'localtime')) as hour_slot,
+          SUM(oi.quantity) as qty,
+          SUM(oi.price * oi.quantity) as revenue,
+          COUNT(DISTINCT oi.order_id) as orders_count
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        ${whereClause}
+        GROUP BY hour_slot
+        ORDER BY hour_slot ASC
+      `, params, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    // 3. Breakdown by event (sagra)
+    const eventsBreakdown = await new Promise((resolve, reject) => {
+      db.all(`
+        SELECT 
+          s.id as sagra_id,
+          s.name as sagra_name,
+          SUM(oi.quantity) as qty,
+          SUM(oi.price * oi.quantity) as revenue,
+          COUNT(DISTINCT oi.order_id) as orders_count
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        JOIN sagras s ON o.sagra_id = s.id
+        ${whereClause}
+        GROUP BY s.id, s.name
+        ORDER BY revenue DESC
+      `, params, (err, rows) => {
+        if (err) reject(err); else resolve(rows || []);
+      });
+    });
+
+    res.json({
+      success: true,
+      product: stats,
+      hourlySales,
+      eventsBreakdown
+    });
+  } catch (err) {
+    console.error("Reports product detail error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // LIST PRINTERS API
 app.get('/api/printers', (req, res) => {
   const cmd = `powershell "Get-Printer | Select-Object Name | ConvertTo-Json"`;

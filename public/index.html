@@ -419,8 +419,7 @@
           </button>
           <button type="button" class="reports-nav-item" data-tab="products" onclick="switchReportsTab('products')">
             <span class="material-symbols-rounded">restaurant_menu</span>
-            <span>Classifica Piatti</span>
-            <span class="reports-nav-pill">Prossimamente</span>
+            <span>Dettagli Prodotti</span>
           </button>
           <button type="button" class="reports-nav-item" data-tab="hourly" onclick="switchReportsTab('hourly')">
             <span class="material-symbols-rounded">pace</span>
@@ -706,11 +705,115 @@
           </div>
         </div>
 
+        <!-- TAB 3: DETTAGLI PRODOTTI -->
         <div id="reports-tab-products" class="reports-tab-section" style="display: none;">
-          <div class="reports-placeholder-box">
-            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">restaurant_menu</span>
-            <h3>Classifica Completa Piatti</h3>
-            <p>Questa sezione verrà implementata nei prossimi step.</p>
+          <!-- Top Control Header Bar (Event Selector outside the table) -->
+          <div class="reports-tab-topbar">
+            <div class="reports-custom-select-container" id="rep-prod-event-select-wrap">
+              <span class="reports-select-label">Filtra per Evento:</span>
+              <div class="reports-custom-select-box">
+                <button type="button" class="reports-custom-select-btn" id="rep-prod-event-select-btn" onclick="toggleProdEventDropdown(event)">
+                  <span class="reports-custom-select-text" id="rep-prod-event-select-text">Tutti gli eventi</span>
+                  <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-prod-event-chevron">expand_more</span>
+                </button>
+                <div class="reports-custom-dropdown-panel" id="rep-prod-event-dropdown" style="display: none;">
+                  <div class="reports-dropdown-search-box">
+                    <span class="material-symbols-rounded">search</span>
+                    <input type="text" id="rep-prod-event-search" placeholder="Cerca evento..." oninput="filterProdEventDropdownItems(this.value)" onclick="event.stopPropagation()">
+                  </div>
+                  <div class="reports-dropdown-options-list" id="rep-prod-event-options">
+                    <!-- Populated via JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reports-card-box">
+            <div class="reports-card-header">
+              <div class="reports-card-title">
+                <span class="material-symbols-rounded">restaurant_menu</span>
+                <span>Elenco Prodotti &amp; Piatti</span>
+                <span id="rep-products-count-badge" class="reports-count-badge">0 prodotti</span>
+              </div>
+              <div class="reports-card-actions" style="display: flex; align-items: center; gap: 10px;">
+                <!-- Custom Category Dropdown Filter -->
+                <div class="reports-custom-select-container" id="rep-prod-cat-select-wrap">
+                  <div class="reports-custom-select-box">
+                    <button type="button" class="reports-custom-select-btn" id="rep-prod-cat-select-btn" onclick="toggleProdCatDropdown(event)">
+                      <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">category</span>
+                      <span class="reports-custom-select-text" id="rep-prod-cat-select-text">Tutte le categorie</span>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-prod-cat-chevron">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rep-prod-cat-dropdown" style="display: none;">
+                      <div class="reports-dropdown-search-box">
+                        <span class="material-symbols-rounded">search</span>
+                        <input type="text" id="rep-prod-cat-search" placeholder="Cerca categoria..." oninput="filterProdCatDropdownItems(this.value)" onclick="event.stopPropagation()">
+                      </div>
+                      <div class="reports-dropdown-options-list" id="rep-prod-cat-options">
+                        <!-- Populated via JS -->
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="reports-search-box">
+                  <span class="material-symbols-rounded">search</span>
+                  <input type="text" id="rep-products-search-input" placeholder="Cerca piatto o prodotto..." oninput="filterReportsProductsList()">
+                </div>
+              </div>
+            </div>
+
+            <div class="reports-card-body" style="padding: 0;">
+              <!-- Products Table with sorting & infinite scroll -->
+              <div id="rep-products-table-wrapper" class="reports-table-responsive reports-scrollable-table" onscroll="handleProductsTableScroll(this)">
+                <table class="reports-table">
+                  <thead>
+                    <tr>
+                      <th class="reports-sortable-th" onclick="sortReportsProductsBy('name')" title="Ordina per nome prodotto">
+                        <div class="reports-th-content">
+                          <span>Prodotto</span>
+                          <span class="reports-sort-icon material-symbols-rounded" data-sort-icon-prod="name"></span>
+                        </div>
+                      </th>
+                      <th class="reports-sortable-th" onclick="sortReportsProductsBy('category')" title="Ordina per categoria">
+                        <div class="reports-th-content">
+                          <span>Categoria</span>
+                          <span class="reports-sort-icon material-symbols-rounded" data-sort-icon-prod="category"></span>
+                        </div>
+                      </th>
+                      <th class="reports-sortable-th th-align-right" onclick="sortReportsProductsBy('qty')" title="Ordina per quantità venduta">
+                        <div class="reports-th-content th-content-right">
+                          <span>Quantità Venduta</span>
+                          <span class="reports-sort-icon material-symbols-rounded" data-sort-icon-prod="qty"></span>
+                        </div>
+                      </th>
+                      <th class="reports-sortable-th th-align-right" onclick="sortReportsProductsBy('price')" title="Ordina per prezzo medio">
+                        <div class="reports-th-content th-content-right">
+                          <span>Prezzo Medio</span>
+                          <span class="reports-sort-icon material-symbols-rounded" data-sort-icon-prod="price"></span>
+                        </div>
+                      </th>
+                      <th class="reports-sortable-th th-align-right" onclick="sortReportsProductsBy('revenue')" title="Ordina per incasso totale">
+                        <div class="reports-th-content th-content-right">
+                          <span>Incasso Totale</span>
+                          <span class="reports-sort-icon material-symbols-rounded" data-sort-icon-prod="revenue">arrow_downward</span>
+                        </div>
+                      </th>
+                      <th class="reports-sortable-th th-align-right" onclick="sortReportsProductsBy('share')" title="Ordina per incidenza percentuale">
+                        <div class="reports-th-content th-content-right">
+                          <span>Incidenza %</span>
+                          <span class="reports-sort-icon material-symbols-rounded" data-sort-icon-prod="share"></span>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-products-tbody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -783,6 +886,67 @@
             <span class="material-symbols-rounded">check</span>
             <span>Applica Filtro</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Detail Modal -->
+    <div id="reports-product-modal" class="modal" style="display: none;">
+      <div class="modal-content" style="max-width: 680px; width: 92%; border-radius: var(--radius-lg, 16px); padding: 0; overflow: hidden;">
+        <div class="modal-header" style="background: var(--bg-card, #ffffff); border-bottom: 1px solid var(--border-color); padding: 18px 24px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div id="rep-prod-modal-icon-wrap" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(37, 99, 235, 0.1); color: var(--primary); display: flex; align-items: center; justify-content: center;">
+              <span class="material-symbols-rounded" id="rep-prod-modal-icon" style="font-size: 24px;">restaurant</span>
+            </div>
+            <div>
+              <h2 id="rep-prod-modal-title" style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main);">Dettaglio Piatto</h2>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                <span id="rep-prod-modal-category" class="reports-table-cat-badge">Categoria</span>
+                <span id="rep-prod-modal-scope-badge" style="font-size: 0.75rem; color: var(--text-light);">Filtro attivo</span>
+              </div>
+            </div>
+          </div>
+          <span class="close-modal" onclick="closeReportsProductModal()" style="font-size: 24px; cursor: pointer; color: var(--text-light);">&times;</span>
+        </div>
+
+        <div class="modal-body" style="padding: 20px 24px; max-height: 75vh; overflow-y: auto;">
+          <!-- 3 KPI Cards Row -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px;">
+            <div style="background: var(--bg-secondary, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px;">
+              <div style="font-size: 0.76rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); margin-bottom: 4px;">Incasso Totale</div>
+              <div id="rep-prod-modal-revenue" style="font-size: 1.35rem; font-weight: 800; color: var(--primary);">€ 0,00</div>
+            </div>
+            <div style="background: var(--bg-secondary, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px;">
+              <div style="font-size: 0.76rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); margin-bottom: 4px;">Quantità Venduta</div>
+              <div id="rep-prod-modal-qty" style="font-size: 1.35rem; font-weight: 800; color: var(--text-main);">0 pz</div>
+            </div>
+            <div style="background: var(--bg-secondary, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px 16px;">
+              <div style="font-size: 0.76rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); margin-bottom: 4px;">Prezzo Medio</div>
+              <div id="rep-prod-modal-price" style="font-size: 1.35rem; font-weight: 800; color: var(--text-main);">€ 0,00</div>
+            </div>
+          </div>
+
+          <!-- Hourly Wave Chart -->
+          <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 18px 20px 18px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 700; font-size: 0.92rem; color: var(--text-main);">
+              <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">schedule</span>
+              <span>Andamento Vendite per Fascia Oraria</span>
+            </div>
+            <div id="rep-prod-modal-chart-container" class="reports-sales-chart-container" style="position: relative; height: 130px;">
+              <!-- Wave chart injected via JS -->
+            </div>
+          </div>
+
+          <!-- Breakdown by Event (Sagra) -->
+          <div style="background: var(--bg-card, #ffffff); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px 18px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 700; font-size: 0.92rem; color: var(--text-main);">
+              <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">festival</span>
+              <span>Distribuzione per Evento</span>
+            </div>
+            <div id="rep-prod-modal-events-list">
+              <!-- Event breakdown bars injected via JS -->
+            </div>
+          </div>
         </div>
       </div>
     </div>

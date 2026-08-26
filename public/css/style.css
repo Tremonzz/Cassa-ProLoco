@@ -6509,11 +6509,64 @@ img {
   font-weight: 600;
 }
 
-/* Scrollable Events Table Container (Height sized for ~10 records) */
+/* Topbar for Tab Controls (e.g. Products Tab) */
+.reports-tab-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.reports-tab-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reports-tab-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Scrollable Events & Products Table Container (Height sized for ~8-9 records to guarantee visible scrollbar) */
 .reports-scrollable-table {
-  max-height: 530px;
+  max-height: 440px;
   overflow-y: auto;
+  overflow-x: auto;
   position: relative;
+  border-radius: 0 0 var(--radius-lg, 14px) var(--radius-lg, 14px);
+}
+
+.reports-table-more-row td,
+.reports-table-end-row td {
+  text-align: center !important;
+  padding: 13px 16px !important;
+  font-size: 0.82rem !important;
+  font-weight: 500;
+  color: var(--text-light) !important;
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.02)) !important;
+  border-top: 1px dashed var(--border-color, #e2e8f0) !important;
+}
+
+[data-theme="dark"] .reports-table-more-row td,
+[data-theme="dark"] .reports-table-end-row td {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.reports-table-more-row:hover td,
+.reports-table-end-row:hover td {
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.02)) !important;
+}
+
+.reports-table-indicator-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 /* Sortable Table Headers */

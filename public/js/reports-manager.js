@@ -336,6 +336,9 @@
         updateDateFilterButtonLabel();
         closeReportsDateRangeModal();
         loadReportsOverview();
+        if (reportsState.activeTab === 'products') {
+            loadProductsBreakdown();
+        }
     }
 
     /**
@@ -391,6 +394,8 @@
             loadReportsOverview();
         } else if (tabName === 'events' && reportsState.overviewData) {
             renderEventsTabSection(reportsState.overviewData.sagras);
+        } else if (tabName === 'products') {
+            loadProductsBreakdown();
         }
     }
 
@@ -1132,6 +1137,10 @@
             `;
         }).join('');
 
+        // Remove previous status row if existing
+        const prevStatusRow = tbody.querySelector('.reports-table-status-row');
+        if (prevStatusRow) prevStatusRow.remove();
+
         if (reset) {
             tbody.innerHTML = rowsHtml;
         } else {
@@ -1139,6 +1148,33 @@
         }
 
         eventsTableState.renderedCount += nextChunk.length;
+
+        // Append 11th row for loading / end of list
+        let statusRowHtml = '';
+        if (eventsTableState.renderedCount < totalItems) {
+            statusRowHtml = `
+                <tr class="reports-table-status-row reports-table-more-row">
+                    <td colspan="7">
+                        <div class="reports-table-indicator-content">
+                            <span class="material-symbols-rounded spin" style="font-size: 16px; color: var(--primary);">progress_activity</span>
+                            <span>Scorri per caricare altri eventi (${eventsTableState.renderedCount} di ${totalItems} visualizzati)</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        } else {
+            statusRowHtml = `
+                <tr class="reports-table-status-row reports-table-end-row">
+                    <td colspan="7">
+                        <div class="reports-table-indicator-content">
+                            <span class="material-symbols-rounded" style="font-size: 16px; color: var(--primary);">check_circle</span>
+                            <span>Fine elenco (${totalItems} ${totalItems === 1 ? 'evento' : 'eventi totali'})</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.insertAdjacentHTML('beforeend', statusRowHtml);
     }
 
     /**
@@ -1337,6 +1373,15 @@
             if (panel) panel.style.display = 'none';
             if (btn) btn.classList.remove('open');
         });
+        const prodPanel = document.getElementById('rep-prod-event-dropdown');
+        const prodBtn = document.getElementById('rep-prod-event-select-btn');
+        if (prodPanel) prodPanel.style.display = 'none';
+        if (prodBtn) prodBtn.classList.remove('open');
+
+        const catPanel = document.getElementById('rep-prod-cat-dropdown');
+        const catBtn = document.getElementById('rep-prod-cat-select-btn');
+        if (catPanel) catPanel.style.display = 'none';
+        if (catBtn) catBtn.classList.remove('open');
     }
 
     // Close custom dropdowns on clicking outside
@@ -1893,6 +1938,739 @@
         }
     }
 
+    /* =========================================================================
+       PRODUCTS BREAKDOWN TAB (TAB 3: DETTAGLI PRODOTTI)
+       ========================================================================= */
+
+    const productsTableState = {
+        rawList: [],
+        filteredList: [],
+        renderedCount: 0,
+        isLoadingMore: false,
+        sortKey: 'revenue',
+        sortDirection: 'desc',
+        selectedEventId: 'all',
+        selectedCategory: 'all',
+        grandTotalRevenue: 0,
+        grandTotalQty: 0
+    };
+
+    /**
+     * Fetch products breakdown from /api/reports/products
+     */
+    async function loadProductsBreakdown() {
+        const tbody = document.getElementById('rep-products-tbody');
+        if (tbody && (!productsTableState.rawList || productsTableState.rawList.length === 0)) {
+            tbody.innerHTML = '<tr><td colspan="6" class="reports-table-loading"><span class="material-symbols-rounded spin">progress_activity</span> Caricamento prodotti in corso...</td></tr>';
+        }
+
+        try {
+            const params = new URLSearchParams();
+            if (reportsState.dateFilter.startDate) params.append('start_date', reportsState.dateFilter.startDate);
+            if (reportsState.dateFilter.endDate) params.append('end_date', reportsState.dateFilter.endDate);
+            if (productsTableState.selectedEventId && productsTableState.selectedEventId !== 'all') {
+                params.append('sagra_id', productsTableState.selectedEventId);
+            }
+
+            const queryString = params.toString();
+            const url = `/api/reports/products${queryString ? '?' + queryString : ''}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (!data.success) {
+                throw new Error(data.error || "Errore durante il caricamento dei prodotti");
+            }
+
+            productsTableState.rawList = data.products || [];
+            productsTableState.grandTotalRevenue = Number(data.grandTotalRevenue) || 0;
+            productsTableState.grandTotalQty = Number(data.grandTotalQty) || 0;
+
+            const sagrasList = (eventsTableState.rawList && eventsTableState.rawList.length > 0)
+                ? eventsTableState.rawList
+                : (reportsState.overviewData?.sagras || []);
+
+            filterReportsProductsList();
+            renderProdEventDropdownOptions(sagrasList, '');
+            updateProdEventButtonLabel();
+            renderProdCatDropdownOptions('');
+            updateProdCatButtonLabel();
+        } catch (e) {
+            console.error("Error loading products breakdown:", e);
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" class="reports-table-empty" style="color:var(--danger,#ef4444);">Errore nel caricamento: ${escapeHtml(e.message)}</td></tr>`;
+            }
+        }
+    }
+
+    /**
+     * Helper to sort products array based on sortKey and sortDirection.
+     */
+    function sortProductsList(list, key, direction) {
+        const sorted = [...list];
+        sorted.sort((a, b) => {
+            let valA, valB;
+            if (key === 'name') {
+                valA = (a.product_name || '').toLowerCase();
+                valB = (b.product_name || '').toLowerCase();
+                return direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            } else if (key === 'category') {
+                valA = (a.category_name || '').toLowerCase();
+                valB = (b.category_name || '').toLowerCase();
+                return direction === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            } else if (key === 'qty') {
+                valA = Number(a.total_qty) || 0;
+                valB = Number(b.total_qty) || 0;
+            } else if (key === 'price') {
+                valA = Number(a.avg_price) || 0;
+                valB = Number(b.avg_price) || 0;
+            } else if (key === 'share') {
+                valA = Number(a.total_revenue) || 0;
+                valB = Number(b.total_revenue) || 0;
+            } else { // 'revenue'
+                valA = Number(a.total_revenue) || 0;
+                valB = Number(b.total_revenue) || 0;
+            }
+
+            return direction === 'asc' ? valA - valB : valB - valA;
+        });
+        return sorted;
+    }
+
+    /**
+     * Filter products by category and search input query and re-render.
+     */
+    function filterReportsProductsList() {
+        const searchInput = document.getElementById('rep-products-search-input');
+        const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const list = productsTableState.rawList || [];
+
+        let filtered = list;
+        if (productsTableState.selectedCategory && productsTableState.selectedCategory !== 'all') {
+            filtered = filtered.filter(p => (p.category_name || 'Altro').trim() === productsTableState.selectedCategory);
+        }
+        if (query) {
+            filtered = filtered.filter(p => 
+                (p.product_name && p.product_name.toLowerCase().includes(query)) ||
+                (p.category_name && p.category_name.toLowerCase().includes(query))
+            );
+        }
+
+        productsTableState.filteredList = sortProductsList(filtered, productsTableState.sortKey, productsTableState.sortDirection);
+
+        const countBadge = document.getElementById('rep-products-count-badge');
+        if (countBadge) {
+            countBadge.innerText = `${productsTableState.filteredList.length} ${productsTableState.filteredList.length === 1 ? 'prodotto' : 'prodotti'}`;
+        }
+
+        renderNextProductsChunk(true);
+
+        const wrapper = document.getElementById('rep-products-table-wrapper');
+        if (wrapper) wrapper.scrollTop = 0;
+    }
+
+    /**
+     * Render next chunk of products (10 per page) with lazy scroll append.
+     */
+    function renderNextProductsChunk(reset = false) {
+        const tbody = document.getElementById('rep-products-tbody');
+        if (!tbody) return;
+
+        if (reset) {
+            productsTableState.renderedCount = 0;
+            updateProductsSortArrows();
+        }
+
+        const filtered = productsTableState.filteredList || [];
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="reports-table-empty">Nessun prodotto trovato per i filtri selezionati</td></tr>';
+            return;
+        }
+
+        const start = productsTableState.renderedCount;
+        const chunkSize = 10;
+        const nextChunk = filtered.slice(start, start + chunkSize);
+
+        if (nextChunk.length === 0 && !reset) return;
+
+        const grandTotal = productsTableState.grandTotalRevenue || 1;
+
+        const rowsHtml = nextChunk.map(p => {
+            const rev = Number(p.total_revenue) || 0;
+            const qty = Number(p.total_qty) || 0;
+            const avgPrice = Number(p.avg_price) || (qty > 0 ? rev / qty : 0);
+            const share = grandTotal > 0 ? (rev / grandTotal) * 100 : 0;
+            const sharePctFormatted = `${share.toFixed(1)}%`;
+
+            const cat = (p.category_name || 'Altro').trim();
+            const catLower = cat.toLowerCase();
+            let catIcon = 'category';
+            if (catLower === 'cibo' || catLower.includes('piatt') || catLower.includes('cucin') || catLower.includes('prim') || catLower.includes('second')) {
+                catIcon = 'restaurant';
+            } else if (catLower === 'bevande' || catLower.includes('bar') || catLower.includes('drink') || catLower.includes('birr') || catLower.includes('vin')) {
+                catIcon = 'local_bar';
+            } else if (catLower === 'dolci' || catLower.includes('dessert')) {
+                catIcon = 'cake';
+            }
+
+            return `
+                <tr onclick="openReportsProductModal('${escapeHtml(p.product_name)}')" style="cursor: pointer;" title="Clicca per visualizzare le statistiche dettagliate del piatto">
+                    <td>
+                        <div class="reports-event-name-cell">
+                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary, #2563eb); margin-right: 4px;">${catIcon}</span>
+                            <span class="reports-event-name">${escapeHtml(p.product_name)}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="reports-table-cat-badge">${escapeHtml(cat)}</span>
+                    </td>
+                    <td class="th-align-right font-medium">
+                        ${qty.toLocaleString('it-IT')} pz
+                    </td>
+                    <td class="th-align-right" style="color: var(--text-light);">
+                        ${formatCurrency(avgPrice)}
+                    </td>
+                    <td class="th-align-right font-bold" style="color: var(--text-main);">
+                        ${formatCurrency(rev)}
+                    </td>
+                    <td class="th-align-right font-medium">
+                        <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                            <div class="reports-progress-track" style="width: 50px; height: 5px; margin: 0;">
+                                <div class="reports-progress-fill" style="width: ${Math.max(share, rev > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                            </div>
+                            <span style="min-width: 42px; font-size: 0.82rem;">${sharePctFormatted}</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Remove previous status row if existing
+        const prevStatusRow = tbody.querySelector('.reports-table-status-row');
+        if (prevStatusRow) prevStatusRow.remove();
+
+        if (reset) {
+            tbody.innerHTML = rowsHtml;
+        } else {
+            tbody.insertAdjacentHTML('beforeend', rowsHtml);
+        }
+
+        productsTableState.renderedCount += nextChunk.length;
+
+        // Append 11th row for loading / end of list
+        let statusRowHtml = '';
+        if (productsTableState.renderedCount < filtered.length) {
+            statusRowHtml = `
+                <tr class="reports-table-status-row reports-table-more-row">
+                    <td colspan="6">
+                        <div class="reports-table-indicator-content">
+                            <span class="material-symbols-rounded spin" style="font-size: 16px; color: var(--primary);">progress_activity</span>
+                            <span>Scorri per caricare altri prodotti (${productsTableState.renderedCount} di ${filtered.length} visualizzati)</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        } else {
+            statusRowHtml = `
+                <tr class="reports-table-status-row reports-table-end-row">
+                    <td colspan="6">
+                        <div class="reports-table-indicator-content">
+                            <span class="material-symbols-rounded" style="font-size: 16px; color: var(--primary);">check_circle</span>
+                            <span>Fine elenco (${filtered.length} ${filtered.length === 1 ? 'prodotto' : 'prodotti totali'})</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.insertAdjacentHTML('beforeend', statusRowHtml);
+    }
+
+    /**
+     * Infinite lazy scroll for Products Table.
+     */
+    function handleProductsTableScroll(container) {
+        if (!container) return;
+        if (productsTableState.renderedCount >= productsTableState.filteredList.length) return;
+        if (productsTableState.isLoadingMore) return;
+
+        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 30) {
+            productsTableState.isLoadingMore = true;
+            renderNextProductsChunk(false);
+            productsTableState.isLoadingMore = false;
+        }
+    }
+
+    /**
+     * Update sorting indicators on Products Table column headers.
+     */
+    function updateProductsSortArrows() {
+        const icons = document.querySelectorAll('[data-sort-icon-prod]');
+        icons.forEach(icon => {
+            const field = icon.getAttribute('data-sort-icon-prod');
+            if (field === productsTableState.sortKey) {
+                icon.innerText = productsTableState.sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward';
+                icon.classList.add('active');
+            } else {
+                icon.innerText = '';
+                icon.classList.remove('active');
+            }
+        });
+    }
+
+    /**
+     * Sort products table by a specific column.
+     */
+    function sortReportsProductsBy(field) {
+        if (productsTableState.sortKey === field) {
+            productsTableState.sortDirection = productsTableState.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            productsTableState.sortKey = field;
+            productsTableState.sortDirection = (field === 'name' || field === 'category') ? 'asc' : 'desc';
+        }
+        filterReportsProductsList();
+    }
+
+    /**
+     * Render options list for the Product Tab Event Filter custom dropdown.
+     */
+    function renderProdEventDropdownOptions(list, query) {
+        const container = document.getElementById('rep-prod-event-options');
+        if (!container) return;
+
+        const cleanQuery = (query || '').trim().toLowerCase();
+        let filtered = list;
+        if (cleanQuery) {
+            filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(cleanQuery)));
+        }
+
+        let html = '';
+        const isAllActive = productsTableState.selectedEventId === 'all';
+        if (!cleanQuery || 'tutti gli eventi'.includes(cleanQuery)) {
+            html += `
+                <button type="button" class="reports-dropdown-option ${isAllActive ? 'active' : ''}" onclick="selectProdEventDropdownOption('all')">
+                    <div class="reports-dropdown-option-left">
+                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">apps</span>
+                        <span class="option-name font-bold">Tutti gli eventi</span>
+                    </div>
+                </button>
+            `;
+        }
+
+        if (filtered.length === 0 && !html) {
+            container.innerHTML = '<div class="reports-dropdown-empty">Nessun evento trovato</div>';
+            return;
+        }
+
+        html += filtered.map(s => {
+            const isActive = String(s.id) === String(productsTableState.selectedEventId);
+            const rev = Number(s.revenue) || 0;
+            return `
+                <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectProdEventDropdownOption(${s.id})">
+                    <div class="reports-dropdown-option-left">
+                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">festival</span>
+                        <span class="option-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+                    </div>
+                    <span class="reports-dropdown-option-right">${formatCurrency(rev)}</span>
+                </button>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    /**
+     * Update label of Product Tab Event trigger button.
+     */
+    function updateProdEventButtonLabel() {
+        const textEl = document.getElementById('rep-prod-event-select-text');
+        if (!textEl) return;
+
+        if (productsTableState.selectedEventId === 'all') {
+            textEl.innerText = 'Tutti gli eventi';
+        } else {
+            const list = eventsTableState.rawList || [];
+            const s = list.find(item => String(item.id) === String(productsTableState.selectedEventId));
+            textEl.innerText = s ? s.name : 'Tutti gli eventi';
+        }
+    }
+
+    /**
+     * Toggle open/close of Product Tab Event Filter custom dropdown.
+     */
+    function toggleProdEventDropdown(e) {
+        if (e) e.stopPropagation();
+        closeAllCompareDropdowns();
+
+        const panel = document.getElementById('rep-prod-event-dropdown');
+        const btn = document.getElementById('rep-prod-event-select-btn');
+        if (!panel || !btn) return;
+
+        const isOpen = panel.style.display === 'flex';
+        if (isOpen) {
+            panel.style.display = 'none';
+            btn.classList.remove('open');
+        } else {
+            panel.style.display = 'flex';
+            btn.classList.add('open');
+
+            const searchInput = document.getElementById('rep-prod-event-search');
+            if (searchInput) {
+                searchInput.value = '';
+                setTimeout(() => searchInput.focus(), 50);
+            }
+            renderProdEventDropdownOptions(eventsTableState.rawList || [], '');
+        }
+    }
+
+    /**
+     * Filter items in Product Tab Event Filter dropdown by search text.
+     */
+    function filterProdEventDropdownItems(query) {
+        renderProdEventDropdownOptions(eventsTableState.rawList || [], query);
+    }
+
+    /**
+     * Select an event in Product Tab Event Filter.
+     */
+    function selectProdEventDropdownOption(id) {
+        productsTableState.selectedEventId = id;
+        updateProdEventButtonLabel();
+        closeAllCompareDropdowns();
+        loadProductsBreakdown();
+    }
+
+    /**
+     * Render options list for the Product Tab Category Filter custom dropdown.
+     */
+    function renderProdCatDropdownOptions(query) {
+        const container = document.getElementById('rep-prod-cat-options');
+        if (!container) return;
+
+        const cleanQuery = (query || '').trim().toLowerCase();
+        const raw = productsTableState.rawList || [];
+        const catMap = new Map();
+
+        raw.forEach(p => {
+            const cName = (p.category_name || 'Altro').trim();
+            catMap.set(cName, (catMap.get(cName) || 0) + 1);
+        });
+
+        let catList = Array.from(catMap.entries()).map(([name, count]) => ({ name, count }));
+        if (cleanQuery) {
+            catList = catList.filter(c => c.name.toLowerCase().includes(cleanQuery));
+        }
+
+        let html = '';
+        const isAllActive = productsTableState.selectedCategory === 'all';
+        if (!cleanQuery || 'tutte le categorie'.includes(cleanQuery)) {
+            html += `
+                <button type="button" class="reports-dropdown-option ${isAllActive ? 'active' : ''}" onclick="selectProdCatDropdownOption('all')">
+                    <div class="reports-dropdown-option-left">
+                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">category</span>
+                        <span class="option-name font-bold">Tutte le categorie</span>
+                    </div>
+                </button>
+            `;
+        }
+
+        if (catList.length === 0 && !html) {
+            container.innerHTML = '<div class="reports-dropdown-empty">Nessuna categoria trovata</div>';
+            return;
+        }
+
+        html += catList.map(c => {
+            const isActive = productsTableState.selectedCategory === c.name;
+            return `
+                <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectProdCatDropdownOption('${escapeHtml(c.name)}')">
+                    <div class="reports-dropdown-option-left">
+                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">label</span>
+                        <span class="option-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</span>
+                    </div>
+                    <span class="reports-dropdown-option-right" style="font-size:0.75rem;">${c.count} piatti</span>
+                </button>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    /**
+     * Update label of Product Tab Category trigger button.
+     */
+    function updateProdCatButtonLabel() {
+        const textEl = document.getElementById('rep-prod-cat-select-text');
+        if (!textEl) return;
+
+        if (productsTableState.selectedCategory === 'all') {
+            textEl.innerText = 'Tutte le categorie';
+        } else {
+            textEl.innerText = productsTableState.selectedCategory;
+        }
+    }
+
+    /**
+     * Toggle open/close of Product Tab Category Filter dropdown.
+     */
+    function toggleProdCatDropdown(e) {
+        if (e) e.stopPropagation();
+        closeAllCompareDropdowns();
+
+        const panel = document.getElementById('rep-prod-cat-dropdown');
+        const btn = document.getElementById('rep-prod-cat-select-btn');
+        if (!panel || !btn) return;
+
+        const isOpen = panel.style.display === 'flex';
+        if (isOpen) {
+            panel.style.display = 'none';
+            btn.classList.remove('open');
+        } else {
+            panel.style.display = 'flex';
+            btn.classList.add('open');
+
+            const searchInput = document.getElementById('rep-prod-cat-search');
+            if (searchInput) {
+                searchInput.value = '';
+                setTimeout(() => searchInput.focus(), 50);
+            }
+            renderProdCatDropdownOptions('');
+        }
+    }
+
+    /**
+     * Filter items in Product Tab Category Filter dropdown by search text.
+     */
+    function filterProdCatDropdownItems(query) {
+        renderProdCatDropdownOptions(query);
+    }
+
+    /**
+     * Select a category in Product Tab Category Filter.
+     */
+    function selectProdCatDropdownOption(catName) {
+        productsTableState.selectedCategory = catName;
+        updateProdCatButtonLabel();
+        closeAllCompareDropdowns();
+        filterReportsProductsList();
+    }
+
+    /* =========================================================================
+       SINGLE PRODUCT DETAIL MODAL
+       ========================================================================= */
+
+    /**
+     * Render the hourly sales wave chart inside the product detail modal.
+     */
+    function renderProductModalHourlyChart(hourlySales) {
+        const container = document.getElementById('rep-prod-modal-chart-container');
+        if (!container) return;
+
+        if (!hourlySales || hourlySales.length === 0) {
+            container.innerHTML = '<div class="empty-chart-text" style="padding-top: 40px;">Nessuna vendita registrata nelle fasce orarie</div>';
+            return;
+        }
+
+        let maxOrders = 0;
+        let peakSlot = '';
+        hourlySales.forEach(slot => {
+            if (slot.orders_count > maxOrders) {
+                maxOrders = slot.orders_count;
+                peakSlot = slot.hour_slot;
+            }
+        });
+
+        const svgWidth = 600;
+        const svgHeight = 110;
+        const paddingX = 35;
+        const paddingTop = 18;
+        const paddingBottom = 16;
+
+        const count = hourlySales.length;
+        const usableWidth = svgWidth - (paddingX * 2);
+        const usableHeight = svgHeight - paddingTop - paddingBottom;
+
+        const points = hourlySales.map((slot, i) => {
+            const x = count === 1 ? svgWidth / 2 : paddingX + (i * (usableWidth / (count - 1)));
+            const ratio = maxOrders > 0 ? (slot.orders_count / maxOrders) : 0;
+            const y = (svgHeight - paddingBottom) - (ratio * usableHeight);
+            return { x, y, slot };
+        });
+
+        // Monotone Spline / Cubic Bezier Path
+        let linePath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+        if (points.length === 1) {
+            linePath += ` L ${(points[0].x + 1).toFixed(1)} ${points[0].y.toFixed(1)}`;
+        } else {
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[i === 0 ? i : i - 1];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+
+                const cp1x = p1.x + (p2.x - p0.x) * 0.18;
+                const cp1y = p1.y + (p2.y - p0.y) * 0.18;
+                const cp2x = p2.x - (p3.x - p1.x) * 0.18;
+                const cp2y = p2.y - (p3.y - p1.y) * 0.18;
+
+                linePath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+            }
+        }
+
+        const firstX = points[0].x;
+        const lastX = points[points.length - 1].x;
+        const bottomY = svgHeight - paddingBottom + 8;
+        const areaPath = `${linePath} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+
+        const dotsHtml = points.map(pt => {
+            const isPeak = (pt.slot.hour_slot === peakSlot && maxOrders > 0);
+            const leftPct = (pt.x / svgWidth * 100).toFixed(2);
+            const topPct = (pt.y / svgHeight * 100).toFixed(2);
+            const orderText = pt.slot.orders_count === 1 ? '1 Ordine' : `${pt.slot.orders_count} Ordini (${pt.slot.qty} pz)`;
+
+            return `
+                <div class="modal-chart-point-dot ${isPeak ? 'peak-dot' : ''}" 
+                     style="left: ${leftPct}%; top: ${topPct}%;"
+                     title="${escapeHtml(pt.slot.hour_slot)}: ${orderText} - ${formatCurrency(pt.slot.revenue)}">
+                </div>
+            `;
+        }).join('');
+
+        const labelsHtml = points.map(pt => `
+            <span class="wave-time-label" style="position: absolute; left: ${(pt.x / svgWidth * 100).toFixed(2)}%; transform: translateX(-50%);">
+                ${escapeHtml(pt.slot.hour_slot)}
+            </span>
+        `).join('');
+
+        container.innerHTML = `
+            <div style="position: relative; width: 100%; height: 110px;">
+                <svg class="wave-svg" style="height: 110px;" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="prodModalWaveGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.32" />
+                            <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
+                        </linearGradient>
+                    </defs>
+                    <path class="wave-area-path" d="${areaPath}" style="fill:url(#prodModalWaveGradient);" />
+                    <path class="wave-line-path" d="${linePath}" style="stroke:#2563eb;" />
+                </svg>
+                <div class="modal-wave-dots-wrap" style="height: 110px;">
+                    ${dotsHtml}
+                </div>
+            </div>
+            <div style="position: relative; width: 100%; height: 20px; margin-top: 4px;">
+                ${labelsHtml}
+            </div>
+        `;
+    }
+
+    /**
+     * Render the events breakdown list inside the product detail modal.
+     */
+    function renderProductModalEvents(eventsBreakdown, totalProductRev) {
+        const container = document.getElementById('rep-prod-modal-events-list');
+        if (!container) return;
+
+        if (!eventsBreakdown || eventsBreakdown.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-light); font-size: 0.86rem; text-align: center; padding: 12px;">Nessun evento associato alle vendite di questo prodotto</div>';
+            return;
+        }
+
+        const maxRev = Number(totalProductRev) > 0 ? Number(totalProductRev) : 1;
+
+        container.innerHTML = eventsBreakdown.map(ev => {
+            const rev = Number(ev.revenue) || 0;
+            const qty = Number(ev.qty) || 0;
+            const pct = Math.min(100, Math.max(0, (rev / maxRev) * 100));
+
+            return `
+                <div style="margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; font-size: 0.88rem;">
+                        <span style="font-weight: 600; color: var(--text-main);">${escapeHtml(ev.sagra_name)}</span>
+                        <div style="text-align: right;">
+                            <span style="font-weight: 700; color: var(--primary); margin-right: 6px;">${formatCurrency(rev)}</span>
+                            <span style="color: var(--text-light); font-size: 0.8rem;">(${qty} pz • ${pct.toFixed(1)}%)</span>
+                        </div>
+                    </div>
+                    <div class="reports-progress-track" style="height: 6px; margin: 0;">
+                        <div class="reports-progress-fill" style="width: ${Math.max(pct, rev > 0 ? 2 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Open product detail modal.
+     */
+    async function openReportsProductModal(productName) {
+        const modal = document.getElementById('reports-product-modal');
+        if (!modal) return;
+
+        document.getElementById('rep-prod-modal-title').innerText = productName;
+        document.getElementById('rep-prod-modal-revenue').innerText = '...';
+        document.getElementById('rep-prod-modal-qty').innerText = '...';
+        document.getElementById('rep-prod-modal-price').innerText = '...';
+        document.getElementById('rep-prod-modal-chart-container').innerHTML = '<div class="empty-chart-text" style="padding-top: 40px;"><span class="material-symbols-rounded spin">progress_activity</span> Caricamento andamento...</div>';
+        document.getElementById('rep-prod-modal-events-list').innerHTML = '<div style="text-align:center; padding:12px; color:var(--text-light);">Caricamento eventi...</div>';
+
+        modal.style.display = 'flex';
+
+        try {
+            const params = new URLSearchParams();
+            params.append('product_name', productName);
+            if (reportsState.dateFilter.startDate) params.append('start_date', reportsState.dateFilter.startDate);
+            if (reportsState.dateFilter.endDate) params.append('end_date', reportsState.dateFilter.endDate);
+            if (productsTableState.selectedEventId && productsTableState.selectedEventId !== 'all') {
+                params.append('sagra_id', productsTableState.selectedEventId);
+            }
+
+            const res = await fetch(`/api/reports/product-detail?${params.toString()}`);
+            const data = await res.json();
+
+            if (!data.success) {
+                throw new Error(data.error || "Errore nel caricamento del dettaglio piatto");
+            }
+
+            const p = data.product;
+            const rev = Number(p.total_revenue) || 0;
+            const qty = Number(p.total_qty) || 0;
+            const avgPrice = Number(p.avg_price) || (qty > 0 ? rev / qty : 0);
+            const cat = (p.category_name || 'Altro').trim();
+
+            document.getElementById('rep-prod-modal-revenue').innerText = formatCurrency(rev);
+            document.getElementById('rep-prod-modal-qty').innerText = `${qty.toLocaleString('it-IT')} pz`;
+            document.getElementById('rep-prod-modal-price').innerText = formatCurrency(avgPrice);
+            document.getElementById('rep-prod-modal-category').innerText = cat;
+            document.getElementById('rep-prod-modal-scope-badge').innerText = (productsTableState.selectedEventId === 'all')
+                ? 'Tutti gli eventi'
+                : (document.getElementById('rep-prod-event-select-text')?.innerText || 'Evento selezionato');
+
+            const catLower = cat.toLowerCase();
+            let catIcon = 'restaurant';
+            if (catLower === 'bevande' || catLower.includes('bar') || catLower.includes('drink') || catLower.includes('birr') || catLower.includes('vin')) {
+                catIcon = 'local_bar';
+            } else if (catLower === 'dolci' || catLower.includes('dessert')) {
+                catIcon = 'cake';
+            }
+            const iconEl = document.getElementById('rep-prod-modal-icon');
+            if (iconEl) iconEl.innerText = catIcon;
+
+            renderProductModalHourlyChart(data.hourlySales);
+            renderProductModalEvents(data.eventsBreakdown, rev);
+        } catch (err) {
+            console.error("Error opening product detail modal:", err);
+            alert("Impossibile caricare i dettagli del piatto: " + err.message);
+            closeReportsProductModal();
+        }
+    }
+
+    /**
+     * Close product detail modal.
+     */
+    function closeReportsProductModal() {
+        const modal = document.getElementById('reports-product-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
     // Expose global functions to window
     window.openReportsView = openReportsView;
     window.closeReportsView = closeReportsView;
@@ -1914,4 +2692,16 @@
     window.toggleCompareDropdown = toggleCompareDropdown;
     window.filterCompareDropdownItems = filterCompareDropdownItems;
     window.selectCompareDropdownOption = selectCompareDropdownOption;
+    window.loadProductsBreakdown = loadProductsBreakdown;
+    window.filterReportsProductsList = filterReportsProductsList;
+    window.sortReportsProductsBy = sortReportsProductsBy;
+    window.handleProductsTableScroll = handleProductsTableScroll;
+    window.toggleProdEventDropdown = toggleProdEventDropdown;
+    window.filterProdEventDropdownItems = filterProdEventDropdownItems;
+    window.selectProdEventDropdownOption = selectProdEventDropdownOption;
+    window.toggleProdCatDropdown = toggleProdCatDropdown;
+    window.filterProdCatDropdownItems = filterProdCatDropdownItems;
+    window.selectProdCatDropdownOption = selectProdCatDropdownOption;
+    window.openReportsProductModal = openReportsProductModal;
+    window.closeReportsProductModal = closeReportsProductModal;
 })();
