@@ -2051,11 +2051,9 @@
         const rev = Number(p.total_revenue) || 0;
         const qty = Number(p.total_qty) || 0;
         const cat = (p.category_name || 'Altro').trim();
-        const rankClass = isTop && rank <= 3 ? `rank-${rank}` : 'rank-other';
+        const rankClass = 'rank-other';
         const pct = maxQty > 0 ? Math.min(100, Math.max(0, (qty / maxQty) * 100)) : 0;
-        const barGradient = isTop 
-            ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-            : 'linear-gradient(90deg, #64748b, #94a3b8)';
+        const barGradient = 'linear-gradient(90deg, #64748b, #94a3b8)';
 
         return `
             <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}')" title="Clicca per visualizzare le statistiche dettagliate">
@@ -2063,7 +2061,7 @@
                 <div class="reports-topflop-info">
                     <div class="reports-topflop-name-row">
                         <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
-                        <span class="reports-topflop-rev" style="color: ${isTop ? 'var(--primary)' : 'var(--text-main)'}; font-weight: 800;">${qty.toLocaleString('it-IT')} pz</span>
+                        <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 800;">${qty.toLocaleString('it-IT')} pz</span>
                     </div>
                     <div class="reports-topflop-sub-row">
                         <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
