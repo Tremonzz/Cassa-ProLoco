@@ -1336,20 +1336,12 @@
 
         const panel = document.getElementById(`rep-custom-dropdown-${index}`);
         const btn = document.getElementById(`rep-custom-select-btn-${index}`);
-        const otherIndex = index === 1 ? 2 : 1;
-        const otherPanel = document.getElementById(`rep-custom-dropdown-${otherIndex}`);
-        const otherBtn = document.getElementById(`rep-custom-select-btn-${otherIndex}`);
-
-        if (otherPanel) otherPanel.style.display = 'none';
-        if (otherBtn) otherBtn.classList.remove('open');
-
         if (!panel || !btn) return;
 
-        const isOpen = panel.style.display === 'flex';
-        if (isOpen) {
-            panel.style.display = 'none';
-            btn.classList.remove('open');
-        } else {
+        const wasOpen = (panel.style.display === 'flex');
+        closeAllCompareDropdowns();
+
+        if (!wasOpen) {
             panel.style.display = 'flex';
             btn.classList.add('open');
 
@@ -2294,15 +2286,7 @@
             const sharePctFormatted = `${share.toFixed(1)}%`;
 
             const cat = (p.category_name || 'Altro').trim();
-            const catLower = cat.toLowerCase();
-            let catIcon = 'category';
-            if (catLower === 'cibo' || catLower.includes('piatt') || catLower.includes('cucin') || catLower.includes('prim') || catLower.includes('second')) {
-                catIcon = 'restaurant';
-            } else if (catLower === 'bevande' || catLower.includes('bar') || catLower.includes('drink') || catLower.includes('birr') || catLower.includes('vin')) {
-                catIcon = 'local_bar';
-            } else if (catLower === 'dolci' || catLower.includes('dessert')) {
-                catIcon = 'cake';
-            }
+            const catIcon = getCategoryIconName(cat);
 
             return `
                 <tr onclick="openReportsProductModal('${escapeHtml(p.product_name)}')" style="cursor: pointer;" title="Clicca per visualizzare le statistiche dettagliate del piatto">
@@ -2490,17 +2474,15 @@
      */
     function toggleProdEventDropdown(e) {
         if (e) e.stopPropagation();
-        closeAllCompareDropdowns();
 
         const panel = document.getElementById('rep-prod-event-dropdown');
         const btn = document.getElementById('rep-prod-event-select-btn');
         if (!panel || !btn) return;
 
-        const isOpen = panel.style.display === 'flex';
-        if (isOpen) {
-            panel.style.display = 'none';
-            btn.classList.remove('open');
-        } else {
+        const wasOpen = (panel.style.display === 'flex');
+        closeAllCompareDropdowns();
+
+        if (!wasOpen) {
             panel.style.display = 'flex';
             btn.classList.add('open');
 
@@ -2571,10 +2553,11 @@
 
         html += catList.map(c => {
             const isActive = productsTableState.selectedCategory === c.name;
+            const icon = getCategoryIconName(c.name);
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectProdCatDropdownOption('${escapeHtml(c.name)}')">
                     <div class="reports-dropdown-option-left">
-                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">label</span>
+                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">${icon}</span>
                         <span class="option-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</span>
                     </div>
                     <span class="reports-dropdown-option-right" style="font-size:0.75rem;">${c.count} piatti</span>
@@ -2586,16 +2569,40 @@
     }
 
     /**
+     * Helper to get appropriate Material Symbol icon name for a category.
+     */
+    function getCategoryIconName(catName) {
+        if (!catName || catName === 'all') return 'category';
+        const name = catName.trim().toLowerCase();
+        if (name === 'cibo' || name.includes('cucin') || name.includes('prim') || name.includes('second') || name.includes('panin') || name.includes('piad') || name.includes('pizz') || name.includes('piatt') || name.includes('gastronom')) {
+            return 'restaurant';
+        }
+        if (name === 'bevande' || name.includes('drink') || name.includes('bar') || name.includes('birr') || name.includes('vin') || name.includes('bibit') || name.includes('acqua') || name.includes('caff') || name.includes('cocktail')) {
+            return 'local_bar';
+        }
+        if (name === 'dolci' || name.includes('dessert') || name.includes('torta') || name.includes('gelat') || name.includes('pasticc')) {
+            return 'cake';
+        }
+        if (name === 'prodotti base' || name.includes('base') || name.includes('ingredient') || name.includes('materie')) {
+            return 'inventory_2';
+        }
+        return 'label';
+    }
+
+    /**
      * Update label of Product Tab Category trigger button.
      */
     function updateProdCatButtonLabel() {
         const textEl = document.getElementById('rep-prod-cat-select-text');
+        const iconEl = document.getElementById('rep-prod-cat-btn-icon');
         if (!textEl) return;
 
         if (productsTableState.selectedCategory === 'all') {
             textEl.innerText = 'Tutte le categorie';
+            if (iconEl) iconEl.innerText = 'category';
         } else {
             textEl.innerText = productsTableState.selectedCategory;
+            if (iconEl) iconEl.innerText = getCategoryIconName(productsTableState.selectedCategory);
         }
     }
 
@@ -2604,17 +2611,15 @@
      */
     function toggleProdCatDropdown(e) {
         if (e) e.stopPropagation();
-        closeAllCompareDropdowns();
 
         const panel = document.getElementById('rep-prod-cat-dropdown');
         const btn = document.getElementById('rep-prod-cat-select-btn');
         if (!panel || !btn) return;
 
-        const isOpen = panel.style.display === 'flex';
-        if (isOpen) {
-            panel.style.display = 'none';
-            btn.classList.remove('open');
-        } else {
+        const wasOpen = (panel.style.display === 'flex');
+        closeAllCompareDropdowns();
+
+        if (!wasOpen) {
             panel.style.display = 'flex';
             btn.classList.add('open');
 
@@ -2942,6 +2947,7 @@
     window.selectProdEventDropdownOption = selectProdEventDropdownOption;
     window.toggleProdCatDropdown = toggleProdCatDropdown;
     window.filterProdCatDropdownItems = filterProdCatDropdownItems;
+    window.selectProdCatDropdownOption = selectProdCatDropdownOption;
     window.openReportsProductModal = openReportsProductModal;
     window.closeReportsProductModal = closeReportsProductModal;
     window.showProdModalChartTooltip = showProdModalChartTooltip;
