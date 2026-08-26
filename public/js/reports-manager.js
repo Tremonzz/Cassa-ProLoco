@@ -1995,6 +1995,7 @@
             updateProdEventButtonLabel();
             renderProdCatDropdownOptions('');
             updateProdCatButtonLabel();
+            renderTopAndFlopProducts();
         } catch (e) {
             console.error("Error loading products breakdown:", e);
             if (tbody) {
@@ -2038,6 +2039,76 @@
     }
 
     /**
+     * Shared template to render a single row for Top 5 or Flop 5 cards (by quantity sold).
+     */
+    function renderTopFlopItemTemplate(p, rank, maxQty, isTop) {
+        const rev = Number(p.total_revenue) || 0;
+        const qty = Number(p.total_qty) || 0;
+        const cat = (p.category_name || 'Altro').trim();
+        const rankClass = isTop && rank <= 3 ? `rank-${rank}` : 'rank-other';
+        const pct = maxQty > 0 ? Math.min(100, Math.max(0, (qty / maxQty) * 100)) : 0;
+        const barGradient = isTop 
+            ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+            : 'linear-gradient(90deg, #64748b, #94a3b8)';
+
+        return `
+            <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}')" title="Clicca per visualizzare le statistiche dettagliate">
+                <div class="reports-topflop-rank ${rankClass}">${rank}</div>
+                <div class="reports-topflop-info">
+                    <div class="reports-topflop-name-row">
+                        <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
+                        <span class="reports-topflop-rev" style="color: ${isTop ? 'var(--primary)' : 'var(--text-main)'}; font-weight: 800;">${qty.toLocaleString('it-IT')} pz</span>
+                    </div>
+                    <div class="reports-topflop-sub-row">
+                        <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
+                        <div class="reports-topflop-track" style="max-width: 90px;">
+                            <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: ${barGradient};"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render Top 5 Best Sellers and Flop 5 least sold items by quantity sold.
+     */
+    function renderTopAndFlopProducts() {
+        const top5Container = document.getElementById('rep-products-top5-list');
+        const flop5Container = document.getElementById('rep-products-flop5-list');
+        if (!top5Container || !flop5Container) return;
+
+        let list = productsTableState.rawList || [];
+        if (productsTableState.selectedCategory && productsTableState.selectedCategory !== 'all') {
+            list = list.filter(p => (p.category_name || 'Altro').trim() === productsTableState.selectedCategory);
+        }
+
+        if (list.length === 0) {
+            top5Container.innerHTML = '<div style="text-align:center; padding: 18px; color: var(--text-light); font-size: 0.84rem;">Nessun prodotto disponibile</div>';
+            flop5Container.innerHTML = '<div style="text-align:center; padding: 18px; color: var(--text-light); font-size: 0.84rem;">Nessun prodotto disponibile</div>';
+            return;
+        }
+
+        // Top 5 by quantity sold
+        const top5 = [...list].sort((a, b) => {
+            const diffQty = (Number(b.total_qty) || 0) - (Number(a.total_qty) || 0);
+            if (diffQty !== 0) return diffQty;
+            return (Number(b.total_revenue) || 0) - (Number(a.total_revenue) || 0);
+        }).slice(0, 5);
+        const maxTopQty = Number(top5[0]?.total_qty) || 1;
+        top5Container.innerHTML = top5.map((p, idx) => renderTopFlopItemTemplate(p, idx + 1, maxTopQty, true)).join('');
+
+        // Flop 5 (Least quantity sold)
+        const flop5 = [...list].sort((a, b) => {
+            const diffQty = (Number(a.total_qty) || 0) - (Number(b.total_qty) || 0);
+            if (diffQty !== 0) return diffQty;
+            return (Number(a.total_revenue) || 0) - (Number(b.total_revenue) || 0);
+        }).slice(0, 5);
+        const maxFlopQty = Math.max(...flop5.map(p => Number(p.total_qty) || 0), 1);
+        flop5Container.innerHTML = flop5.map((p, idx) => renderTopFlopItemTemplate(p, idx + 1, maxFlopQty, false)).join('');
+    }
+
+    /**
      * Filter products by category and search input query and re-render.
      */
     function filterReportsProductsList() {
@@ -2063,6 +2134,7 @@
             countBadge.innerText = `${productsTableState.filteredList.length} ${productsTableState.filteredList.length === 1 ? 'prodotto' : 'prodotti'}`;
         }
 
+        renderTopAndFlopProducts();
         renderNextProductsChunk(true);
 
         const wrapper = document.getElementById('rep-products-table-wrapper');

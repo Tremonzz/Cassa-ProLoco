@@ -6569,6 +6569,120 @@ img {
   gap: 8px;
 }
 
+/* Top / Flop Product Cards */
+.reports-topflop-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md, 10px);
+  transition: background 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+}
+
+.reports-topflop-item:hover {
+  background: var(--bg-hover, #f1f5f9);
+  border-color: var(--border-color, #e2e8f0);
+}
+
+[data-theme="dark"] .reports-topflop-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.reports-topflop-rank {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.reports-topflop-rank.rank-1 {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #b45309;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
+}
+
+.reports-topflop-rank.rank-2 {
+  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  color: #475569;
+}
+
+.reports-topflop-rank.rank-3 {
+  background: linear-gradient(135deg, #ffedd5, #fed7aa);
+  color: #c2410c;
+}
+
+.reports-topflop-rank.rank-other {
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.04));
+  color: var(--text-light, #64748b);
+}
+
+[data-theme="dark"] .reports-topflop-rank.rank-other {
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+}
+
+.reports-topflop-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-topflop-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.reports-topflop-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reports-topflop-rev {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.reports-topflop-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--text-light);
+  gap: 8px;
+}
+
+.reports-topflop-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border-color, #e2e8f0);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.reports-topflop-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
 /* Sortable Table Headers */
 .reports-sortable-th {
   cursor: pointer;

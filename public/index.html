@@ -815,6 +815,39 @@
               </div>
             </div>
           </div>
+
+          <!-- Top 5 Best Seller & Flop 5 Meno Venduti Cards Grid (Under Table) -->
+          <div class="reports-products-topflop-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; margin-top: 20px;">
+            <!-- Top 5 Card -->
+            <div class="reports-card-box" style="margin-bottom: 0;">
+              <div class="reports-card-header" style="padding: 14px 20px;">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded" style="color: #f59e0b;">emoji_events</span>
+                  <span>Top 5 Più Venduti</span>
+                </div>
+              </div>
+              <div class="reports-card-body" style="padding: 10px 16px 14px 16px;">
+                <div id="rep-products-top5-list" class="reports-topflop-list">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Flop 5 Card -->
+            <div class="reports-card-box" style="margin-bottom: 0;">
+              <div class="reports-card-header" style="padding: 14px 20px;">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded" style="color: var(--text-light);">trending_down</span>
+                  <span>5 Meno Venduti</span>
+                </div>
+              </div>
+              <div class="reports-card-body" style="padding: 10px 16px 14px 16px;">
+                <div id="rep-products-flop5-list" class="reports-topflop-list">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div id="reports-tab-hourly" class="reports-tab-section" style="display: none;">
