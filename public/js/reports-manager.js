@@ -523,13 +523,13 @@
         `;
 
         const dot = e.target;
-        const container = tooltip.closest('.reports-timeline-card');
-        if (dot && container) {
+        const parent = tooltip.offsetParent || tooltip.parentElement;
+        if (dot && parent) {
             const dotRect = dot.getBoundingClientRect();
-            const cardRect = container.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
 
-            const left = dotRect.left - cardRect.left + (dotRect.width / 2);
-            const top = dotRect.top - cardRect.top;
+            const left = dotRect.left - parentRect.left + (dotRect.width / 2);
+            const top = dotRect.top - parentRect.top - 8;
 
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;
@@ -1473,13 +1473,13 @@
         tooltip.innerHTML = contentHtml;
 
         const dot = e.target;
-        const container = tooltip.closest('.reports-compare-card');
-        if (dot && container) {
+        const parent = tooltip.offsetParent || tooltip.parentElement;
+        if (dot && parent) {
             const dotRect = dot.getBoundingClientRect();
-            const cardRect = container.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
 
-            const left = dotRect.left - cardRect.left + (dotRect.width / 2);
-            const top = dotRect.top - cardRect.top;
+            const left = dotRect.left - parentRect.left + (dotRect.width / 2);
+            const top = dotRect.top - parentRect.top - 8;
 
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;

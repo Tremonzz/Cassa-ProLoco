@@ -6194,8 +6194,8 @@ img {
   position: absolute;
   pointer-events: none;
   opacity: 0;
-  transform: translate(-50%, -100%) scale(0.92);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transform: translate(-50%, -100%) scale(0.95);
+  transition: opacity 0.15s ease, transform 0.15s ease;
   background: var(--card-bg, #ffffff);
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
@@ -6207,7 +6207,20 @@ img {
 
 .reports-chart-tooltip.visible {
   opacity: 1;
-  transform: translate(-50%, -125%) scale(1);
+  transform: translate(-50%, -100%) scale(1);
+}
+
+.reports-chart-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--border-color);
 }
 
 .reports-tooltip-time {
