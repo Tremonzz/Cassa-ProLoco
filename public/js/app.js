@@ -3877,13 +3877,13 @@ function showChartTooltip(e, hourSlot, orderText) {
     `;
 
     const dot = e.target;
-    const card = tooltip.closest('.stats-chart-card');
+    const card = tooltip.closest('.stats-chart-card') || tooltip.parentElement;
     if (dot && card) {
         const dotRect = dot.getBoundingClientRect();
         const cardRect = card.getBoundingClientRect();
 
         const left = dotRect.left - cardRect.left + (dotRect.width / 2);
-        const top = dotRect.top - cardRect.top;
+        const top = dotRect.top - cardRect.top - 8;
 
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
@@ -3966,34 +3966,40 @@ function renderHourlyChart(hourlySales) {
     const dotsHtml = points.map(pt => {
         const isPeak = (pt.slot.hour_slot === peakSlot && maxOrders > 0);
         const orderText = pt.slot.orders_count === 1 ? '1 Ordine' : `${pt.slot.orders_count} Ordini`;
+        const leftPct = (pt.x / svgWidth * 100).toFixed(2);
+        const topPct = (pt.y / svgHeight * 100).toFixed(2);
+
         return `
-            <circle class="wave-dot ${isPeak ? 'peak-dot' : ''}" 
-                    cx="${pt.x.toFixed(1)}" 
-                    cy="${pt.y.toFixed(1)}"
-                    onmouseenter="showChartTooltip(event, '${pt.slot.hour_slot}', '${orderText}')"
-                    onmouseleave="hideChartTooltip()">
-            </circle>
+            <div class="modal-chart-point-dot ${isPeak ? 'peak-dot' : ''}" 
+                 style="left: ${leftPct}%; top: ${topPct}%;"
+                 onmouseenter="showChartTooltip(event, '${escapeHtml(pt.slot.hour_slot)}', '${orderText}')"
+                 onmouseleave="hideChartTooltip()">
+            </div>
         `;
     }).join('');
 
     const labelsHtml = points.map(pt => `
         <span class="wave-time-label" style="position: absolute; left: ${(pt.x / svgWidth * 100).toFixed(2)}%; transform: translateX(-50%);">
-            ${pt.slot.hour_slot}
+            ${escapeHtml(pt.slot.hour_slot)}
         </span>
     `).join('');
 
     chartContainer.innerHTML = `
-        <svg class="wave-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none">
-            <defs>
-                <linearGradient id="waveGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--btn-bg)" stop-opacity="0.32" />
-                    <stop offset="100%" stop-color="var(--btn-bg)" stop-opacity="0.0" />
-                </linearGradient>
-            </defs>
-            <path class="wave-area-path" d="${areaPath}" />
-            <path class="wave-line-path" d="${linePath}" />
-            ${dotsHtml}
-        </svg>
+        <div style="position: relative; width: 100%; height: 140px;">
+            <svg class="wave-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="waveGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="var(--btn-bg)" stop-opacity="0.32" />
+                        <stop offset="100%" stop-color="var(--btn-bg)" stop-opacity="0.0" />
+                    </linearGradient>
+                </defs>
+                <path class="wave-area-path" d="${areaPath}" />
+                <path class="wave-line-path" d="${linePath}" />
+            </svg>
+            <div class="modal-wave-dots-wrap">
+                ${dotsHtml}
+            </div>
+        </div>
         <div style="position: relative; width: 100%; height: 22px; margin-top: 6px;">
             ${labelsHtml}
         </div>

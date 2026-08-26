@@ -792,14 +792,15 @@
             const revenueText = formatCurrency(rev);
             const orderText = pt.slot.orders_count === 1 ? '1 scontrino' : `${pt.slot.orders_count} scontrini`;
             const titleLabel = pt.slot.label || pt.slot.time_key;
+            const leftPct = (pt.x / svgWidth * 100).toFixed(2);
+            const topPct = (pt.y / svgHeight * 100).toFixed(2);
 
             return `
-                <circle class="reports-wave-dot ${isPeak ? 'peak-dot' : ''}" 
-                        cx="${pt.x.toFixed(1)}" 
-                        cy="${pt.y.toFixed(1)}"
-                        onmouseenter="showReportsChartTooltip(event, '${escapeHtml(titleLabel)}', '${revenueText}', '${orderText}')"
-                        onmouseleave="hideReportsChartTooltip()">
-                </circle>
+                <div class="reports-chart-point-dot ${isPeak ? 'peak-dot' : ''}" 
+                     style="left: ${leftPct}%; top: ${topPct}%; background: var(--primary, #2563eb);"
+                     onmouseenter="showReportsChartTooltip(event, '${escapeHtml(titleLabel)}', '${revenueText}', '${orderText}')"
+                     onmouseleave="hideReportsChartTooltip()">
+                </div>
             `;
         }).join('');
 
@@ -826,8 +827,10 @@
                 </defs>
                 <path class="reports-wave-area-path" d="${areaPath}" />
                 <path class="reports-wave-line-path" d="${linePath}" />
-                ${dotsHtml}
             </svg>
+            <div class="reports-wave-dots-wrap">
+                ${dotsHtml}
+            </div>
             <div class="reports-wave-labels-wrap">
                 ${labelsHtml}
             </div>
@@ -1597,40 +1600,40 @@
         const areaPath1 = `${linePath1} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
 
         let wave2Markup = '';
+        let dots2Html = '';
         if (data2 && name2) {
             const linePath2 = buildMonotoneSplinePath(points2, baselineY);
             const areaPath2 = `${linePath2} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
 
-            const dots2 = points2.map(pt => {
+            dots2Html = points2.map(pt => {
                 if (pt.slot.rev2 <= 0) return '';
+                const leftPct = (pt.x / svgWidth * 100).toFixed(2);
+                const topPct = (pt.y / svgHeight * 100).toFixed(2);
                 return `
-                    <circle class="reports-wave-dot compare-dot-2" 
-                            cx="${pt.x.toFixed(1)}" 
-                            cy="${pt.y.toFixed(1)}"
-                            style="fill:#8b5cf6; stroke:#ffffff; stroke-width:2;"
-                            onmouseenter="showCompareChartTooltip(event, '${escapeHtml(pt.slot.label)}', '${escapeHtml(name1)}', ${pt.slot.rev1}, '${escapeHtml(name2)}', ${pt.slot.rev2})"
-                            onmouseleave="hideCompareChartTooltip()">
-                    </circle>
+                    <div class="reports-chart-point-dot" 
+                         style="left: ${leftPct}%; top: ${topPct}%; background: #8b5cf6;"
+                         onmouseenter="showCompareChartTooltip(event, '${escapeHtml(pt.slot.label)}', '${escapeHtml(name1)}', ${pt.slot.rev1}, '${escapeHtml(name2)}', ${pt.slot.rev2})"
+                         onmouseleave="hideCompareChartTooltip()">
+                    </div>
                 `;
             }).join('');
 
             wave2Markup = `
                 <path class="reports-wave-area-path" d="${areaPath2}" style="fill:url(#compareGradient2);" />
                 <path class="reports-wave-line-path" d="${linePath2}" style="stroke:#8b5cf6;" />
-                ${dots2}
             `;
         }
 
-        const dots1 = points1.map((pt, i) => {
+        const dots1Html = points1.map((pt, i) => {
             if (pt.slot.rev1 <= 0 && (!data2 || points2[i].slot.rev2 <= 0)) return '';
+            const leftPct = (pt.x / svgWidth * 100).toFixed(2);
+            const topPct = (pt.y / svgHeight * 100).toFixed(2);
             return `
-                <circle class="reports-wave-dot compare-dot-1" 
-                        cx="${pt.x.toFixed(1)}" 
-                        cy="${pt.y.toFixed(1)}"
-                        style="fill:#2563eb; stroke:#ffffff; stroke-width:2;"
-                        onmouseenter="showCompareChartTooltip(event, '${escapeHtml(pt.slot.label)}', '${escapeHtml(name1)}', ${pt.slot.rev1}, ${name2 ? `'${escapeHtml(name2)}'` : 'null'}, ${points2[i].slot.rev2})"
-                        onmouseleave="hideCompareChartTooltip()">
-                </circle>
+                <div class="reports-chart-point-dot" 
+                     style="left: ${leftPct}%; top: ${topPct}%; background: #2563eb;"
+                     onmouseenter="showCompareChartTooltip(event, '${escapeHtml(pt.slot.label)}', '${escapeHtml(name1)}', ${pt.slot.rev1}, ${name2 ? `'${escapeHtml(name2)}'` : 'null'}, ${points2[i].slot.rev2})"
+                     onmouseleave="hideCompareChartTooltip()">
+                </div>
             `;
         }).join('');
 
@@ -1658,8 +1661,11 @@
                 ${wave2Markup}
                 <path class="reports-wave-area-path" d="${areaPath1}" style="fill:url(#compareGradient1);" />
                 <path class="reports-wave-line-path" d="${linePath1}" style="stroke:#2563eb;" />
-                ${dots1}
             </svg>
+            <div class="reports-wave-dots-wrap">
+                ${dots2Html}
+                ${dots1Html}
+            </div>
             <div class="reports-wave-labels-wrap">
                 ${labelsHtml}
             </div>
