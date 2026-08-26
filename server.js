@@ -1274,18 +1274,25 @@ app.get('/api/reports/overview', async (req, res) => {
 
     // 2. Sagras breakdown
     let sagraOrderJoin = "";
-    let sagraOrderParams = [];
+    let sagraWhere = "";
+    let sagraQueryParams = [];
+
     if (start_date && end_date) {
       sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?`;
-      sagraOrderParams = [start_date, end_date];
+      sagraWhere = `WHERE (DATE(datetime(s.created_at, 'localtime')) BETWEEN ? AND ? OR EXISTS (SELECT 1 FROM orders ord WHERE ord.sagra_id = s.id AND DATE(datetime(ord.created_at, 'localtime')) BETWEEN ? AND ?))`;
+      sagraQueryParams = [start_date, end_date, start_date, end_date, start_date, end_date];
     } else if (start_date) {
       sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id AND DATE(datetime(o.created_at, 'localtime')) >= ?`;
-      sagraOrderParams = [start_date];
+      sagraWhere = `WHERE (DATE(datetime(s.created_at, 'localtime')) >= ? OR EXISTS (SELECT 1 FROM orders ord WHERE ord.sagra_id = s.id AND DATE(datetime(ord.created_at, 'localtime')) >= ?))`;
+      sagraQueryParams = [start_date, start_date, start_date];
     } else if (end_date) {
       sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id AND DATE(datetime(o.created_at, 'localtime')) <= ?`;
-      sagraOrderParams = [end_date];
+      sagraWhere = `WHERE (DATE(datetime(s.created_at, 'localtime')) <= ? OR EXISTS (SELECT 1 FROM orders ord WHERE ord.sagra_id = s.id AND DATE(datetime(ord.created_at, 'localtime')) <= ?))`;
+      sagraQueryParams = [end_date, end_date, end_date];
     } else {
       sagraOrderJoin = `LEFT JOIN orders o ON o.sagra_id = s.id`;
+      sagraWhere = "";
+      sagraQueryParams = [];
     }
 
     const sagrasList = await new Promise((resolve, reject) => {
@@ -1299,9 +1306,10 @@ app.get('/api/reports/overview', async (req, res) => {
           COALESCE(SUM(o.total), 0) as revenue
         FROM sagras s
         ${sagraOrderJoin}
+        ${sagraWhere}
         GROUP BY s.id
         ORDER BY revenue DESC, s.id DESC
-      `, sagraOrderParams, (err, rows) => {
+      `, sagraQueryParams, (err, rows) => {
         if (err) reject(err); else resolve(rows || []);
       });
     });
