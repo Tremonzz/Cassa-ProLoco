@@ -1728,8 +1728,12 @@ app.get('/api/reports/products', async (req, res) => {
       if (item.remaining_stock === null || item.remaining_stock === undefined) return;
 
       const stat = productStats[`${item.sagra_id}_${item.product_name}`] || { sold_qty: 0, last_sale_at: null, total_revenue: 0 };
-      const remaining = Number(item.remaining_stock) || 0;
       const sold = Number(stat.sold_qty) || 0;
+      const remaining = Number(item.remaining_stock) || 0;
+
+      // Only include products with active sales / order activity within the selected date range
+      if (sold <= 0 || !stat.last_sale_at) return;
+
       const initial = remaining + sold;
       const unsoldPct = initial > 0 ? (remaining / initial) * 100 : 0;
       const soldPct = initial > 0 ? (sold / initial) * 100 : 0;
