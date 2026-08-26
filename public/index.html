@@ -701,24 +701,41 @@
 
         <!-- TAB 3: DETTAGLI PRODOTTI -->
         <div id="reports-tab-products" class="reports-tab-section" style="display: none;">
-          <!-- Top Control Header Bar (Event Selector outside the table) -->
-          <div class="reports-tab-topbar">
-            <div class="reports-custom-select-container" id="rep-prod-event-select-wrap">
-              <span class="reports-select-label">Filtra per Evento:</span>
-              <div class="reports-custom-select-box">
-                <button type="button" class="reports-custom-select-btn" id="rep-prod-event-select-btn" onclick="toggleProdEventDropdown(event)">
-                  <span class="reports-custom-select-text" id="rep-prod-event-select-text">Tutti gli eventi</span>
-                  <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-prod-event-chevron">expand_more</span>
-                </button>
-                <div class="reports-custom-dropdown-panel" id="rep-prod-event-dropdown" style="display: none;">
-                  <div class="reports-dropdown-search-box">
-                    <span class="material-symbols-rounded">search</span>
-                    <input type="text" id="rep-prod-event-search" placeholder="Cerca evento..." oninput="filterProdEventDropdownItems(this.value)" onclick="event.stopPropagation()">
-                  </div>
-                  <div class="reports-dropdown-options-list" id="rep-prod-event-options">
-                    <!-- Populated via JS -->
+          <!-- Topbar: Event selector & Quick info -->
+          <div class="reports-card-box" style="margin-bottom: 20px; padding: 14px 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- Custom Event Dropdown -->
+                <div class="reports-custom-select-container" id="rep-prod-event-select-wrap">
+                  <div class="reports-custom-select-box">
+                    <button type="button" class="reports-custom-select-btn" id="rep-prod-event-select-btn" onclick="toggleProdEventDropdown(event)">
+                      <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">festival</span>
+                      <span class="reports-custom-select-text" id="rep-prod-event-select-text">Tutti gli eventi</span>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-prod-event-chevron">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rep-prod-event-dropdown" style="display: none;">
+                      <div class="reports-dropdown-search-box">
+                        <span class="material-symbols-rounded">search</span>
+                        <input type="text" id="rep-prod-event-search" placeholder="Cerca evento..." oninput="filterProdEventDropdownItems(this.value)" onclick="event.stopPropagation()">
+                      </div>
+                      <div class="reports-dropdown-options-list" id="rep-prod-event-options">
+                        <!-- Populated via JS -->
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                <div id="rep-prod-event-meta-badge" style="font-size: 0.84rem; padding: 7px 14px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-light); font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: var(--text-light);">calendar_today</span>
+                  <span id="rep-prod-event-date-text">Tutto lo storico</span>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="reports-table-action-btn" id="rep-prod-refresh-btn" onclick="loadProductsBreakdown()" title="Aggiorna dati prodotti" style="padding: 7px 14px; font-size: 0.84rem;">
+                  <span class="material-symbols-rounded" id="rep-prod-refresh-icon" style="font-size: 18px; color: var(--text-light);">refresh</span>
+                  <span>Ricarica</span>
+                </button>
               </div>
             </div>
           </div>
@@ -910,8 +927,8 @@
               </div>
 
               <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="reports-table-action-btn" onclick="loadInspectEventData()" title="Aggiorna dati evento" style="padding: 7px 14px; font-size: 0.84rem;">
-                  <span class="material-symbols-rounded" style="font-size: 18px; color: var(--text-light);">refresh</span>
+                <button type="button" class="reports-table-action-btn" id="rep-inspect-refresh-btn" onclick="loadInspectEventData()" title="Aggiorna dati evento" style="padding: 7px 14px; font-size: 0.84rem;">
+                  <span class="material-symbols-rounded" id="rep-inspect-refresh-icon" style="font-size: 18px; color: var(--text-light);">refresh</span>
                   <span>Ricarica</span>
                 </button>
               </div>

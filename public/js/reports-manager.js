@@ -1961,11 +1961,26 @@
      */
     async function loadProductsBreakdown() {
         const tbody = document.getElementById('rep-products-tbody');
+        const refreshIcon = document.getElementById('rep-prod-refresh-icon');
+        const refreshBtn = document.getElementById('rep-prod-refresh-btn');
+
+        if (refreshIcon) refreshIcon.classList.add('spin');
+        if (refreshBtn) refreshBtn.disabled = true;
+
         if (tbody && (!productsTableState.rawList || productsTableState.rawList.length === 0)) {
             tbody.innerHTML = '<tr><td colspan="6" class="reports-table-loading"><span class="material-symbols-rounded spin">progress_activity</span> Caricamento prodotti in corso...</td></tr>';
         }
 
         try {
+            // Also refresh sagras list in background to ensure new events are available
+            fetch('/api/reports/overview').then(r => r.json()).then(ov => {
+                if (ov.success && ov.sagras) {
+                    eventsTableState.rawList = ov.sagras;
+                    renderProdEventDropdownOptions(ov.sagras, '');
+                    updateProdEventButtonLabel();
+                }
+            }).catch(() => {});
+
             const params = new URLSearchParams();
             if (reportsState.dateFilter.startDate) params.append('start_date', reportsState.dateFilter.startDate);
             if (reportsState.dateFilter.endDate) params.append('end_date', reportsState.dateFilter.endDate);
@@ -2006,6 +2021,9 @@
             if (tbody) {
                 tbody.innerHTML = `<tr><td colspan="6" class="reports-table-empty" style="color:var(--danger,#ef4444);">Errore nel caricamento: ${escapeHtml(e.message)}</td></tr>`;
             }
+        } finally {
+            if (refreshIcon) refreshIcon.classList.remove('spin');
+            if (refreshBtn) refreshBtn.disabled = false;
         }
     }
 
@@ -2465,14 +2483,24 @@
      */
     function updateProdEventButtonLabel() {
         const textEl = document.getElementById('rep-prod-event-select-text');
+        const dateBadge = document.getElementById('rep-prod-event-date-text');
         if (!textEl) return;
 
         if (productsTableState.selectedEventId === 'all') {
             textEl.innerText = 'Tutti gli eventi';
+            if (dateBadge) dateBadge.innerText = 'Tutto lo storico';
         } else {
             const list = eventsTableState.rawList || [];
             const s = list.find(item => String(item.id) === String(productsTableState.selectedEventId));
             textEl.innerText = s ? s.name : 'Tutti gli eventi';
+            if (dateBadge && s) {
+                try {
+                    const d = new Date(s.created_at || Date.now());
+                    dateBadge.innerText = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                } catch(e) {
+                    dateBadge.innerText = 'Data N/D';
+                }
+            }
         }
     }
 
@@ -3038,6 +3066,11 @@
         const sagraId = inspectState.selectedSagraId;
         if (!sagraId) return;
 
+        const refreshIcon = document.getElementById('rep-inspect-refresh-icon');
+        const refreshBtn = document.getElementById('rep-inspect-refresh-btn');
+        if (refreshIcon) refreshIcon.classList.add('spin');
+        if (refreshBtn) refreshBtn.disabled = true;
+
         const sagras = eventsTableState.rawList || [];
         const sagra = sagras.find(s => String(s.id) === String(sagraId));
 
@@ -3083,6 +3116,14 @@
 
         try {
             inspectState.isLoading = true;
+
+            // Also refresh sagras list in background
+            fetch('/api/reports/overview').then(r => r.json()).then(ov => {
+                if (ov.success && ov.sagras) {
+                    eventsTableState.rawList = ov.sagras;
+                    renderInspectEventDropdownOptions(ov.sagras, '');
+                }
+            }).catch(() => {});
 
             const [statsRes, prodsRes] = await Promise.all([
                 fetch(`/api/stats?sagraId=${sagraId}`),
@@ -3136,6 +3177,8 @@
             if (chartContainer) chartContainer.innerHTML = `<div class="reports-empty-state" style="color:var(--danger);">Errore: ${escapeHtml(err.message)}</div>`;
         } finally {
             inspectState.isLoading = false;
+            if (refreshIcon) refreshIcon.classList.remove('spin');
+            if (refreshBtn) refreshBtn.disabled = false;
         }
     }
 
