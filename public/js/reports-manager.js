@@ -2525,11 +2525,14 @@
             const leftPct = (pt.x / svgWidth * 100).toFixed(2);
             const topPct = (pt.y / svgHeight * 100).toFixed(2);
             const orderText = pt.slot.orders_count === 1 ? '1 Ordine' : `${pt.slot.orders_count} Ordini (${pt.slot.qty} pz)`;
+            const titleLabel = `Ore ${pt.slot.hour_slot}`;
+            const revFormatted = formatCurrency(pt.slot.revenue);
 
             return `
                 <div class="modal-chart-point-dot ${isPeak ? 'peak-dot' : ''}" 
                      style="left: ${leftPct}%; top: ${topPct}%;"
-                     title="${escapeHtml(pt.slot.hour_slot)}: ${orderText} - ${formatCurrency(pt.slot.revenue)}">
+                     onmouseenter="showProdModalChartTooltip(event, '${escapeHtml(titleLabel)}', '${revFormatted}', '${orderText}')"
+                     onmouseleave="hideProdModalChartTooltip()">
                 </div>
             `;
         }).join('');
@@ -2560,6 +2563,49 @@
                 ${labelsHtml}
             </div>
         `;
+    }
+
+    /**
+     * Show custom tooltip for product modal wave chart.
+     */
+    function showProdModalChartTooltip(e, timeLabel, revenueText, orderText) {
+        const tooltip = document.getElementById('rep-prod-modal-tooltip');
+        if (!tooltip) return;
+
+        tooltip.innerHTML = `
+            <div class="reports-tooltip-time">${escapeHtml(timeLabel)}</div>
+            <div class="reports-tooltip-val">
+                <span class="material-symbols-rounded">payments</span>
+                <span>${revenueText}</span>
+            </div>
+            <div class="reports-tooltip-sub">
+                <span class="material-symbols-rounded" style="font-size:14px;">receipt_long</span>
+                <span>${orderText}</span>
+            </div>
+        `;
+
+        const dot = e.target;
+        const parent = tooltip.offsetParent || tooltip.parentElement;
+        if (dot && parent) {
+            const dotRect = dot.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
+
+            const left = dotRect.left - parentRect.left + (dotRect.width / 2);
+            const top = dotRect.top - parentRect.top - 8;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }
+
+        tooltip.classList.add('visible');
+    }
+
+    /**
+     * Hide custom tooltip for product modal wave chart.
+     */
+    function hideProdModalChartTooltip() {
+        const tooltip = document.getElementById('rep-prod-modal-tooltip');
+        if (tooltip) tooltip.classList.remove('visible');
     }
 
     /**
@@ -2701,7 +2747,8 @@
     window.selectProdEventDropdownOption = selectProdEventDropdownOption;
     window.toggleProdCatDropdown = toggleProdCatDropdown;
     window.filterProdCatDropdownItems = filterProdCatDropdownItems;
-    window.selectProdCatDropdownOption = selectProdCatDropdownOption;
     window.openReportsProductModal = openReportsProductModal;
     window.closeReportsProductModal = closeReportsProductModal;
+    window.showProdModalChartTooltip = showProdModalChartTooltip;
+    window.hideProdModalChartTooltip = hideProdModalChartTooltip;
 })();
