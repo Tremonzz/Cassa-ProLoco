@@ -1236,12 +1236,11 @@ app.get('/api/stats', async (req, res) => {
             SELECT 
               strftime('%H:00', datetime(created_at, 'localtime')) as hour_slot, 
               COUNT(id) as orders_count, 
-              SUM(total) as revenue,
-              MIN(created_at) as min_time
+              SUM(total) as revenue
             FROM orders 
             WHERE sagra_id = ? ${dateFilter}
-            GROUP BY strftime('%Y-%m-%d %H:00', datetime(created_at, 'localtime')) 
-            ORDER BY min_time ASC
+            GROUP BY hour_slot 
+            ORDER BY hour_slot ASC
         `, params, (err, rows) => {
         if (err) reject(err); else resolve(rows || []);
       });

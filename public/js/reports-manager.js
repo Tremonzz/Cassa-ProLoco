@@ -396,6 +396,8 @@
             renderEventsTabSection(reportsState.overviewData.sagras);
         } else if (tabName === 'products') {
             loadProductsBreakdown();
+        } else if (tabName === 'event-inspect') {
+            initInspectEventTab();
         }
     }
 
@@ -1374,6 +1376,11 @@
         const catBtn = document.getElementById('rep-prod-cat-select-btn');
         if (catPanel) catPanel.style.display = 'none';
         if (catBtn) catBtn.classList.remove('open');
+
+        const inspectPanel = document.getElementById('rep-inspect-event-dropdown');
+        const inspectBtn = document.getElementById('rep-inspect-event-select-btn');
+        if (inspectPanel) inspectPanel.style.display = 'none';
+        if (inspectBtn) inspectBtn.classList.remove('open');
     }
 
     // Close custom dropdowns on clicking outside
@@ -2909,6 +2916,504 @@
         }
     }
 
+    /* =========================================================================
+       INSPECT EVENT TAB (TAB 4: ISPEZIONE EVENTO)
+       ========================================================================= */
+
+    const inspectState = {
+        selectedSagraId: null,
+        sagraData: null,
+        statsData: null,
+        stockData: null,
+        isLoading: false
+    };
+
+    /**
+     * Initialize Inspect Event Tab
+     */
+    async function initInspectEventTab() {
+        if (!eventsTableState.rawList || eventsTableState.rawList.length === 0) {
+            try {
+                const res = await fetch('/api/reports/overview');
+                const data = await res.json();
+                if (data.success && data.sagras) {
+                    eventsTableState.rawList = data.sagras;
+                }
+            } catch (e) {}
+        }
+
+        const sagras = eventsTableState.rawList || [];
+        if (!inspectState.selectedSagraId && sagras.length > 0) {
+            inspectState.selectedSagraId = sagras[0].id;
+        }
+
+        renderInspectEventDropdownOptions(sagras, '');
+        if (inspectState.selectedSagraId) {
+            loadInspectEventData();
+        }
+    }
+
+    /**
+     * Toggle Inspect Event Dropdown
+     */
+    function toggleInspectEventDropdown(e) {
+        if (e) e.stopPropagation();
+
+        const panel = document.getElementById('rep-inspect-event-dropdown');
+        const btn = document.getElementById('rep-inspect-event-select-btn');
+        if (!panel || !btn) return;
+
+        const wasOpen = (panel.style.display === 'flex');
+        closeAllCompareDropdowns();
+
+        if (!wasOpen) {
+            panel.style.display = 'flex';
+            btn.classList.add('open');
+
+            const searchInput = document.getElementById('rep-inspect-event-search');
+            if (searchInput) {
+                searchInput.value = '';
+                setTimeout(() => searchInput.focus(), 50);
+            }
+            renderInspectEventDropdownOptions(eventsTableState.rawList || [], '');
+        }
+    }
+
+    /**
+     * Filter Inspect Event Dropdown
+     */
+    function filterInspectEventDropdownItems(query) {
+        renderInspectEventDropdownOptions(eventsTableState.rawList || [], query);
+    }
+
+    /**
+     * Render Inspect Event Dropdown Options
+     */
+    function renderInspectEventDropdownOptions(sagrasList, query) {
+        const container = document.getElementById('rep-inspect-event-options');
+        if (!container) return;
+
+        const cleanQuery = (query || '').trim().toLowerCase();
+        let list = sagrasList || [];
+
+        if (cleanQuery) {
+            list = list.filter(s => s.name.toLowerCase().includes(cleanQuery));
+        }
+
+        if (list.length === 0) {
+            container.innerHTML = '<div class="reports-dropdown-empty">Nessun evento trovato</div>';
+            return;
+        }
+
+        container.innerHTML = list.map(s => {
+            const isActive = String(inspectState.selectedSagraId) === String(s.id);
+            const rev = Number(s.total_revenue) || 0;
+            const revStr = formatCurrency(rev);
+
+            return `
+                <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectInspectEventDropdownOption(${s.id})">
+                    <div class="reports-dropdown-option-left">
+                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">festival</span>
+                        <span class="option-name font-bold" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+                    </div>
+                    <span class="reports-dropdown-option-right" style="font-size:0.75rem;">${revStr}</span>
+                </button>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Select an event in Inspect Event Tab
+     */
+    function selectInspectEventDropdownOption(id) {
+        inspectState.selectedSagraId = id;
+        closeAllCompareDropdowns();
+        loadInspectEventData();
+    }
+
+    /**
+     * Fetch and render all data for the selected event in Inspect Event Tab
+     */
+    async function loadInspectEventData() {
+        const sagraId = inspectState.selectedSagraId;
+        if (!sagraId) return;
+
+        const sagras = eventsTableState.rawList || [];
+        const sagra = sagras.find(s => String(s.id) === String(sagraId));
+
+        const selectText = document.getElementById('rep-inspect-event-select-text');
+        if (selectText) {
+            selectText.innerText = sagra ? sagra.name : `Evento #${sagraId}`;
+        }
+
+        const dateBadge = document.getElementById('rep-inspect-event-date-text');
+        if (dateBadge && sagra) {
+            try {
+                const d = new Date(sagra.created_at || Date.now());
+                dateBadge.innerText = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+            } catch(e) {
+                dateBadge.innerText = 'Data N/D';
+            }
+        }
+
+        // Show loading in KPI values
+        const revEl = document.getElementById('rep-inspect-kpi-revenue');
+        const ordEl = document.getElementById('rep-inspect-kpi-orders');
+        const avgEl = document.getElementById('rep-inspect-kpi-avg-ticket');
+        const qtyEl = document.getElementById('rep-inspect-kpi-qty');
+        if (revEl) revEl.innerText = '...';
+        if (ordEl) ordEl.innerText = '...';
+        if (avgEl) avgEl.innerText = '...';
+        if (qtyEl) qtyEl.innerText = '...';
+
+        const chartContainer = document.getElementById('rep-inspect-hourly-chart');
+        if (chartContainer) {
+            chartContainer.innerHTML = '<div class="empty-chart-text" style="padding-top: 40px;"><span class="material-symbols-rounded spin">progress_activity</span> Caricamento andamento evento...</div>';
+        }
+
+        const dishesList = document.getElementById('rep-inspect-dishes-list');
+        if (dishesList) {
+            dishesList.innerHTML = '<div style="text-align:center; padding: 24px; color: var(--text-light);"><span class="material-symbols-rounded spin">progress_activity</span> Caricamento piatti...</div>';
+        }
+
+        const stockList = document.getElementById('rep-inspect-stock-list');
+        if (stockList) {
+            stockList.innerHTML = '<div style="text-align:center; padding: 24px; color: var(--text-light);"><span class="material-symbols-rounded spin">progress_activity</span> Caricamento scorte...</div>';
+        }
+
+        try {
+            inspectState.isLoading = true;
+
+            const [statsRes, prodsRes] = await Promise.all([
+                fetch(`/api/stats?sagraId=${sagraId}`),
+                fetch(`/api/reports/products?sagra_id=${sagraId}`)
+            ]);
+
+            const statsData = await statsRes.json();
+            const prodsData = await prodsRes.json();
+
+            inspectState.statsData = statsData;
+            inspectState.stockData = prodsData;
+
+            const totalRev = Number(statsData.totalRevenue) || 0;
+            const ordersCount = Number(statsData.ordersCount) || 0;
+            const avgTicket = ordersCount > 0 ? totalRev / ordersCount : 0;
+
+            let totalQty = 0;
+            if (statsData.topItems && Array.isArray(statsData.topItems)) {
+                statsData.topItems.forEach(item => {
+                    totalQty += Number(item.qty) || 0;
+                });
+            }
+
+            // Update KPI cards
+            if (revEl) revEl.innerText = formatCurrency(totalRev);
+            if (ordEl) ordEl.innerText = ordersCount.toLocaleString('it-IT');
+            if (avgEl) avgEl.innerText = formatCurrency(avgTicket);
+            if (qtyEl) qtyEl.innerText = `${totalQty.toLocaleString('it-IT')} pz`;
+
+            // Payment method split if available
+            const pmSplitEl = document.getElementById('rep-inspect-kpi-payments-split');
+            if (pmSplitEl && statsData.paymentMethods) {
+                const cash = Number(statsData.paymentMethods.cash_revenue) || 0;
+                const pos = Number(statsData.paymentMethods.pos_revenue) || 0;
+                pmSplitEl.innerText = `Contanti: ${formatCurrency(cash)} • POS: ${formatCurrency(pos)}`;
+            } else if (pmSplitEl) {
+                pmSplitEl.innerText = `${ordersCount} transazioni completate`;
+            }
+
+            // Render hourly chart
+            renderInspectHourlyChart(statsData.hourlySales || []);
+
+            // Render dishes list
+            renderInspectDishesList(statsData.topItems || [], totalRev);
+
+            // Render stock list
+            renderInspectStockList(prodsData.products || [], prodsData.exhaustedProducts || [], prodsData.surplusProducts || []);
+
+        } catch(err) {
+            console.error("Error loading inspect event data:", err);
+            if (chartContainer) chartContainer.innerHTML = `<div class="reports-empty-state" style="color:var(--danger);">Errore: ${escapeHtml(err.message)}</div>`;
+        } finally {
+            inspectState.isLoading = false;
+        }
+    }
+
+    /**
+     * Render Hourly Sales Wave Chart for inspected event
+     */
+    function renderInspectHourlyChart(hourlySales) {
+        const container = document.getElementById('rep-inspect-hourly-chart');
+        const peakBadge = document.getElementById('rep-inspect-peak-badge');
+        if (!container) return;
+
+        if (!hourlySales || hourlySales.length === 0) {
+            container.innerHTML = '<div class="empty-chart-text" style="padding-top: 40px;">Nessuna vendita oraria registrata per questo evento</div>';
+            if (peakBadge) peakBadge.innerText = 'Picco: N/D';
+            return;
+        }
+
+        let maxRev = 0;
+        let maxOrders = 0;
+        let peakSlot = '';
+        hourlySales.forEach(s => {
+            const rev = Number(s.revenue) || 0;
+            const ords = Number(s.orders_count) || 0;
+            if (rev > maxRev) {
+                maxRev = rev;
+                peakSlot = s.hour_slot;
+            }
+            if (ords > maxOrders) maxOrders = ords;
+        });
+
+        if (peakBadge) {
+            peakBadge.innerText = peakSlot ? `Picco: Ore ${peakSlot} (${formatCurrency(maxRev)})` : 'Picco: --:--';
+        }
+
+        const count = hourlySales.length;
+        const svgWidth = 800;
+        const svgHeight = 140;
+        const paddingLeft = 40;
+        const paddingRight = 40;
+        const paddingTop = 20;
+        const paddingBottom = 25;
+        const chartAreaWidth = svgWidth - paddingLeft - paddingRight;
+        const chartAreaHeight = svgHeight - paddingTop - paddingBottom;
+
+        const points = hourlySales.map((slot, index) => {
+            const rev = Number(slot.revenue) || 0;
+            const x = count === 1
+                ? paddingLeft + chartAreaWidth / 2
+                : paddingLeft + (index / (count - 1)) * chartAreaWidth;
+            const normalizedY = maxRev > 0 ? rev / maxRev : 0;
+            const y = svgHeight - paddingBottom - (normalizedY * chartAreaHeight);
+            return { x, y, slot };
+        });
+
+        let linePath = '';
+        if (points.length === 1) {
+            linePath = `M ${paddingLeft} ${points[0].y} L ${svgWidth - paddingRight} ${points[0].y}`;
+        } else {
+            linePath = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = i > 0 ? points[i - 1] : points[i];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = i < points.length - 2 ? points[i + 2] : p2;
+
+                const cp1x = p1.x + (p2.x - p0.x) * 0.18;
+                const cp1y = p1.y + (p2.y - p0.y) * 0.18;
+                const cp2x = p2.x - (p3.x - p1.x) * 0.18;
+                const cp2y = p2.y - (p3.y - p1.y) * 0.18;
+
+                linePath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+            }
+        }
+
+        const firstX = points[0].x;
+        const lastX = points[points.length - 1].x;
+        const bottomY = svgHeight - paddingBottom + 8;
+        const areaPath = `${linePath} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
+
+        const dotsHtml = points.map(pt => {
+            const isPeak = (pt.slot.hour_slot === peakSlot && maxRev > 0);
+            const leftPct = (pt.x / svgWidth * 100).toFixed(2);
+            const topPct = (pt.y / svgHeight * 100).toFixed(2);
+            const orderText = pt.slot.orders_count === 1 ? '1 Ordine' : `${pt.slot.orders_count} Ordini`;
+            const titleLabel = `Ore ${pt.slot.hour_slot}`;
+            const revFormatted = formatCurrency(pt.slot.revenue);
+
+            return `
+                <div class="modal-chart-point-dot ${isPeak ? 'peak-dot' : ''}" 
+                     style="left: ${leftPct}%; top: ${topPct}%;"
+                     onmouseenter="showInspectChartTooltip(event, '${escapeHtml(titleLabel)}', '${revFormatted}', '${orderText}')"
+                     onmouseleave="hideInspectChartTooltip()">
+                </div>
+            `;
+        }).join('');
+
+        const labelsHtml = points.map(pt => `
+            <span class="wave-time-label" style="position: absolute; left: ${(pt.x / svgWidth * 100).toFixed(2)}%; transform: translateX(-50%);">
+                ${escapeHtml(pt.slot.hour_slot)}
+            </span>
+        `).join('');
+
+        container.innerHTML = `
+            <div style="position: relative; width: 100%; height: 130px;">
+                <svg class="wave-svg" style="height: 130px;" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="inspectWaveGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.30" />
+                            <stop offset="100%" stop-color="#2563eb" stop-opacity="0.0" />
+                        </linearGradient>
+                    </defs>
+                    <path class="wave-area-path" d="${areaPath}" style="fill:url(#inspectWaveGradient);" />
+                    <path class="wave-line-path" d="${linePath}" style="stroke:#2563eb;" />
+                </svg>
+                <div class="modal-wave-dots-wrap" style="height: 130px;">
+                    ${dotsHtml}
+                </div>
+            </div>
+            <div style="position: relative; width: 100%; height: 20px; margin-top: 4px;">
+                ${labelsHtml}
+            </div>
+        `;
+    }
+
+    /**
+     * Show custom tooltip for inspect event hourly chart
+     */
+    function showInspectChartTooltip(e, timeLabel, revenueText, orderText) {
+        const tooltip = document.getElementById('rep-inspect-hourly-tooltip');
+        if (!tooltip) return;
+
+        tooltip.innerHTML = `
+            <div class="reports-tooltip-time">${escapeHtml(timeLabel)}</div>
+            <div class="reports-tooltip-val">
+                <span class="material-symbols-rounded">payments</span>
+                <span>${revenueText}</span>
+            </div>
+            <div class="reports-tooltip-sub">
+                <span class="material-symbols-rounded" style="font-size:14px;">receipt_long</span>
+                <span>${orderText}</span>
+            </div>
+        `;
+
+        const dot = e.target;
+        const parent = tooltip.offsetParent || tooltip.parentElement;
+        if (dot && parent) {
+            const dotRect = dot.getBoundingClientRect();
+            const parentRect = parent.getBoundingClientRect();
+
+            const left = dotRect.left - parentRect.left + (dotRect.width / 2);
+            const top = dotRect.top - parentRect.top - 8;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        }
+
+        tooltip.classList.add('visible');
+    }
+
+    /**
+     * Hide custom tooltip for inspect event hourly chart
+     */
+    function hideInspectChartTooltip() {
+        const tooltip = document.getElementById('rep-inspect-hourly-tooltip');
+        if (tooltip) tooltip.classList.remove('visible');
+    }
+
+    /**
+     * Render dishes list in inspect event tab
+     */
+    function renderInspectDishesList(topItems, totalEventRev) {
+        const container = document.getElementById('rep-inspect-dishes-list');
+        const countBadge = document.getElementById('rep-inspect-dishes-count');
+        if (!container) return;
+
+        if (!topItems || topItems.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding: 24px; color: var(--text-light); font-size: 0.88rem;">Nessun piatto venduto in questo evento</div>';
+            if (countBadge) countBadge.innerText = '0 piatti';
+            return;
+        }
+
+        if (countBadge) countBadge.innerText = `${topItems.length} ${topItems.length === 1 ? 'piatto' : 'piatti'}`;
+
+        const maxQty = Number(topItems[0]?.qty) || 1;
+
+        container.innerHTML = topItems.map((item, idx) => {
+            const rank = idx + 1;
+            const qty = Number(item.qty) || 0;
+            const rev = Number(item.revenue) || 0;
+            const cat = (item.category_name || 'Altro').trim();
+            const pct = maxQty > 0 ? Math.min(100, Math.max(0, (qty / maxQty) * 100)) : 0;
+
+            return `
+                <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(item.product_name)}', ${inspectState.selectedSagraId})" title="Clicca per statistiche piatto">
+                    <div class="reports-topflop-rank rank-other">${rank}</div>
+                    <div class="reports-topflop-info">
+                        <div class="reports-topflop-name-row">
+                            <span class="reports-topflop-name">${escapeHtml(item.product_name)}</span>
+                            <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 800;">${qty.toLocaleString('it-IT')} pz</span>
+                        </div>
+                        <div class="reports-topflop-sub-row">
+                            <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
+                            <div class="reports-topflop-track" style="max-width: 90px;">
+                                <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: linear-gradient(90deg, #64748b, #94a3b8);"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Render stock movements and out of stock items in inspect event tab
+     */
+    function renderInspectStockList(allProds, exhaustedProds, surplusProds) {
+        const container = document.getElementById('rep-inspect-stock-list');
+        const countBadge = document.getElementById('rep-inspect-stock-count');
+        if (!container) return;
+
+        const stockItems = [...(exhaustedProds || []), ...(surplusProds || [])];
+
+        if (stockItems.length === 0) {
+            container.innerHTML = `
+                <div style="text-align:center; padding: 24px; color: var(--text-light);">
+                    <span class="material-symbols-rounded" style="font-size: 28px; color: var(--text-light); display: block; margin-bottom: 4px;">inventory_2</span>
+                    <strong style="color: var(--text-main); font-size: 0.88rem;">Nessuna giacenza limitata</strong>
+                    <div style="font-size: 0.78rem; margin-top: 2px;">Tutti i prodotti di questo evento erano a disponibilità illimitata.</div>
+                </div>
+            `;
+            if (countBadge) countBadge.innerText = '0 tracciati';
+            return;
+        }
+
+        if (countBadge) countBadge.innerText = `${stockItems.length} tracciati`;
+
+        container.innerHTML = stockItems.map((p, idx) => {
+            const rank = idx + 1;
+            const remaining = Number(p.remaining_stock) || 0;
+            const soldQty = Number(p.total_sold_qty) || 0;
+            const cat = (p.category_name || 'Altro').trim();
+            const isExhausted = remaining <= 0;
+
+            let statusSub = '';
+            if (isExhausted) {
+                let timeStr = 'Esaurito';
+                if (p.exhausted_at) {
+                    try {
+                        const d = new Date(p.exhausted_at);
+                        timeStr = `Esaurito ore ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                    } catch(e){}
+                }
+                statusSub = `<span style="font-weight: 600; color: var(--text-light);">${timeStr}</span>`;
+            } else {
+                const unsoldPct = Number(p.unsold_pct) || 0;
+                statusSub = `<span style="font-weight: 600; color: var(--text-light);">${soldQty} venduti (${unsoldPct}% invenduto)</span>`;
+            }
+
+            return `
+                <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}', ${p.sagra_id})" title="Clicca per statistiche piatto">
+                    <div class="reports-topflop-rank rank-other">${rank}</div>
+                    <div class="reports-topflop-info">
+                        <div class="reports-topflop-name-row">
+                            <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
+                            <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 700;">
+                                ${isExhausted ? `${soldQty} pz venduti` : `${remaining} pz rimasti`}
+                            </span>
+                        </div>
+                        <div class="reports-topflop-sub-row">
+                            <span>${escapeHtml(cat)}</span>
+                            ${statusSub}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
     /**
      * Close product detail modal.
      */
@@ -2952,4 +3457,10 @@
     window.closeReportsProductModal = closeReportsProductModal;
     window.showProdModalChartTooltip = showProdModalChartTooltip;
     window.hideProdModalChartTooltip = hideProdModalChartTooltip;
+    window.toggleInspectEventDropdown = toggleInspectEventDropdown;
+    window.filterInspectEventDropdownItems = filterInspectEventDropdownItems;
+    window.selectInspectEventDropdownOption = selectInspectEventDropdownOption;
+    window.loadInspectEventData = loadInspectEventData;
+    window.showInspectChartTooltip = showInspectChartTooltip;
+    window.hideInspectChartTooltip = hideInspectChartTooltip;
 })();

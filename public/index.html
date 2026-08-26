@@ -421,15 +421,9 @@
             <span class="material-symbols-rounded">restaurant_menu</span>
             <span>Dettagli Prodotti</span>
           </button>
-          <button type="button" class="reports-nav-item" data-tab="hourly" onclick="switchReportsTab('hourly')">
-            <span class="material-symbols-rounded">pace</span>
-            <span>Fasce Orarie</span>
-            <span class="reports-nav-pill">Prossimamente</span>
-          </button>
-          <button type="button" class="reports-nav-item" data-tab="raw-materials" onclick="switchReportsTab('raw-materials')">
-            <span class="material-symbols-rounded">inventory_2</span>
-            <span>Consumi Base</span>
-            <span class="reports-nav-pill">Prossimamente</span>
+          <button type="button" class="reports-nav-item" data-tab="event-inspect" onclick="switchReportsTab('event-inspect')">
+            <span class="material-symbols-rounded">manage_search</span>
+            <span>Ispezione Evento</span>
           </button>
         </div>
       </aside>
@@ -883,19 +877,145 @@
           </div>
         </div>
 
-        <div id="reports-tab-hourly" class="reports-tab-section" style="display: none;">
-          <div class="reports-placeholder-box">
-            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">pace</span>
-            <h3>Analisi Fasce Orarie &amp; Affluenza</h3>
-            <p>Questa sezione verrà implementata nei prossimi step.</p>
-          </div>
-        </div>
+        <!-- TAB 4: ISPEZIONE EVENTO -->
+        <div id="reports-tab-event-inspect" class="reports-tab-section" style="display: none;">
+          <!-- Topbar: Event selector & Quick info -->
+          <div class="reports-card-box" style="margin-bottom: 20px; padding: 14px 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <!-- Custom Event Dropdown -->
+                <div class="reports-custom-select-container" id="rep-inspect-event-select-wrap">
+                  <div class="reports-custom-select-box">
+                    <button type="button" class="reports-custom-select-btn" id="rep-inspect-event-select-btn" onclick="toggleInspectEventDropdown(event)">
+                      <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">festival</span>
+                      <span class="reports-custom-select-text" id="rep-inspect-event-select-text">Seleziona evento...</span>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-inspect-event-chevron">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rep-inspect-event-dropdown" style="display: none;">
+                      <div class="reports-dropdown-search-box">
+                        <span class="material-symbols-rounded">search</span>
+                        <input type="text" id="rep-inspect-event-search" placeholder="Cerca evento..." oninput="filterInspectEventDropdownItems(this.value)" onclick="event.stopPropagation()">
+                      </div>
+                      <div class="reports-dropdown-options-list" id="rep-inspect-event-options">
+                        <!-- Populated via JS -->
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-        <div id="reports-tab-raw-materials" class="reports-tab-section" style="display: none;">
-          <div class="reports-placeholder-box">
-            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">inventory_2</span>
-            <h3>Consumi Materie Prime</h3>
-            <p>Questa sezione verrà implementata nei prossimi step.</p>
+                <div id="rep-inspect-event-meta-badge" style="font-size: 0.84rem; padding: 7px 14px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-light); font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                  <span class="material-symbols-rounded" style="font-size: 16px; color: var(--text-light);">calendar_today</span>
+                  <span id="rep-inspect-event-date-text">--/--/----</span>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="reports-table-action-btn" onclick="loadInspectEventData()" title="Aggiorna dati evento" style="padding: 7px 14px; font-size: 0.84rem;">
+                  <span class="material-symbols-rounded" style="font-size: 18px; color: var(--text-light);">refresh</span>
+                  <span>Ricarica</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI Cards for the Inspected Event -->
+          <div class="reports-kpi-grid">
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-primary">
+                <span class="material-symbols-rounded">payments</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Incasso Totale</div>
+                <div id="rep-inspect-kpi-revenue" class="reports-kpi-value">€ 0,00</div>
+                <div id="rep-inspect-kpi-payments-split" class="reports-kpi-sub">Totale incasso dell'evento</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-slate">
+                <span class="material-symbols-rounded">receipt_long</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Scontrini Emessi</div>
+                <div id="rep-inspect-kpi-orders" class="reports-kpi-value">0</div>
+                <div id="rep-inspect-kpi-orders-sub" class="reports-kpi-sub">Transazioni registrate</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-primary">
+                <span class="material-symbols-rounded">calculate</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Scontrino Medio</div>
+                <div id="rep-inspect-kpi-avg-ticket" class="reports-kpi-value">€ 0,00</div>
+                <div class="reports-kpi-sub">Spesa media per ordine</div>
+              </div>
+            </div>
+
+            <div class="reports-kpi-card">
+              <div class="reports-kpi-icon-wrap kpi-theme-slate">
+                <span class="material-symbols-rounded">restaurant_menu</span>
+              </div>
+              <div class="reports-kpi-content">
+                <div class="reports-kpi-label">Prodotti Venduti</div>
+                <div id="rep-inspect-kpi-qty" class="reports-kpi-value">0 pz</div>
+                <div id="rep-inspect-kpi-dishes-sub" class="reports-kpi-sub">Porzioni totali erogate</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wave Chart Box: Hourly Trend for this Event -->
+          <div class="reports-card-box">
+            <div class="reports-card-header">
+              <div class="reports-card-title">
+                <span class="material-symbols-rounded">show_chart</span>
+                <span>Andamento Orario Vendite &amp; Affluenza</span>
+              </div>
+              <span id="rep-inspect-peak-badge" class="reports-count-badge" style="background: rgba(37,99,235,0.1); color: var(--primary); font-weight: 700;">Picco: --:--</span>
+            </div>
+            <div class="reports-card-body" style="position: relative; min-height: 180px; padding: 20px 24px;">
+              <div id="rep-inspect-hourly-chart" style="width: 100%;">
+                <!-- Populated via JS -->
+              </div>
+              <!-- Tooltip for hourly chart -->
+              <div id="rep-inspect-hourly-tooltip" class="reports-chart-tooltip"></div>
+            </div>
+          </div>
+
+          <!-- 2-Column Grid: Menu Performance & Stock Situation -->
+          <div class="reports-products-topflop-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px;">
+            <!-- Column 1: Performance Piatti Venduti -->
+            <div class="reports-card-box" style="margin-bottom: 0;">
+              <div class="reports-card-header" style="padding: 14px 20px;">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded" style="color: var(--text-light);">restaurant_menu</span>
+                  <span>Vendite Piatti &amp; Prodotti</span>
+                  <span id="rep-inspect-dishes-count" class="reports-count-badge">0 piatti</span>
+                </div>
+              </div>
+              <div class="reports-card-body" style="padding: 10px 16px 14px 16px;">
+                <div id="rep-inspect-dishes-list" class="reports-topflop-list" style="max-height: 480px; overflow-y: auto;">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Column 2: Giacenze & Esaurimenti dell'Evento -->
+            <div class="reports-card-box" style="margin-bottom: 0;">
+              <div class="reports-card-header" style="padding: 14px 20px;">
+                <div class="reports-card-title">
+                  <span class="material-symbols-rounded" style="color: var(--text-light);">inventory_2</span>
+                  <span>Stato Scorte &amp; Giacenze Evento</span>
+                  <span id="rep-inspect-stock-count" class="reports-count-badge">0 tracciati</span>
+                </div>
+              </div>
+              <div class="reports-card-body" style="padding: 10px 16px 14px 16px;">
+                <div id="rep-inspect-stock-list" class="reports-topflop-list" style="max-height: 480px; overflow-y: auto;">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>
