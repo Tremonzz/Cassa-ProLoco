@@ -11,6 +11,7 @@
         activeTab: 'overview',
         overviewData: null,
         timelinePeriod: 'month',
+        eventsList: [],
         dateFilter: {
             preset: 'this_year',
             startDate: `${currentYear}-01-01`,
@@ -369,8 +370,10 @@
             }
         });
 
-        if (tabName === 'overview' && !reportsState.overviewData && !reportsState.isLoading) {
+        if ((tabName === 'overview' || tabName === 'events') && !reportsState.overviewData && !reportsState.isLoading) {
             loadReportsOverview();
+        } else if (tabName === 'events' && reportsState.overviewData) {
+            renderEventsTabSection(reportsState.overviewData.sagras);
         }
     }
 
@@ -659,6 +662,7 @@
         const tangents = [slopes[0]];
         for (let i = 1; i < n - 1; i++) {
             if (slopes[i - 1] * slopes[i] <= 0) {
+                // If slope changes sign or either is flat, clamp tangent to 0 (flat horizontal)
                 tangents.push(0);
             } else {
                 tangents.push((slopes[i - 1] + slopes[i]) / 2);
@@ -851,6 +855,9 @@
         // 3. Sagras and Categories Comparisons
         renderSagrasRevenueChart(sagras, totals.totalRevenue);
         renderCategoryBreakdown(categoryBreakdown, totals.totalRevenue);
+
+        // 4. Events Tab Section Table
+        renderEventsTabSection(sagras);
     }
 
     /**
@@ -951,6 +958,98 @@
     }
 
     /**
+     * Render the Dettaglio Eventi list section sorted by most recent date.
+     */
+    function renderEventsTabSection(sagras) {
+        const list = sagras || [];
+
+        // Sort descending by most recent date (created_at DESC / id DESC)
+        const sorted = [...list].sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (dateB !== dateA) return dateB - dateA;
+            return (Number(b.id) || 0) - (Number(a.id) || 0);
+        });
+
+        reportsState.eventsList = sorted;
+
+        const countBadge = document.getElementById('rep-events-count-badge');
+        if (countBadge) {
+            countBadge.innerText = `${sorted.length} ${sorted.length === 1 ? 'evento' : 'eventi'}`;
+        }
+
+        renderEventsTableRows(sorted);
+    }
+
+    /**
+     * Render table rows for the events list.
+     */
+    function renderEventsTableRows(events) {
+        const tbody = document.getElementById('rep-events-tbody');
+        if (!tbody) return;
+
+        if (!events || events.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="reports-table-empty">Nessun evento registrato nel periodo selezionato.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = events.map((s, idx) => {
+            const rev = Number(s.revenue) || 0;
+            const orders = Number(s.orders_count) || 0;
+            const avg = orders > 0 ? (rev / orders) : 0;
+            const dateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+
+            return `
+                <tr>
+                    <td style="text-align: center; font-weight: 600; color: var(--text-light);">${idx + 1}</td>
+                    <td>
+                        <button type="button" class="reports-event-link-btn" onclick="openEventStatsModal(${s.id})" title="Apri statistiche evento">
+                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">festival</span>
+                            <span class="reports-event-name-text">${escapeHtml(s.name)}</span>
+                        </button>
+                    </td>
+                    <td style="color: var(--text-light);">${dateStr}</td>
+                    <td style="text-align: right; font-weight: 600;">${orders.toLocaleString('it-IT')}</td>
+                    <td style="text-align: right; font-weight: 700; color: var(--primary);">${formatCurrency(rev)}</td>
+                    <td style="text-align: right; color: var(--text-light);">${formatCurrency(avg)}</td>
+                    <td style="text-align: center;">
+                        <button type="button" class="reports-table-action-btn" onclick="openEventStatsModal(${s.id})" title="Visualizza statistiche complete">
+                            <span class="material-symbols-rounded">bar_chart</span>
+                            <span>Statistiche</span>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Filter events list by search query.
+     */
+    function filterReportsEventsList() {
+        const searchInput = document.getElementById('rep-events-search-input');
+        const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const list = reportsState.eventsList || [];
+        if (!query) {
+            renderEventsTableRows(list);
+            return;
+        }
+        const filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(query)));
+        renderEventsTableRows(filtered);
+    }
+
+    /**
+     * Open the existing POS statistics modal for the selected event.
+     */
+    function openEventStatsModal(sagraId) {
+        if (typeof window.showStats === 'function') {
+            window.showStats(sagraId);
+        } else {
+            console.warn("window.showStats is not available");
+        }
+    }
+
+    /**
      * Render error view.
      */
     function renderOverviewError(message) {
@@ -972,4 +1071,6 @@
     window.selectReportsPreset = selectReportsPreset;
     window.onCustomDateInputChanged = onCustomDateInputChanged;
     window.applyReportsDateFilter = applyReportsDateFilter;
+    window.filterReportsEventsList = filterReportsEventsList;
+    window.openEventStatsModal = openEventStatsModal;
 })();

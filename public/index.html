@@ -416,7 +416,6 @@
           <button type="button" class="reports-nav-item" data-tab="events" onclick="switchReportsTab('events')">
             <span class="material-symbols-rounded">festival</span>
             <span>Dettaglio Eventi</span>
-            <span class="reports-nav-pill">Prossimamente</span>
           </button>
           <button type="button" class="reports-nav-item" data-tab="products" onclick="switchReportsTab('products')">
             <span class="material-symbols-rounded">restaurant_menu</span>
@@ -553,12 +552,42 @@
           </div>
         </div>
 
-        <!-- Placeholder Sections for Subsequent Steps -->
+        <!-- TAB 2: DETTAGLIO EVENTI -->
         <div id="reports-tab-events" class="reports-tab-section" style="display: none;">
-          <div class="reports-placeholder-box">
-            <span class="material-symbols-rounded" style="font-size: 48px; color: var(--primary);">festival</span>
-            <h3>Dettaglio &amp; Confronto Eventi</h3>
-            <p>Questa sezione verrà implementata nei prossimi step.</p>
+          <div class="reports-card-box">
+            <div class="reports-card-header">
+              <div class="reports-card-title">
+                <span class="material-symbols-rounded">festival</span>
+                <span>Elenco Storico Eventi</span>
+                <span id="rep-events-count-badge" class="reports-count-badge">0 eventi</span>
+              </div>
+              <div class="reports-card-actions">
+                <div class="reports-search-box">
+                  <span class="material-symbols-rounded">search</span>
+                  <input type="text" id="rep-events-search-input" placeholder="Cerca per nome evento..." oninput="filterReportsEventsList()">
+                </div>
+              </div>
+            </div>
+            <div class="reports-card-body" style="padding: 0;">
+              <div class="reports-table-responsive">
+                <table class="reports-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px; text-align: center;">#</th>
+                      <th>Nome Evento</th>
+                      <th>Data Creazione</th>
+                      <th style="text-align: right;">Scontrini Emessi</th>
+                      <th style="text-align: right;">Incasso Totale</th>
+                      <th style="text-align: right;">Scontrino Medio</th>
+                      <th style="width: 140px; text-align: center;">Azione</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-events-tbody">
+                    <!-- Dynamic Rows injected via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
