@@ -4000,12 +4000,17 @@ function renderHourlyChart(hourlySales) {
     `;
 }
 
-async function showStats(sagraId) {
+async function showStats(sagraId, dateFilter) {
     const targetId = sagraId || (STATE.currentSagra ? STATE.currentSagra.id : null);
     if (!targetId) return;
 
     try {
-        const res = await fetch(`/api/stats?sagraId=${targetId}`);
+        let url = `/api/stats?sagraId=${targetId}`;
+        if (dateFilter) {
+            if (dateFilter.startDate) url += `&start_date=${encodeURIComponent(dateFilter.startDate)}`;
+            if (dateFilter.endDate) url += `&end_date=${encodeURIComponent(dateFilter.endDate)}`;
+        }
+        const res = await fetch(url);
         const data = await res.json();
 
         const revEl = document.getElementById('stat-revenue');

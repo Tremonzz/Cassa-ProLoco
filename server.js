@@ -1180,10 +1180,25 @@ app.get('/api/history', (req, res) => {
 // STATS API
 app.get('/api/stats', async (req, res) => {
   const sagraId = req.query.sagraId || 1;
+  const { start_date, end_date } = req.query;
+
+  let dateFilter = "";
+  const params = [sagraId];
+
+  if (start_date && end_date) {
+    dateFilter = "AND DATE(datetime(created_at, 'localtime')) BETWEEN ? AND ?";
+    params.push(start_date, end_date);
+  } else if (start_date) {
+    dateFilter = "AND DATE(datetime(created_at, 'localtime')) >= ?";
+    params.push(start_date);
+  } else if (end_date) {
+    dateFilter = "AND DATE(datetime(created_at, 'localtime')) <= ?";
+    params.push(end_date);
+  }
 
   try {
     const totalRow = await new Promise((resolve, reject) => {
-      db.get("SELECT COUNT(*) as count, SUM(total) as revenue FROM orders WHERE sagra_id = ?", [sagraId], (err, row) => {
+      db.get(`SELECT COUNT(*) as count, SUM(total) as revenue FROM orders WHERE sagra_id = ? ${dateFilter}`, params, (err, row) => {
         if (err) reject(err); else resolve(row);
       });
     });
@@ -1192,10 +1207,10 @@ app.get('/api/stats', async (req, res) => {
       db.all(`
             SELECT product_name, SUM(quantity) as qty, SUM(price * quantity) as revenue 
             FROM order_items 
-            WHERE order_id IN (SELECT id FROM orders WHERE sagra_id = ?)
+            WHERE order_id IN (SELECT id FROM orders WHERE sagra_id = ? ${dateFilter})
             GROUP BY product_name 
             ORDER BY qty DESC
-        `, [sagraId], (err, rows) => {
+        `, params, (err, rows) => {
         if (err) reject(err); else resolve(rows);
       });
     });
@@ -1208,10 +1223,10 @@ app.get('/api/stats', async (req, res) => {
               SUM(total) as revenue,
               MIN(created_at) as min_time
             FROM orders 
-            WHERE sagra_id = ? 
+            WHERE sagra_id = ? ${dateFilter}
             GROUP BY strftime('%Y-%m-%d %H:00', datetime(created_at, 'localtime')) 
             ORDER BY min_time ASC
-        `, [sagraId], (err, rows) => {
+        `, params, (err, rows) => {
         if (err) reject(err); else resolve(rows);
       });
     });

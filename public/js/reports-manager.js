@@ -1172,7 +1172,7 @@
      */
     function openEventStatsModal(sagraId) {
         if (typeof window.showStats === 'function') {
-            window.showStats(sagraId);
+            window.showStats(sagraId, reportsState.dateFilter);
         } else {
             console.warn("window.showStats is not available");
         }
