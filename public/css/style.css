@@ -6418,6 +6418,56 @@ img {
   font-weight: 600;
 }
 
+/* Scrollable Events Table Container (Height sized for ~10 records) */
+.reports-scrollable-table {
+  max-height: 530px;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Sortable Table Headers */
+.reports-sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.reports-sortable-th:hover {
+  background: rgba(37, 99, 235, 0.08) !important;
+  color: var(--primary) !important;
+}
+
+.reports-th-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.th-align-right {
+  text-align: right !important;
+}
+
+.th-content-right {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.reports-sort-icon {
+  font-size: 16px;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  vertical-align: middle;
+}
+
+.reports-sort-icon.active {
+  opacity: 1;
+}
+
+.reports-sortable-th:hover .reports-sort-icon:not(.active) {
+  opacity: 0.35;
+}
+
 /* Reports Events Table Elements */
 .reports-count-badge {
   background: var(--bg-secondary);

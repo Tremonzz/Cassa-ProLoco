@@ -11,7 +11,6 @@
         activeTab: 'overview',
         overviewData: null,
         timelinePeriod: 'month',
-        eventsList: [],
         dateFilter: {
             preset: 'this_year',
             startDate: `${currentYear}-01-01`,
@@ -20,6 +19,16 @@
         },
         isLoading: false,
         lastUpdated: null
+    };
+
+    let eventsTableState = {
+        sortKey: 'date',
+        sortDirection: 'desc',
+        rawList: [],
+        filteredList: [],
+        renderedCount: 0,
+        pageSize: 10,
+        isLoadingMore: false
     };
 
     /**
@@ -662,7 +671,6 @@
         const tangents = [slopes[0]];
         for (let i = 1; i < n - 1; i++) {
             if (slopes[i - 1] * slopes[i] <= 0) {
-                // If slope changes sign or either is flat, clamp tangent to 0 (flat horizontal)
                 tangents.push(0);
             } else {
                 tangents.push((slopes[i - 1] + slopes[i]) / 2);
@@ -958,42 +966,129 @@
     }
 
     /**
-     * Render the Dettaglio Eventi list section sorted by most recent date.
+     * Helper to sort list of events based on column and direction.
      */
-    function renderEventsTabSection(sagras) {
-        const list = sagras || [];
-
-        // Sort descending by most recent date (created_at DESC / id DESC)
-        const sorted = [...list].sort((a, b) => {
-            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-            if (dateB !== dateA) return dateB - dateA;
-            return (Number(b.id) || 0) - (Number(a.id) || 0);
+    function sortEventsList(list, key, direction) {
+        return [...list].sort((a, b) => {
+            let valA, valB;
+            if (key === 'name') {
+                valA = (a.name || '').toLowerCase();
+                valB = (b.name || '').toLowerCase();
+                return direction === 'asc' ? valA.localeCompare(valB, 'it') : valB.localeCompare(valA, 'it');
+            } else if (key === 'date') {
+                valA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                valB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                if (valA === valB) {
+                    valA = Number(a.id) || 0;
+                    valB = Number(b.id) || 0;
+                }
+            } else if (key === 'orders') {
+                valA = Number(a.orders_count) || 0;
+                valB = Number(b.orders_count) || 0;
+            } else if (key === 'revenue') {
+                valA = Number(a.revenue) || 0;
+                valB = Number(b.revenue) || 0;
+            } else if (key === 'avg') {
+                const ordersA = Number(a.orders_count) || 0;
+                const ordersB = Number(b.orders_count) || 0;
+                valA = ordersA > 0 ? (Number(a.revenue) || 0) / ordersA : 0;
+                valB = ordersB > 0 ? (Number(b.revenue) || 0) / ordersB : 0;
+            }
+            return direction === 'asc' ? valA - valB : valB - valA;
         });
-
-        reportsState.eventsList = sorted;
-
-        const countBadge = document.getElementById('rep-events-count-badge');
-        if (countBadge) {
-            countBadge.innerText = `${sorted.length} ${sorted.length === 1 ? 'evento' : 'eventi'}`;
-        }
-
-        renderEventsTableRows(sorted);
     }
 
     /**
-     * Render table rows for the events list.
+     * Update sort arrow icons in table header.
      */
-    function renderEventsTableRows(events) {
+    function updateSortHeaderIcons() {
+        const icons = document.querySelectorAll('.reports-sort-icon');
+        icons.forEach(icon => {
+            const key = icon.getAttribute('data-sort-icon');
+            if (key === eventsTableState.sortKey) {
+                icon.innerText = eventsTableState.sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward';
+                icon.classList.add('active');
+            } else {
+                icon.innerText = '';
+                icon.classList.remove('active');
+            }
+        });
+    }
+
+    /**
+     * Sort events table by a given column key.
+     */
+    function sortReportsEventsBy(key) {
+        if (eventsTableState.sortKey === key) {
+            eventsTableState.sortDirection = eventsTableState.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            eventsTableState.sortKey = key;
+            eventsTableState.sortDirection = (key === 'name' ? 'asc' : 'desc');
+        }
+
+        updateSortHeaderIcons();
+
+        eventsTableState.filteredList = sortEventsList(eventsTableState.filteredList, eventsTableState.sortKey, eventsTableState.sortDirection);
+        renderNextEventsChunk(true);
+
+        const wrapper = document.getElementById('rep-events-table-wrapper');
+        if (wrapper) wrapper.scrollTop = 0;
+    }
+
+    /**
+     * Render the Dettaglio Eventi list section.
+     */
+    function renderEventsTabSection(sagras) {
+        const list = sagras || [];
+        eventsTableState.rawList = list;
+
+        const searchInput = document.getElementById('rep-events-search-input');
+        const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+        let filtered = list;
+        if (query) {
+            filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(query)));
+        }
+
+        eventsTableState.filteredList = sortEventsList(filtered, eventsTableState.sortKey, eventsTableState.sortDirection);
+
+        const countBadge = document.getElementById('rep-events-count-badge');
+        if (countBadge) {
+            countBadge.innerText = `${eventsTableState.filteredList.length} ${eventsTableState.filteredList.length === 1 ? 'evento' : 'eventi'}`;
+        }
+
+        updateSortHeaderIcons();
+        renderNextEventsChunk(true);
+    }
+
+    /**
+     * Render a chunk of 10 events (or next 10 upon scrolling).
+     */
+    function renderNextEventsChunk(reset = false) {
         const tbody = document.getElementById('rep-events-tbody');
         if (!tbody) return;
 
-        if (!events || events.length === 0) {
+        if (reset) {
+            tbody.innerHTML = '';
+            eventsTableState.renderedCount = 0;
+        }
+
+        const totalItems = eventsTableState.filteredList.length;
+        if (totalItems === 0) {
             tbody.innerHTML = `<tr><td colspan="7" class="reports-table-empty">Nessun evento registrato nel periodo selezionato.</td></tr>`;
+            eventsTableState.renderedCount = 0;
             return;
         }
 
-        tbody.innerHTML = events.map((s, idx) => {
+        if (eventsTableState.renderedCount >= totalItems) return;
+
+        const nextChunk = eventsTableState.filteredList.slice(
+            eventsTableState.renderedCount,
+            eventsTableState.renderedCount + eventsTableState.pageSize
+        );
+
+        const rowsHtml = nextChunk.map((s, i) => {
+            const globalIndex = eventsTableState.renderedCount + i + 1;
             const rev = Number(s.revenue) || 0;
             const orders = Number(s.orders_count) || 0;
             const avg = orders > 0 ? (rev / orders) : 0;
@@ -1001,7 +1096,7 @@
 
             return `
                 <tr>
-                    <td style="text-align: center; font-weight: 600; color: var(--text-light);">${idx + 1}</td>
+                    <td style="text-align: center; font-weight: 600; color: var(--text-light);">${globalIndex}</td>
                     <td>
                         <button type="button" class="reports-event-link-btn" onclick="openEventStatsModal(${s.id})" title="Apri statistiche evento">
                             <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">festival</span>
@@ -1021,6 +1116,29 @@
                 </tr>
             `;
         }).join('');
+
+        if (reset) {
+            tbody.innerHTML = rowsHtml;
+        } else {
+            tbody.insertAdjacentHTML('beforeend', rowsHtml);
+        }
+
+        eventsTableState.renderedCount += nextChunk.length;
+    }
+
+    /**
+     * Infinite scroll event handler for the table wrapper.
+     */
+    function handleEventsTableScroll(container) {
+        if (!container) return;
+        if (eventsTableState.renderedCount >= eventsTableState.filteredList.length) return;
+        if (eventsTableState.isLoadingMore) return;
+
+        if (container.scrollTop + container.clientHeight >= container.scrollHeight - 30) {
+            eventsTableState.isLoadingMore = true;
+            renderNextEventsChunk(false);
+            eventsTableState.isLoadingMore = false;
+        }
     }
 
     /**
@@ -1029,13 +1147,24 @@
     function filterReportsEventsList() {
         const searchInput = document.getElementById('rep-events-search-input');
         const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-        const list = reportsState.eventsList || [];
-        if (!query) {
-            renderEventsTableRows(list);
-            return;
+        const list = eventsTableState.rawList || [];
+
+        let filtered = list;
+        if (query) {
+            filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(query)));
         }
-        const filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(query)));
-        renderEventsTableRows(filtered);
+
+        eventsTableState.filteredList = sortEventsList(filtered, eventsTableState.sortKey, eventsTableState.sortDirection);
+
+        const countBadge = document.getElementById('rep-events-count-badge');
+        if (countBadge) {
+            countBadge.innerText = `${eventsTableState.filteredList.length} ${eventsTableState.filteredList.length === 1 ? 'evento' : 'eventi'}`;
+        }
+
+        renderNextEventsChunk(true);
+
+        const wrapper = document.getElementById('rep-events-table-wrapper');
+        if (wrapper) wrapper.scrollTop = 0;
     }
 
     /**
@@ -1073,4 +1202,6 @@
     window.applyReportsDateFilter = applyReportsDateFilter;
     window.filterReportsEventsList = filterReportsEventsList;
     window.openEventStatsModal = openEventStatsModal;
+    window.sortReportsEventsBy = sortReportsEventsBy;
+    window.handleEventsTableScroll = handleEventsTableScroll;
 })();
