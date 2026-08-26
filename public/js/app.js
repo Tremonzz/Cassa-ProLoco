@@ -4032,19 +4032,22 @@ async function showStats(sagraId, dateFilter) {
         if (!data.topItems || data.topItems.length === 0) {
             topContainer.innerHTML = '<div class="empty-stats-state"><span class="material-symbols-rounded">bar_chart</span><p>Nessun dato di vendita disponibile.</p></div>';
         } else {
-            // Group items by category using STATE.products
+            // Group items by category using category_name returned from API
             const categoryGroups = {};
 
-            // Initialize categories from STATE.products to maintain menu order
-            if (STATE.products) {
-                for (const catName of Object.keys(STATE.products)) {
-                    categoryGroups[catName] = [];
-                }
+            // If categories summary is provided, initialize to maintain ordering
+            if (data.categories && Array.isArray(data.categories)) {
+                data.categories.forEach(c => {
+                    const cName = c.category_name || 'Generale';
+                    if (!categoryGroups[cName]) categoryGroups[cName] = [];
+                });
             }
 
             data.topItems.forEach(item => {
-                let matchedCat = 'Altro';
-                if (STATE.products) {
+                let matchedCat = item.category_name || 'Altro';
+                
+                // Fallback to STATE.products if category_name was Altro and current active sagra matches
+                if (matchedCat === 'Altro' && STATE.products) {
                     for (const [catName, prods] of Object.entries(STATE.products)) {
                         if (prods.some(p => p.name === item.product_name)) {
                             matchedCat = catName;
@@ -4058,26 +4061,31 @@ async function showStats(sagraId, dateFilter) {
 
             let html = '';
             for (const [catName, items] of Object.entries(categoryGroups)) {
-                if (items.length === 0) continue; // Skip empty categories in stats
+                if (!items || items.length === 0) continue; // Skip empty categories in stats
 
-                const trimmed = catName.trim();
+                const trimmed = catName.trim().toLowerCase();
                 let catIcon = 'category';
-                if (trimmed === 'Cibo') catIcon = 'restaurant';
-                if (trimmed === 'Bevande') catIcon = 'local_bar';
+                if (trimmed === 'cibo' || trimmed.includes('piatt') || trimmed.includes('cucin') || trimmed.includes('prim') || trimmed.includes('second')) {
+                    catIcon = 'restaurant';
+                } else if (trimmed === 'bevande' || trimmed.includes('bar') || trimmed.includes('drink') || trimmed.includes('birr') || trimmed.includes('vin')) {
+                    catIcon = 'local_bar';
+                } else if (trimmed === 'dolci' || trimmed.includes('dessert')) {
+                    catIcon = 'cake';
+                }
 
                 html += `
                     <div class="stats-category-group">
                         <div class="stats-category-title">
                             <span class="material-symbols-rounded" style="font-size: 1.2rem;">${catIcon}</span>
-                            ${catName}
+                            ${escapeHtml(catName)}
                         </div>
                         <div class="top-products-list">
                             ${items.map(item => `
                                 <div class="top-product-item">
-                                    <span class="top-product-name">${item.product_name}</span>
+                                    <span class="top-product-name">${escapeHtml(item.product_name)}</span>
                                     <div class="top-product-right">
                                         <span class="top-qty-pill"><b>${item.qty}</b> venduti</span>
-                                        <span class="top-revenue-tag">€ ${item.revenue.toFixed(2)}</span>
+                                        <span class="top-revenue-tag">€ ${Number(item.revenue).toFixed(2)}</span>
                                     </div>
                                 </div>
                             `).join('')}

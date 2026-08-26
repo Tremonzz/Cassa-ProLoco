@@ -1183,16 +1183,20 @@ app.get('/api/stats', async (req, res) => {
   const { start_date, end_date } = req.query;
 
   let dateFilter = "";
+  let catDateFilter = "";
   const params = [sagraId];
 
   if (start_date && end_date) {
     dateFilter = "AND DATE(datetime(created_at, 'localtime')) BETWEEN ? AND ?";
+    catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
     params.push(start_date, end_date);
   } else if (start_date) {
     dateFilter = "AND DATE(datetime(created_at, 'localtime')) >= ?";
+    catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) >= ?";
     params.push(start_date);
   } else if (end_date) {
     dateFilter = "AND DATE(datetime(created_at, 'localtime')) <= ?";
+    catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) <= ?";
     params.push(end_date);
   }
 
@@ -1205,13 +1209,25 @@ app.get('/api/stats', async (req, res) => {
 
     const topItems = await new Promise((resolve, reject) => {
       db.all(`
-            SELECT product_name, SUM(quantity) as qty, SUM(price * quantity) as revenue 
-            FROM order_items 
-            WHERE order_id IN (SELECT id FROM orders WHERE sagra_id = ? ${dateFilter})
-            GROUP BY product_name 
+            SELECT 
+              oi.product_name, 
+              COALESCE(c.name, 'Altro') as category_name,
+              SUM(oi.quantity) as qty, 
+              SUM(oi.price * oi.quantity) as revenue 
+            FROM order_items oi
+            JOIN orders o ON oi.order_id = o.id
+            LEFT JOIN (
+              SELECT p.name, p.category_id, cat.sagra_id 
+              FROM products p 
+              JOIN categories cat ON p.category_id = cat.id
+              GROUP BY p.name, cat.sagra_id
+            ) p ON p.name = oi.product_name AND p.sagra_id = o.sagra_id
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE o.sagra_id = ? ${catDateFilter}
+            GROUP BY oi.product_name, COALESCE(c.name, 'Altro')
             ORDER BY revenue DESC, qty DESC
         `, params, (err, rows) => {
-        if (err) reject(err); else resolve(rows);
+        if (err) reject(err); else resolve(rows || []);
       });
     });
 
@@ -1227,18 +1243,9 @@ app.get('/api/stats', async (req, res) => {
             GROUP BY strftime('%Y-%m-%d %H:00', datetime(created_at, 'localtime')) 
             ORDER BY min_time ASC
         `, params, (err, rows) => {
-        if (err) reject(err); else resolve(rows);
+        if (err) reject(err); else resolve(rows || []);
       });
     });
-
-    let catDateFilter = "";
-    if (start_date && end_date) {
-      catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
-    } else if (start_date) {
-      catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) >= ?";
-    } else if (end_date) {
-      catDateFilter = "AND DATE(datetime(o.created_at, 'localtime')) <= ?";
-    }
 
     const categories = await new Promise((resolve, reject) => {
       db.all(`
