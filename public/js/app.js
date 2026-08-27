@@ -3910,10 +3910,51 @@ function renderHourlyChart(hourlySales) {
         return;
     }
 
+    // Fill gap hours between earliest and latest hour + pad previous/next hour with 0 if span <= 3
+    const slotMap = new Map();
+    let minHour = 24;
+    let maxHour = -1;
+
+    hourlySales.forEach(s => {
+        const h = parseInt(String(s.hour_slot).split(':')[0], 10);
+        if (!isNaN(h)) {
+            if (h < minHour) minHour = h;
+            if (h > maxHour) maxHour = h;
+            slotMap.set(h, s);
+        }
+    });
+
+    const fullHourly = [];
+    if (minHour <= maxHour) {
+        let startHour = minHour;
+        let endHour = maxHour;
+
+        if (maxHour - minHour + 1 <= 3) {
+            startHour = Math.max(0, minHour - 1);
+            endHour = Math.min(23, maxHour + 1);
+            if (minHour === 0 && endHour < 23 && minHour === maxHour) {
+                endHour = Math.min(23, endHour + 1);
+            } else if (maxHour === 23 && startHour > 0 && minHour === maxHour) {
+                startHour = Math.max(0, startHour - 1);
+            }
+        }
+
+        for (let h = startHour; h <= endHour; h++) {
+            const key = `${String(h).padStart(2, '0')}:00`;
+            fullHourly.push(slotMap.get(h) || {
+                hour_slot: key,
+                orders_count: 0,
+                revenue: 0
+            });
+        }
+    } else {
+        fullHourly.push(...hourlySales);
+    }
+
     let maxOrders = 0;
     let peakSlot = '';
 
-    hourlySales.forEach(slot => {
+    fullHourly.forEach(slot => {
         if (slot.orders_count > maxOrders) {
             maxOrders = slot.orders_count;
             peakSlot = slot.hour_slot;
@@ -3926,12 +3967,12 @@ function renderHourlyChart(hourlySales) {
     const paddingTop = 22;
     const paddingBottom = 20;
 
-    const count = hourlySales.length;
+    const count = fullHourly.length;
     const usableWidth = svgWidth - (paddingX * 2);
     const usableHeight = svgHeight - paddingTop - paddingBottom;
 
     // Compute (x, y) coordinates based strictly on orders count
-    const points = hourlySales.map((slot, i) => {
+    const points = fullHourly.map((slot, i) => {
         const x = count === 1 ? svgWidth / 2 : paddingX + (i * (usableWidth / (count - 1)));
         const ratio = maxOrders > 0 ? (slot.orders_count / maxOrders) : 0;
         const y = (svgHeight - paddingBottom) - (ratio * usableHeight);
@@ -3964,6 +4005,9 @@ function renderHourlyChart(hourlySales) {
     const areaPath = `${linePath} L ${lastX.toFixed(1)} ${bottomY} L ${firstX.toFixed(1)} ${bottomY} Z`;
 
     const dotsHtml = points.map(pt => {
+        const orders = Number(pt.slot.orders_count) || 0;
+        if (orders === 0) return '';
+
         const isPeak = (pt.slot.hour_slot === peakSlot && maxOrders > 0);
         const orderText = pt.slot.orders_count === 1 ? '1 Ordine' : `${pt.slot.orders_count} Ordini`;
         const leftPct = (pt.x / svgWidth * 100).toFixed(2);
