@@ -1292,7 +1292,7 @@
 
         html += filtered.map(s => {
             const isActive = String(s.id) === String(selectedId);
-            const rev = Number(s.revenue) || 0;
+            const rev = Number(s.revenue ?? s.total_revenue ?? s.totalRevenue ?? 0) || 0;
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectCompareDropdownOption(${index}, ${s.id})">
                     <div class="reports-dropdown-option-left">
@@ -2471,7 +2471,7 @@
 
         html += filtered.map(s => {
             const isActive = String(s.id) === String(productsTableState.selectedEventId);
-            const rev = Number(s.revenue) || 0;
+            const rev = Number(s.revenue ?? s.total_revenue ?? s.totalRevenue ?? 0) || 0;
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectProdEventDropdownOption(${s.id})">
                     <div class="reports-dropdown-option-left">
@@ -3093,7 +3093,7 @@
 
         container.innerHTML = list.map(s => {
             const isActive = String(inspectState.selectedSagraId) === String(s.id);
-            const rev = Number(s.total_revenue) || 0;
+            const rev = Number(s.revenue ?? s.total_revenue ?? s.totalRevenue ?? 0) || 0;
             const revStr = formatCurrency(rev);
 
             return `
@@ -3102,7 +3102,7 @@
                         <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">festival</span>
                         <span class="option-name font-bold" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
                     </div>
-                    <span class="reports-dropdown-option-right" style="font-size:0.75rem;">${revStr}</span>
+                    <span class="reports-dropdown-option-right">${revStr}</span>
                 </button>
             `;
         }).join('');
