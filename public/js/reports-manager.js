@@ -3164,6 +3164,9 @@
             // Render stock list
             renderInspectStockList(prodsData.products || [], prodsData.exhaustedProducts || [], prodsData.surplusProducts || []);
 
+            // Render Top 3 and 3 Meno Venduti
+            renderInspectTopAndFlop3(prodsData.products || statsData.topItems || []);
+
         } catch(err) {
             console.error("Error loading inspect event data:", err);
             if (chartContainer) chartContainer.innerHTML = `<div class="reports-empty-state" style="color:var(--danger);">Errore: ${escapeHtml(err.message)}</div>`;
@@ -3496,6 +3499,77 @@
                 </div>
             `;
         }).join('');
+    }
+
+    /**
+     * Render Top 3 and 3 Meno Venduti for the inspected event.
+     */
+    function renderInspectTopAndFlop3(productsList) {
+        const top3Container = document.getElementById('rep-inspect-top3-list');
+        const flop3Container = document.getElementById('rep-inspect-flop3-list');
+        if (!top3Container || !flop3Container) return;
+
+        // Map items from either /api/reports/products or /api/stats format
+        let list = (productsList || []).map(p => ({
+            product_name: p.product_name || p.name,
+            category_name: p.category_name || p.category || 'Altro',
+            total_qty: Number(p.total_qty !== undefined ? p.total_qty : p.qty) || 0,
+            total_revenue: Number(p.total_revenue !== undefined ? p.total_revenue : p.revenue) || 0
+        })).filter(p => p.total_qty > 0 || p.total_revenue > 0);
+
+        if (list.length === 0) {
+            top3Container.innerHTML = '<div style="text-align:center; padding: 18px; color: var(--text-light); font-size: 0.84rem;">Nessun prodotto venduto</div>';
+            flop3Container.innerHTML = '<div style="text-align:center; padding: 18px; color: var(--text-light); font-size: 0.84rem;">Nessun prodotto venduto</div>';
+            return;
+        }
+
+        // Top 3 by quantity sold
+        const top3 = [...list].sort((a, b) => {
+            const diffQty = b.total_qty - a.total_qty;
+            if (diffQty !== 0) return diffQty;
+            return b.total_revenue - a.total_revenue;
+        }).slice(0, 3);
+        const maxTopQty = top3[0]?.total_qty || 1;
+        top3Container.innerHTML = top3.map((p, idx) => renderInspectTopFlopItemTemplate(p, idx + 1, maxTopQty)).join('');
+
+        // 3 Meno Venduti (Least quantity sold)
+        const flop3 = [...list].sort((a, b) => {
+            const diffQty = a.total_qty - b.total_qty;
+            if (diffQty !== 0) return diffQty;
+            return a.total_revenue - b.total_revenue;
+        }).slice(0, 3);
+        const maxFlopQty = Math.max(...flop3.map(p => p.total_qty), 1);
+        flop3Container.innerHTML = flop3.map((p, idx) => renderInspectTopFlopItemTemplate(p, idx + 1, maxFlopQty)).join('');
+    }
+
+    /**
+     * Shared template for Inspect Event Top/Flop rows.
+     */
+    function renderInspectTopFlopItemTemplate(p, rank, maxQty) {
+        const rev = Number(p.total_revenue) || 0;
+        const qty = Number(p.total_qty) || 0;
+        const cat = (p.category_name || 'Altro').trim();
+        const rankClass = 'rank-other';
+        const pct = maxQty > 0 ? Math.min(100, Math.max(0, (qty / maxQty) * 100)) : 0;
+        const barGradient = 'linear-gradient(90deg, #64748b, #94a3b8)';
+
+        return `
+            <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}', ${inspectState.selectedSagraId})" title="Clicca per visualizzare le statistiche dettagliate">
+                <div class="reports-topflop-rank ${rankClass}">${rank}</div>
+                <div class="reports-topflop-info">
+                    <div class="reports-topflop-name-row">
+                        <span class="reports-topflop-name">${escapeHtml(p.product_name)}</span>
+                        <span class="reports-topflop-rev" style="color: var(--text-main); font-weight: 800;">${qty.toLocaleString('it-IT')} pz</span>
+                    </div>
+                    <div class="reports-topflop-sub-row">
+                        <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
+                        <div class="reports-topflop-track" style="max-width: 90px;">
+                            <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: ${barGradient};"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     /**
