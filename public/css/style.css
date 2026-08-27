@@ -5966,7 +5966,7 @@ img {
 .reports-tab-section {
   display: flex !important;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   width: 100%;
 }
 
@@ -5978,7 +5978,7 @@ img {
 .reports-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  gap: 16px;
   width: 100%;
 }
 
@@ -6353,7 +6353,7 @@ img {
 .reports-charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 16px;
 }
 
 @media (max-width: 1024px) {
@@ -6532,7 +6532,6 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 
@@ -6920,7 +6919,6 @@ img {
 
 /* Event Comparison Custom Dropdowns */
 .reports-compare-card {
-  margin-top: 20px;
   overflow: visible !important;
 }
 
