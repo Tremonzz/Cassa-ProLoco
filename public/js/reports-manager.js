@@ -1289,15 +1289,25 @@
 
     /**
      * Render the items inside a custom comparison dropdown list.
+     * Sorted by creation date (most recent first) and displaying creation date on the right.
      */
     function renderCompareDropdownOptions(index, list, query) {
         const container = document.getElementById(`rep-dropdown-options-${index}`);
         if (!container) return;
 
         const cleanQuery = (query || '').trim().toLowerCase();
-        let filtered = list;
+        let sortedList = [...(list || [])].sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+                return timeB - timeA;
+            }
+            return Number(b.id) - Number(a.id);
+        });
+
+        let filtered = sortedList;
         if (cleanQuery) {
-            filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(cleanQuery)));
+            filtered = sortedList.filter(s => (s.name && s.name.toLowerCase().includes(cleanQuery)));
         }
 
         let html = '';
@@ -1326,14 +1336,23 @@
 
         html += filtered.map(s => {
             const isActive = String(s.id) === String(selectedId);
-            const rev = Number(s.revenue ?? s.total_revenue ?? s.totalRevenue ?? 0) || 0;
+            let dateStr = '--/--/----';
+            if (s.created_at) {
+                try {
+                    const d = new Date(s.created_at);
+                    if (!isNaN(d.getTime())) {
+                        dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                    }
+                } catch (e) {}
+            }
+
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectCompareDropdownOption(${index}, ${s.id})">
                     <div class="reports-dropdown-option-left">
                         <span class="material-symbols-rounded" style="font-size:18px; color:${index === 1 ? '#2563eb' : '#8b5cf6'};">festival</span>
                         <span class="option-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
                     </div>
-                    <span class="reports-dropdown-option-right">${formatCurrency(rev)}</span>
+                    <span class="reports-dropdown-option-right" style="font-size:0.8rem; color:var(--text-light); font-weight:500;">${dateStr}</span>
                 </button>
             `;
         }).join('');
@@ -2474,15 +2493,25 @@
 
     /**
      * Render options list for the Product Tab Event Filter custom dropdown.
+     * Sorted by creation date (most recent first) and displaying creation date on the right.
      */
     function renderProdEventDropdownOptions(list, query) {
         const container = document.getElementById('rep-prod-event-options');
         if (!container) return;
 
         const cleanQuery = (query || '').trim().toLowerCase();
-        let filtered = list;
+        let sortedList = [...(list || [])].sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+                return timeB - timeA;
+            }
+            return Number(b.id) - Number(a.id);
+        });
+
+        let filtered = sortedList;
         if (cleanQuery) {
-            filtered = list.filter(s => (s.name && s.name.toLowerCase().includes(cleanQuery)));
+            filtered = sortedList.filter(s => (s.name && s.name.toLowerCase().includes(cleanQuery)));
         }
 
         let html = '';
@@ -2505,14 +2534,23 @@
 
         html += filtered.map(s => {
             const isActive = String(s.id) === String(productsTableState.selectedEventId);
-            const rev = Number(s.revenue ?? s.total_revenue ?? s.totalRevenue ?? 0) || 0;
+            let dateStr = '--/--/----';
+            if (s.created_at) {
+                try {
+                    const d = new Date(s.created_at);
+                    if (!isNaN(d.getTime())) {
+                        dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                    }
+                } catch (e) {}
+            }
+
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectProdEventDropdownOption(${s.id})">
                     <div class="reports-dropdown-option-left">
                         <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">festival</span>
                         <span class="option-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
                     </div>
-                    <span class="reports-dropdown-option-right">${formatCurrency(rev)}</span>
+                    <span class="reports-dropdown-option-right" style="font-size:0.8rem; color:var(--text-light); font-weight:500;">${dateStr}</span>
                 </button>
             `;
         }).join('');
@@ -3109,6 +3147,7 @@
 
     /**
      * Render Inspect Event Dropdown Options
+     * Sorted by creation date (most recent first) and displaying creation date on the right.
      */
     function renderInspectEventDropdownOptions(sagrasList, query) {
         const container = document.getElementById('rep-inspect-event-options');
@@ -3117,8 +3156,18 @@
         const cleanQuery = (query || '').trim().toLowerCase();
         let list = sagrasList || [];
 
+        // Sort by creation date DESC (most recent first)
+        list = [...list].sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+                return timeB - timeA;
+            }
+            return Number(b.id) - Number(a.id);
+        });
+
         if (cleanQuery) {
-            list = list.filter(s => s.name.toLowerCase().includes(cleanQuery));
+            list = list.filter(s => s.name && s.name.toLowerCase().includes(cleanQuery));
         }
 
         if (list.length === 0) {
@@ -3128,8 +3177,15 @@
 
         container.innerHTML = list.map(s => {
             const isActive = String(inspectState.selectedSagraId) === String(s.id);
-            const rev = Number(s.revenue ?? s.total_revenue ?? s.totalRevenue ?? 0) || 0;
-            const revStr = formatCurrency(rev);
+            let dateStr = '--/--/----';
+            if (s.created_at) {
+                try {
+                    const d = new Date(s.created_at);
+                    if (!isNaN(d.getTime())) {
+                        dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                    }
+                } catch (e) {}
+            }
 
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectInspectEventDropdownOption(${s.id})">
@@ -3137,7 +3193,7 @@
                         <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">festival</span>
                         <span class="option-name font-bold" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
                     </div>
-                    <span class="reports-dropdown-option-right">${revStr}</span>
+                    <span class="reports-dropdown-option-right" style="font-size:0.8rem; color:var(--text-light); font-weight:500;">${dateStr}</span>
                 </button>
             `;
         }).join('');
