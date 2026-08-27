@@ -5702,6 +5702,39 @@ img {
   font-size: 19px;
 }
 
+/* Reports Export Screenshot Button */
+.reports-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+}
+
+.reports-export-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.reports-export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reports-export-btn .material-symbols-rounded {
+  color: var(--primary);
+  font-size: 19px;
+}
+
 /* Date Range Filter Modal */
 .reports-daterange-modal-content {
   max-width: 520px;
@@ -6621,18 +6654,18 @@ img {
 }
 
 .reports-topflop-rank.rank-1 {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  background: #fef3c7;
   color: #b45309;
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
 }
 
 .reports-topflop-rank.rank-2 {
-  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+  background: #f1f5f9;
   color: #475569;
 }
 
 .reports-topflop-rank.rank-3 {
-  background: linear-gradient(135deg, #ffedd5, #fed7aa);
+  background: #ffedd5;
   color: #c2410c;
 }
 

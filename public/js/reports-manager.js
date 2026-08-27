@@ -1724,7 +1724,7 @@
     /**
      * Helper to render a Top 3 Podium column for an event.
      */
-    function renderPodiumColumn(topItems, eventName, colorHex, gradientCss, totalEventRevenue) {
+    function renderPodiumColumn(topItems, eventName, colorHex, totalEventRevenue) {
         if (!topItems || topItems.length === 0) {
             return `
                 <div class="reports-compare-podium-col">
@@ -1755,7 +1755,7 @@
                         </div>
                         <div class="reports-podium-sub-row">
                             <div class="reports-progress-track" style="height: 5px; flex: 1;">
-                                <div class="reports-progress-fill" style="width: ${Math.max(pct, rev > 0 ? 1 : 0)}%; background: ${gradientCss};"></div>
+                                <div class="reports-progress-fill" style="width: ${Math.max(pct, rev > 0 ? 1 : 0)}%; background: ${colorHex || '#2563eb'};"></div>
                             </div>
                             <span class="reports-podium-item-qty">${qty.toLocaleString('it-IT')} pz • ${shareText}</span>
                         </div>
@@ -1769,7 +1769,7 @@
                 <div class="reports-podium-col-header" style="color: ${colorHex};">
                     <span class="reports-podium-event-name" title="${escapeHtml(eventName)}">${escapeHtml(eventName)}</span>
                 </div>
-                <div class="reports-podium-list">
+                <div class="reports-podium-items-list">
                     ${itemsHtml}
                 </div>
             </div>
@@ -1777,7 +1777,7 @@
     }
 
     /**
-     * Render Top 3 Products per Event inside the comparison card.
+     * Render Top 3 Dishes per Event in Comparison View.
      */
     function renderCompareTopProducts(data1, name1, data2, name2) {
         const container = document.getElementById('rep-compare-products-list');
@@ -1788,7 +1788,7 @@
 
         if (!isDual) {
             // Single event mode: render top 3 of Event 1
-            const col1 = renderPodiumColumn(items1, name1, '#2563eb', 'linear-gradient(90deg, #2563eb, #3b82f6)', data1?.totalRevenue);
+            const col1 = renderPodiumColumn(items1, name1, '#2563eb', data1?.totalRevenue);
             container.innerHTML = `
                 <div class="reports-compare-podium-grid">
                     ${col1}
@@ -1799,8 +1799,8 @@
 
         // Dual comparison mode: render podium for Event 1 and podium for Event 2 stacked vertically
         const items2 = (data2 && data2.topItems) ? [...data2.topItems].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0)).slice(0, 3) : [];
-        const col1 = renderPodiumColumn(items1, name1, '#2563eb', 'linear-gradient(90deg, #2563eb, #3b82f6)', data1?.totalRevenue);
-        const col2 = renderPodiumColumn(items2, name2, '#8b5cf6', 'linear-gradient(90deg, #8b5cf6, #a855f7)', data2?.totalRevenue);
+        const col1 = renderPodiumColumn(items1, name1, '#2563eb', data1?.totalRevenue);
+        const col2 = renderPodiumColumn(items2, name2, '#8b5cf6', data2?.totalRevenue);
 
         container.innerHTML = `
             <div class="reports-compare-podium-grid">
@@ -1872,7 +1872,7 @@
                             </div>
                         </div>
                         <div class="reports-progress-track">
-                            <div class="reports-progress-fill" style="width: ${Math.max(pct1, c1.revenue > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                            <div class="reports-progress-fill" style="width: ${Math.max(pct1, c1.revenue > 0 ? 1 : 0)}%; background: #2563eb;"></div>
                         </div>
                     </div>
                 `;
@@ -1895,7 +1895,7 @@
                             </div>
                         </div>
                         <div class="reports-progress-track">
-                            <div class="reports-progress-fill" style="width: ${Math.max(pct1, c1.revenue > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                            <div class="reports-progress-fill" style="width: ${Math.max(pct1, c1.revenue > 0 ? 1 : 0)}%; background: #2563eb;"></div>
                         </div>
                     </div>
 
@@ -1911,7 +1911,7 @@
                             </div>
                         </div>
                         <div class="reports-progress-track">
-                            <div class="reports-progress-fill" style="width: ${Math.max(pct2, c2.revenue > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #8b5cf6, #a855f7);"></div>
+                            <div class="reports-progress-fill" style="width: ${Math.max(pct2, c2.revenue > 0 ? 1 : 0)}%; background: #8b5cf6;"></div>
                         </div>
                     </div>
                 </div>
@@ -2075,7 +2075,8 @@
         const cat = (p.category_name || 'Altro').trim();
         const rankClass = 'rank-other';
         const pct = maxQty > 0 ? Math.min(100, Math.max(0, (qty / maxQty) * 100)) : 0;
-        const barGradient = 'linear-gradient(90deg, #64748b, #94a3b8)';
+        const barWidth = Math.max(pct, qty > 0 ? 4 : 0);
+        const barStyle = barWidth > 0 ? `width: ${barWidth}%; background: #64748b;` : 'width: 0%; background: none;';
 
         return `
             <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}')" title="Clicca per visualizzare le statistiche dettagliate">
@@ -2088,7 +2089,7 @@
                     <div class="reports-topflop-sub-row">
                         <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
                         <div class="reports-topflop-track" style="max-width: 90px;">
-                            <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: ${barGradient};"></div>
+                            <div class="reports-topflop-bar" style="${barStyle}"></div>
                         </div>
                     </div>
                 </div>
@@ -2343,7 +2344,7 @@
                     <td class="th-align-right font-medium">
                         <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px;">
                             <div class="reports-progress-track" style="width: 50px; height: 5px; margin: 0;">
-                                <div class="reports-progress-fill" style="width: ${Math.max(share, rev > 0 ? 1 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                                <div class="reports-progress-fill" style="width: ${Math.max(share, rev > 0 ? 1 : 0)}%; background: #2563eb;"></div>
                             </div>
                             <span style="min-width: 42px; font-size: 0.82rem;">${sharePctFormatted}</span>
                         </div>
@@ -2875,7 +2876,7 @@
                         </div>
                     </div>
                     <div class="reports-progress-track" style="height: 6px; margin: 0;">
-                        <div class="reports-progress-fill" style="width: ${Math.max(pct, rev > 0 ? 2 : 0)}%; background: linear-gradient(90deg, #2563eb, #3b82f6);"></div>
+                        <div class="reports-progress-fill" style="width: ${Math.max(pct, rev > 0 ? 2 : 0)}%; background: #2563eb;"></div>
                     </div>
                 </div>
             `;
@@ -3441,7 +3442,7 @@
                         <div class="reports-topflop-sub-row">
                             <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
                             <div class="reports-topflop-track" style="max-width: 90px;">
-                                <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: linear-gradient(90deg, #64748b, #94a3b8);"></div>
+                                <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: #64748b;"></div>
                             </div>
                         </div>
                     </div>
@@ -3569,7 +3570,6 @@
         const cat = (p.category_name || 'Altro').trim();
         const rankClass = 'rank-other';
         const pct = maxQty > 0 ? Math.min(100, Math.max(0, (qty / maxQty) * 100)) : 0;
-        const barGradient = 'linear-gradient(90deg, #64748b, #94a3b8)';
 
         return `
             <div class="reports-topflop-item" onclick="openReportsProductModal('${escapeHtml(p.product_name)}', ${inspectState.selectedSagraId})" title="Clicca per visualizzare le statistiche dettagliate">
@@ -3582,7 +3582,7 @@
                     <div class="reports-topflop-sub-row">
                         <span>${escapeHtml(cat)} • ${formatCurrency(rev)}</span>
                         <div class="reports-topflop-track" style="max-width: 90px;">
-                            <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: ${barGradient};"></div>
+                            <div class="reports-topflop-bar" style="width: ${Math.max(pct, qty > 0 ? 4 : 0)}%; background: #64748b;"></div>
                         </div>
                     </div>
                 </div>
@@ -3795,6 +3795,135 @@
     }
 
     /**
+     * Export screenshot of the active reports tab to PNG image.
+     * Excludes order history card on the event inspect tab as requested,
+     * and adds balanced outer margins/padding for a framed report layout.
+     */
+    async function exportReportsScreenshot() {
+        if (typeof html2canvas !== 'function') {
+            if (typeof showToast === 'function') {
+                showToast("Libreria di cattura screenshot non disponibile.", "error");
+            }
+            return;
+        }
+
+        const tabKey = reportsState.activeTab || (document.querySelector('.reports-nav-item.active')?.getAttribute('data-tab')) || 'overview';
+
+        let targetEl = null;
+        if (tabKey === 'overview') targetEl = document.getElementById('reports-tab-overview');
+        else if (tabKey === 'events') targetEl = document.getElementById('reports-tab-events');
+        else if (tabKey === 'products') targetEl = document.getElementById('reports-tab-products');
+        else if (tabKey === 'event-inspect') targetEl = document.getElementById('reports-tab-event-inspect');
+
+        if (!targetEl) targetEl = document.querySelector('.reports-main-content');
+        if (!targetEl) return;
+
+        const exportBtn = document.getElementById('reports-export-btn');
+        const exportIcon = document.getElementById('reports-export-btn-icon');
+        const exportText = document.getElementById('reports-export-btn-text');
+
+        if (exportBtn) exportBtn.disabled = true;
+        if (exportIcon) {
+            exportIcon.innerText = 'progress_activity';
+            exportIcon.classList.add('spin');
+        }
+        if (exportText) exportText.innerText = 'Esportazione...';
+
+        try {
+            // Small delay for DOM layout reflow
+            await new Promise(resolve => setTimeout(resolve, 120));
+
+            const computedBg = window.getComputedStyle(document.body).getPropertyValue('--bg-main')?.trim() || '#f8fafc';
+
+            const canvas = await html2canvas(targetEl, {
+                scale: 2, // High resolution Retina 2x
+                useCORS: true,
+                allowTaint: true,
+                logging: false,
+                backgroundColor: computedBg,
+                scrollX: 0,
+                scrollY: 0,
+                onclone: (clonedDoc, element) => {
+                    // Apply outer frame margins/padding around the exported report
+                    element.style.padding = '24px 28px 32px 28px';
+                    element.style.backgroundColor = computedBg;
+                    element.style.boxSizing = 'border-box';
+                    element.style.width = '100%';
+                    element.style.borderRadius = '0';
+
+                    // Convert sticky table headers to static in clone to prevent html2canvas offset bugs
+                    element.querySelectorAll('.reports-table th').forEach(th => {
+                        th.style.position = 'static';
+                    });
+
+                    // Hide any open dropdown panels in clone
+                    element.querySelectorAll('.reports-custom-dropdown-panel').forEach(panel => {
+                        panel.style.display = 'none';
+                    });
+
+                    // Strip any gradient backgrounds from clone to completely eliminate createPattern zero-dimension errors
+                    element.querySelectorAll('*').forEach(el => {
+                        if (el.style && (el.style.backgroundImage?.includes('gradient') || el.style.background?.includes('gradient'))) {
+                            el.style.backgroundImage = 'none';
+                        }
+                    });
+
+                    // Hide reload / refresh buttons from the screenshot
+                    element.querySelectorAll('#rep-prod-refresh-btn, #rep-inspect-refresh-btn, .reports-table-action-btn').forEach(btn => {
+                        btn.style.display = 'none';
+                    });
+
+                    // If event-inspect tab, exclude orders history card from the screenshot
+                    if (tabKey === 'event-inspect') {
+                        const ordersBox = element.querySelector('#rep-inspect-orders-grid')?.closest('.reports-card-box');
+                        if (ordersBox) ordersBox.remove();
+                    }
+                }
+            });
+
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+
+            let tabLabel = 'Panoramica';
+            if (tabKey === 'events') tabLabel = 'Dettagli_Eventi';
+            else if (tabKey === 'products') tabLabel = 'Dettagli_Prodotti';
+            else if (tabKey === 'event-inspect') {
+                const eventName = (inspectState.sagraData?.name || 'Evento').replace(/[^a-zA-Z0-9_-]/g, '_');
+                tabLabel = `Ispezione_${eventName}`;
+            }
+
+            const filename = `Report_${tabLabel}_${day}-${month}-${year}_${timeStr}.png`;
+
+            // Download trigger
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            if (typeof showToast === 'function') {
+                showToast(`Report esportato con successo! (${filename})`, 'success');
+            }
+        } catch (err) {
+            console.error('Errore durante esportazione screenshot:', err);
+            if (typeof showToast === 'function') {
+                showToast(`Errore durante l'esportazione: ${err.message}`, 'error');
+            }
+        } finally {
+            if (exportBtn) exportBtn.disabled = false;
+            if (exportIcon) {
+                exportIcon.innerText = 'photo_camera';
+                exportIcon.classList.remove('spin');
+            }
+            if (exportText) exportText.innerText = 'Esporta Report';
+        }
+    }
+
+    /**
      * Close product detail modal.
      */
     function closeReportsProductModal() {
@@ -3848,4 +3977,5 @@
     window.selectInspectOrdersSortOption = selectInspectOrdersSortOption;
     window.showInspectChartTooltip = showInspectChartTooltip;
     window.hideInspectChartTooltip = hideInspectChartTooltip;
+    window.exportReportsScreenshot = exportReportsScreenshot;
 })();

@@ -389,12 +389,16 @@
         </div>
       </div>
 
-      <!-- RIGHT: Date Range Filter & Back to Home Button -->
+      <!-- RIGHT: Date Range Filter, Export Screenshot & Back to Home Button -->
       <div class="reports-header-right">
         <button type="button" id="reports-daterange-btn" class="reports-daterange-btn" onclick="openReportsDateRangeModal()" title="Filtra per periodo temporale">
           <span class="material-symbols-rounded">calendar_month</span>
           <span id="reports-daterange-btn-text">Quest'anno</span>
           <span class="material-symbols-rounded" style="font-size: 18px; margin-left: 2px;">expand_more</span>
+        </button>
+        <button type="button" id="reports-export-btn" class="reports-export-btn" onclick="exportReportsScreenshot()" title="Esporta screenshot del report">
+          <span class="material-symbols-rounded" id="reports-export-btn-icon">photo_camera</span>
+          <span id="reports-export-btn-text">Esporta Report</span>
         </button>
         <button type="button" class="reports-header-back-btn" onclick="closeReportsView()" title="Torna alla schermata iniziale">
           <span class="material-symbols-rounded">arrow_back</span>
@@ -2099,6 +2103,7 @@
   <script src="js/menu-printer.js"></script>
   <script src="js/menu-templates/template-a4-modern.js"></script>
   <script src="js/menu-templates/template-a4-vintage.js"></script>
+  <script src="js/html2canvas.min.js"></script>
   <script src="js/reports-manager.js"></script>
   <script src="js/app.js"></script>
 </body>
