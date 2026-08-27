@@ -1063,6 +1063,71 @@
               </div>
             </div>
           </div>
+
+          <!-- Orders History Card Grid (Bottom Full Width) -->
+          <div class="reports-card-box" style="margin-top: 20px;">
+            <div class="reports-card-header" style="padding: 14px 20px; flex-wrap: wrap; gap: 12px;">
+              <div class="reports-card-title">
+                <span class="material-symbols-rounded" style="color: var(--text-light);">receipt_long</span>
+                <span>Storico Ordini dell'Evento</span>
+                <span id="rep-inspect-orders-count-badge" class="reports-count-badge">0 ordini</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <!-- Custom Order Sort Dropdown Filter -->
+                <div class="reports-custom-select-container" id="rep-inspect-orders-sort-wrap">
+                  <div class="reports-custom-select-box">
+                    <button type="button" class="reports-custom-select-btn" id="rep-inspect-orders-sort-btn" onclick="toggleInspectOrdersSortDropdown(event)">
+                      <span class="material-symbols-rounded" id="rep-inspect-orders-sort-icon" style="font-size: 18px; color: var(--primary);">sort</span>
+                      <span class="reports-custom-select-text" id="rep-inspect-orders-sort-text">Più recenti</span>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rep-inspect-orders-sort-chevron">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rep-inspect-orders-sort-dropdown" style="display: none; min-width: 180px;">
+                      <div class="reports-dropdown-options-list" id="rep-inspect-orders-sort-options">
+                        <button type="button" class="reports-dropdown-option active" data-value="recent_desc" onclick="selectInspectOrdersSortOption('recent_desc', 'Più recenti', event)">
+                          <div class="reports-dropdown-option-left">
+                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary);">schedule</span>
+                            <span class="option-name">Più recenti</span>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary);">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="recent_asc" onclick="selectInspectOrdersSortOption('recent_asc', 'Meno recenti', event)">
+                          <div class="reports-dropdown-option-left">
+                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--text-light);">history</span>
+                            <span class="option-name">Meno recenti</span>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary); display: none;">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="price_desc" onclick="selectInspectOrdersSortOption('price_desc', 'Più costosi', event)">
+                          <div class="reports-dropdown-option-left">
+                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--text-light);">payments</span>
+                            <span class="option-name">Più costosi</span>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary); display: none;">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="price_asc" onclick="selectInspectOrdersSortOption('price_asc', 'Meno costosi', event)">
+                          <div class="reports-dropdown-option-left">
+                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--text-light);">savings</span>
+                            <span class="option-name">Meno costosi</span>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary); display: none;">check</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="reports-search-box" style="min-width: 220px;">
+                  <span class="material-symbols-rounded">search</span>
+                  <input type="text" id="rep-inspect-orders-search" placeholder="Cerca ordine o piatto..." oninput="filterInspectOrdersHistory(this.value)">
+                </div>
+              </div>
+            </div>
+            <div class="reports-card-body" style="padding: 16px 20px;">
+              <div id="rep-inspect-orders-grid" class="reports-orders-grid" style="max-height: 580px; overflow-y: auto; padding-right: 4px;" onscroll="handleInspectOrdersScroll(this)">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>

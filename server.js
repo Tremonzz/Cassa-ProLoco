@@ -1136,6 +1136,25 @@ app.post('/api/orders', async (req, res) => {
 // Get History
 app.get('/api/history', (req, res) => {
   const sagraId = req.query.sagraId || 1;
+  const limit = parseInt(req.query.limit, 10) || 500;
+  const { start_date, end_date } = req.query;
+
+  let dateFilter = "";
+  const params = [sagraId];
+
+  if (start_date && end_date) {
+    dateFilter = "AND DATE(datetime(o.created_at, 'localtime')) BETWEEN ? AND ?";
+    params.push(start_date, end_date);
+  } else if (start_date) {
+    dateFilter = "AND DATE(datetime(o.created_at, 'localtime')) >= ?";
+    params.push(start_date);
+  } else if (end_date) {
+    dateFilter = "AND DATE(datetime(o.created_at, 'localtime')) <= ?";
+    params.push(end_date);
+  }
+
+  params.push(limit);
+
   const sql = `
     SELECT 
       o.id as order_id,
@@ -1147,12 +1166,12 @@ app.get('/api/history', (req, res) => {
       oi.price as item_price
     FROM orders o
     LEFT JOIN order_items oi ON o.id = oi.order_id
-    WHERE o.sagra_id = ?
-    ORDER BY o.created_at DESC
-    LIMIT 200
+    WHERE o.sagra_id = ? ${dateFilter}
+    ORDER BY o.created_at DESC, o.id DESC
+    LIMIT ?
   `;
 
-  db.all(sql, [sagraId], (err, rows) => {
+  db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     const orders = {};
     rows.forEach(row => {

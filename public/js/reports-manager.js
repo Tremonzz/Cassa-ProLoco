@@ -1381,6 +1381,11 @@
         const inspectBtn = document.getElementById('rep-inspect-event-select-btn');
         if (inspectPanel) inspectPanel.style.display = 'none';
         if (inspectBtn) inspectBtn.classList.remove('open');
+
+        const orderSortPanel = document.getElementById('rep-inspect-orders-sort-dropdown');
+        const orderSortBtn = document.getElementById('rep-inspect-orders-sort-btn');
+        if (orderSortPanel) orderSortPanel.style.display = 'none';
+        if (orderSortBtn) orderSortBtn.classList.remove('open');
     }
 
     // Close custom dropdowns on clicking outside
@@ -2955,6 +2960,11 @@
         sagraData: null,
         statsData: null,
         stockData: null,
+        rawOrders: [],
+        filteredOrders: [],
+        ordersRenderedCount: 0,
+        ordersChunkSize: 18,
+        ordersSort: 'recent_desc',
         isLoading: false
     };
 
@@ -3127,16 +3137,19 @@
                 }
             }).catch(() => {});
 
-            const [statsRes, prodsRes] = await Promise.all([
+            const [statsRes, prodsRes, historyRes] = await Promise.all([
                 fetch(`/api/stats?sagraId=${sagraId}`),
-                fetch(`/api/reports/products?sagra_id=${sagraId}`)
+                fetch(`/api/reports/products?sagra_id=${sagraId}`),
+                fetch(`/api/history?sagraId=${sagraId}&limit=500`)
             ]);
 
             const statsData = await statsRes.json();
             const prodsData = await prodsRes.json();
+            const historyData = await historyRes.json();
 
             inspectState.statsData = statsData;
             inspectState.stockData = prodsData;
+            inspectState.rawOrders = Array.isArray(historyData) ? historyData : [];
 
             const totalRev = Number(statsData.totalRevenue) || 0;
             const ordersCount = Number(statsData.ordersCount) || 0;
@@ -3166,6 +3179,11 @@
 
             // Render Top 3 and 3 Meno Venduti
             renderInspectTopAndFlop3(prodsData.products || statsData.topItems || []);
+
+            // Reset search and render orders history cards
+            const ordersSearchInput = document.getElementById('rep-inspect-orders-search');
+            if (ordersSearchInput) ordersSearchInput.value = '';
+            filterInspectOrdersHistory('');
 
         } catch(err) {
             console.error("Error loading inspect event data:", err);
@@ -3573,6 +3591,210 @@
     }
 
     /**
+     * Helper to sort orders array based on selected criteria.
+     */
+    function sortInspectOrders(list, sortKey) {
+        const sorted = [...list];
+        sorted.sort((a, b) => {
+            if (sortKey === 'recent_asc') {
+                const timeA = new Date(a.created_at || 0).getTime();
+                const timeB = new Date(b.created_at || 0).getTime();
+                if (timeA !== timeB) return timeA - timeB;
+                return (a.id || 0) - (b.id || 0);
+            } else if (sortKey === 'price_desc') {
+                const diff = (Number(b.total) || 0) - (Number(a.total) || 0);
+                if (diff !== 0) return diff;
+                return (b.id || 0) - (a.id || 0);
+            } else if (sortKey === 'price_asc') {
+                const diff = (Number(a.total) || 0) - (Number(b.total) || 0);
+                if (diff !== 0) return diff;
+                return (b.id || 0) - (a.id || 0);
+            } else { // 'recent_desc'
+                const timeA = new Date(a.created_at || 0).getTime();
+                const timeB = new Date(b.created_at || 0).getTime();
+                if (timeA !== timeB) return timeB - timeA;
+                return (b.id || 0) - (a.id || 0);
+            }
+        });
+        return sorted;
+    }
+
+    /**
+     * Filter orders history search in inspect event tab.
+     */
+    function filterInspectOrdersHistory(query) {
+        const q = (query !== undefined ? query : (document.getElementById('rep-inspect-orders-search')?.value || '')).trim().toLowerCase();
+        const raw = inspectState.rawOrders || [];
+
+        let filtered = raw;
+        if (q) {
+            filtered = raw.filter(order => {
+                const seqMatch = String(order.seq || '').toLowerCase().includes(q) || String(order.id || '').toLowerCase().includes(q);
+                const totalMatch = String(order.total || '').includes(q);
+                const itemMatch = (order.items || []).some(it => (it.name || '').toLowerCase().includes(q));
+                return seqMatch || totalMatch || itemMatch;
+            });
+        }
+
+        inspectState.filteredOrders = sortInspectOrders(filtered, inspectState.ordersSort);
+
+        const badge = document.getElementById('rep-inspect-orders-count-badge');
+        if (badge) badge.innerText = `${inspectState.filteredOrders.length} ${inspectState.filteredOrders.length === 1 ? 'ordine' : 'ordini'}`;
+
+        renderNextInspectOrdersChunk(true);
+    }
+
+    /**
+     * Render next chunk of orders in the inspect event orders grid (progressive lazy scroll).
+     */
+    function renderNextInspectOrdersChunk(reset = false) {
+        const container = document.getElementById('rep-inspect-orders-grid');
+        if (!container) return;
+
+        if (reset) {
+            container.innerHTML = '';
+            inspectState.ordersRenderedCount = 0;
+            container.scrollTop = 0;
+        }
+
+        const filtered = inspectState.filteredOrders || [];
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align:center; padding: 36px 20px; color: var(--text-light);">
+                    <span class="material-symbols-rounded" style="font-size: 32px; color: var(--text-light); display: block; margin-bottom: 6px;">receipt_long</span>
+                    <strong style="color: var(--text-main); font-size: 0.92rem;">Nessun ordine trovato</strong>
+                    <div style="font-size: 0.8rem; margin-top: 2px;">Nessun ordine registrato per questo evento o corrispondente ai filtri di ricerca.</div>
+                </div>
+            `;
+            return;
+        }
+
+        const start = inspectState.ordersRenderedCount;
+        const chunkSize = inspectState.ordersChunkSize || 18;
+        const nextChunk = filtered.slice(start, start + chunkSize);
+
+        if (nextChunk.length === 0 && !reset) return;
+
+        const cardsHtml = nextChunk.map(order => {
+            const seq = order.seq || order.id || '-';
+            const total = Number(order.total) || 0;
+            const items = order.items || [];
+            
+            let timeStr = '--:--';
+            let dateStr = '';
+            if (order.created_at) {
+                try {
+                    const d = new Date(order.created_at);
+                    if (!isNaN(d.getTime())) {
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const mm = String(d.getMinutes()).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        timeStr = `${hh}:${mm}`;
+                        dateStr = `${day}/${month}`;
+                    }
+                } catch(e) {}
+            }
+
+            let totalPz = 0;
+            const itemsHtml = items.map(it => {
+                const qty = Number(it.quantity) || 1;
+                const price = Number(it.price) || 0;
+                totalPz += qty;
+                return `
+                    <div class="reports-order-card-item-row">
+                        <div class="reports-order-item-left" title="${escapeHtml(it.name)}">
+                            <span class="reports-order-item-qty">${qty}x</span>
+                            <span class="reports-order-item-name">${escapeHtml(it.name)}</span>
+                        </div>
+                        <span class="reports-order-item-price">${formatCurrency(price * qty)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="reports-order-card">
+                    <div class="reports-order-card-header">
+                        <div class="reports-order-card-id-wrap">
+                            <span class="reports-order-seq-badge">#${escapeHtml(String(seq))}</span>
+                            <span class="reports-order-time-text">Ore ${timeStr} ${dateStr ? `• ${dateStr}` : ''}</span>
+                        </div>
+                        <span class="reports-order-card-total">${formatCurrency(total)}</span>
+                    </div>
+                    <div class="reports-order-card-items">
+                        ${itemsHtml || '<div style="color:var(--text-light); font-size:0.78rem;">Nessun dettaglio piatti</div>'}
+                    </div>
+                    <div class="reports-order-card-footer">
+                        <span>${totalPz} ${totalPz === 1 ? 'prodotto' : 'prodotti'}</span>
+                        <span>ID #${order.id}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (reset) {
+            container.innerHTML = cardsHtml;
+        } else {
+            container.insertAdjacentHTML('beforeend', cardsHtml);
+        }
+
+        inspectState.ordersRenderedCount += nextChunk.length;
+    }
+
+    /**
+     * Handle scroll for infinite loading of orders.
+     */
+    function handleInspectOrdersScroll(el) {
+        if (!el) return;
+        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 120) {
+            renderNextInspectOrdersChunk(false);
+        }
+    }
+
+    /**
+     * Toggle inspect orders sort dropdown.
+     */
+    function toggleInspectOrdersSortDropdown(e) {
+        if (e) e.stopPropagation();
+        const panel = document.getElementById('rep-inspect-orders-sort-dropdown');
+        const btn = document.getElementById('rep-inspect-orders-sort-btn');
+        if (!panel) return;
+
+        const isVisible = panel.style.display === 'block';
+        closeAllCompareDropdowns();
+
+        if (!isVisible) {
+            panel.style.display = 'block';
+            if (btn) btn.classList.add('open');
+        }
+    }
+
+    /**
+     * Select sorting option for inspect orders grid.
+     */
+    function selectInspectOrdersSortOption(sortKey, label, e) {
+        if (e) e.stopPropagation();
+        inspectState.ordersSort = sortKey;
+
+        const textEl = document.getElementById('rep-inspect-orders-sort-text');
+        if (textEl) textEl.innerText = label;
+
+        // Update active class & checkmark in options
+        const options = document.querySelectorAll('#rep-inspect-orders-sort-options .reports-dropdown-option');
+        options.forEach(opt => {
+            const isSel = opt.getAttribute('data-value') === sortKey;
+            opt.classList.toggle('active', isSel);
+            const check = opt.querySelector('.option-check');
+            if (check) check.style.display = isSel ? 'inline-block' : 'none';
+            const icon = opt.querySelector('.material-symbols-rounded:not(.option-check)');
+            if (icon) icon.style.color = isSel ? 'var(--primary)' : 'var(--text-light)';
+        });
+
+        closeAllCompareDropdowns();
+        filterInspectOrdersHistory();
+    }
+
+    /**
      * Close product detail modal.
      */
     function closeReportsProductModal() {
@@ -3619,6 +3841,11 @@
     window.filterInspectEventDropdownItems = filterInspectEventDropdownItems;
     window.selectInspectEventDropdownOption = selectInspectEventDropdownOption;
     window.loadInspectEventData = loadInspectEventData;
+    window.renderNextInspectOrdersChunk = renderNextInspectOrdersChunk;
+    window.handleInspectOrdersScroll = handleInspectOrdersScroll;
+    window.filterInspectOrdersHistory = filterInspectOrdersHistory;
+    window.toggleInspectOrdersSortDropdown = toggleInspectOrdersSortDropdown;
+    window.selectInspectOrdersSortOption = selectInspectOrdersSortOption;
     window.showInspectChartTooltip = showInspectChartTooltip;
     window.hideInspectChartTooltip = hideInspectChartTooltip;
 })();
