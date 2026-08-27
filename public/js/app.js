@@ -3663,12 +3663,113 @@ async function clearCart() {
 
 let isPrintingOrder = false;
 
-async function printOrder() {
+function handlePrintOrderContextMenu(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const btn = document.getElementById('btn-print-unrecorded');
+    if (!btn) return;
+
+    if (btn.style.display === 'flex') {
+        hidePrintUnrecordedButton();
+    } else {
+        btn.style.display = 'flex';
+    }
+}
+
+function hidePrintUnrecordedButton() {
+    const btn = document.getElementById('btn-print-unrecorded');
+    if (btn) btn.style.display = 'none';
+}
+
+window.handlePrintOrderContextMenu = handlePrintOrderContextMenu;
+window.hidePrintUnrecordedButton = hidePrintUnrecordedButton;
+window.printUnrecordedOrder = printUnrecordedOrder;
+
+// Dismiss unrecorded button on outside click or ESC
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#btn-print-unrecorded') && !e.target.closest('#btn-print-order')) {
+        hidePrintUnrecordedButton();
+    }
+});
+
+async function printUnrecordedOrder(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    hidePrintUnrecordedButton();
+
     if (isPrintingOrder) return;
     if (STATE.cart.length === 0) return showToast("Il carrello è vuoto", "error");
     const total = STATE.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
-    const printBtn = document.querySelector('.btn-print');
+    const printBtn = document.getElementById('btn-print-order') || document.querySelector('.btn-print');
+    isPrintingOrder = true;
+    if (printBtn) printBtn.disabled = true;
+
+    // Get stored printer name and template
+    const printerName = localStorage.getItem('thermalPrinterName');
+    const template = localStorage.getItem('receiptTemplate') || 'compact';
+
+    const payload = {
+        sagraId: STATE.currentSagra ? STATE.currentSagra.id : 1,
+        items: STATE.cart,
+        total: total,
+        printerName: printerName,
+        template: template,
+        isUnrecorded: true, // Do NOT decrement stock, do NOT save into DB history
+        testMode: (localStorage.getItem('appTestMode') === 'true'),
+        printEventName: (localStorage.getItem('appPrintEventName') !== 'false')
+    };
+
+    try {
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            if (data.testMode && data.preview) {
+                showReceiptPreviewModal(data.preview);
+            } else if (data.warning) {
+                showAlert(`Nota: ${data.warning}`);
+            } else {
+                showToast("Ordine stampato (senza salvataggio nello storico)", "info");
+            }
+
+            STATE.cart = [];
+            const cashInput = document.getElementById('cash-received');
+            if (cashInput) cashInput.value = '';
+            renderCart();
+
+            // Refresh Inventory from server & re-render products to restore correct stock counts
+            await loadSagraResources();
+            renderProducts();
+        } else {
+            const msg = data.error || 'Sconosciuto';
+            alert('Errore: ' + msg);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Errore di connessione');
+    } finally {
+        isPrintingOrder = false;
+        if (printBtn) printBtn.disabled = false;
+    }
+}
+
+async function printOrder() {
+    hidePrintUnrecordedButton();
+    if (isPrintingOrder) return;
+    if (STATE.cart.length === 0) return showToast("Il carrello è vuoto", "error");
+    const total = STATE.cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+    const printBtn = document.getElementById('btn-print-order') || document.querySelector('.btn-print');
     isPrintingOrder = true;
     if (printBtn) printBtn.disabled = true;
 

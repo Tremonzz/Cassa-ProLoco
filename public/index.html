@@ -275,9 +275,14 @@
             <button class="btn-action btn-history" onclick="showHistory()">
               <span class="material-symbols-rounded">history</span> Storico
             </button>
-            <button class="btn-action btn-print" onclick="printOrder()">
-              <span class="material-symbols-rounded">print</span> STAMPA ORDINE
-            </button>
+            <div class="btn-print-wrapper">
+              <button class="btn-action btn-print" id="btn-print-order" onclick="printOrder()" oncontextmenu="handlePrintOrderContextMenu(event)">
+                <span class="material-symbols-rounded">print</span> STAMPA ORDINE
+              </button>
+              <button type="button" id="btn-print-unrecorded" class="btn-print-unrecorded" onclick="printUnrecordedOrder(event)" style="display: none;" title="Stampa l'ordine senza scalare le scorte e senza salvarlo nello storico">
+                <span class="material-symbols-rounded">print_disabled</span> Stampa senza salvare
+              </button>
+            </div>
           </div>
         </div>
       </div>

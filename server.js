@@ -892,14 +892,14 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
 
 // Create Order (SEQ LOGIC + THERMAL PRINT + INVENTORY)
 app.post('/api/orders', async (req, res) => {
-  const { items, total, sagraId, printerName, template, testMode, printEventName, isReprint, orderId: reqOrderId } = req.body;
+  const { items, total, sagraId, printerName, template, testMode, printEventName, isReprint, isUnrecorded, orderId: reqOrderId } = req.body;
   if (!items || items.length === 0) return res.status(400).send('Empty order');
   const targetSagra = sagraId || 1;
 
   try {
     let seq = reqOrderId;
 
-    if (!isReprint) {
+    if (!isReprint && !isUnrecorded) {
       await dbRun("BEGIN TRANSACTION");
 
       // 1. Inventory Check & Aggregated Update
@@ -1008,9 +1008,16 @@ app.post('/api/orders', async (req, res) => {
       stmt.finalize();
 
       await dbRun("COMMIT");
+    } else if (isUnrecorded && !seq) {
+      try {
+        const row = await dbAll("SELECT COUNT(*) as count FROM orders WHERE sagra_id = ?", [targetSagra]);
+        seq = (row && row[0] ? (row[0].count + 1) : 1);
+      } catch (e) {
+        seq = 1;
+      }
     }
 
-    // 5. Printing / Test Mode Logic (Applies to both New Orders and Reprints)
+    // 5. Printing / Test Mode Logic (Applies to New Orders, Reprints and Unrecorded prints)
     try {
       // Fetch event name from DB (only if enabled)
       let sagraName = '';
@@ -1127,7 +1134,7 @@ app.post('/api/orders', async (req, res) => {
     }
 
   } catch (err) {
-    if (!isReprint) await dbRun("ROLLBACK").catch(() => {});
+    if (!isReprint && !isUnrecorded) await dbRun("ROLLBACK").catch(() => {});
     console.error("Order Error:", err);
     res.status(500).json({ success: false, error: err.message });
   }

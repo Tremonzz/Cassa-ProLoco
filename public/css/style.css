@@ -1995,6 +1995,66 @@ select.hidden-native-select {
   transform: translateY(-1px);
 }
 
+.btn-print-wrapper {
+  position: relative;
+  flex: 2;
+  display: flex;
+}
+
+.btn-print-wrapper .btn-print {
+  width: 100%;
+}
+
+.btn-print-unrecorded {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--card-bg, #ffffff);
+  color: var(--text-main, #1e293b);
+  border: 1.5px solid var(--border-color, #cbd5e1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  z-index: 100;
+  white-space: nowrap;
+  animation: printUnrecordedFadeUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s ease;
+}
+
+.btn-print-unrecorded:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(239, 68, 68, 0.22);
+}
+
+.btn-print-unrecorded .material-symbols-rounded {
+  font-size: 17px;
+  color: #ef4444;
+}
+
+@keyframes printUnrecordedFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 
 /* --- MODAL --- */
 .modal {
