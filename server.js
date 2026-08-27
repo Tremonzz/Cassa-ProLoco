@@ -1391,6 +1391,7 @@ app.get('/api/reports/overview', async (req, res) => {
           s.name, 
           s.status, 
           s.created_at,
+          MAX(o.created_at) as last_order_at,
           COUNT(o.id) as orders_count,
           COALESCE(SUM(o.total), 0) as revenue
         FROM sagras s

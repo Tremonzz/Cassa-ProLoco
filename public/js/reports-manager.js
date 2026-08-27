@@ -1221,6 +1221,39 @@
     }
 
     /**
+     * Helper to find the default event to select:
+     * The most recent event in which an order was placed (latest last_order_at),
+     * falling back to the most recently created event with orders or latest created event.
+     */
+    function getDefaultSelectedSagra(sagrasList) {
+        if (!sagrasList || sagrasList.length === 0) return null;
+
+        // Filter sagras with orders
+        const withOrders = sagrasList.filter(s => (s.last_order_at || s.orders_count > 0 || Number(s.revenue || s.total_revenue || 0) > 0));
+
+        if (withOrders.length > 0) {
+            // Sort by last_order_at DESC, then by created_at / id DESC
+            const sorted = [...withOrders].sort((a, b) => {
+                if (a.last_order_at && b.last_order_at) {
+                    const timeA = new Date(a.last_order_at).getTime();
+                    const timeB = new Date(b.last_order_at).getTime();
+                    if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+                        return timeB - timeA;
+                    }
+                }
+                if (a.last_order_at && !b.last_order_at) return -1;
+                if (!a.last_order_at && b.last_order_at) return 1;
+                return Number(b.id) - Number(a.id);
+            });
+            return sorted[0];
+        }
+
+        // If no sagra has orders yet, select the most recently created event (id DESC)
+        const sortedById = [...sagrasList].sort((a, b) => Number(b.id) - Number(a.id));
+        return sortedById[0];
+    }
+
+    /**
      * Populate Custom Dropdown Selectors for Event 1 and Event 2.
      */
     function populateCompareEventSelectors(sagras) {
@@ -1237,9 +1270,10 @@
             return;
         }
 
-        // Validate or set default Event 1
+        // Validate or set default Event 1 to the most recent event with orders
         if (!compareState.event1Id || !list.some(s => String(s.id) === String(compareState.event1Id))) {
-            compareState.event1Id = list[0].id;
+            const defSagra = getDefaultSelectedSagra(list);
+            compareState.event1Id = defSagra ? defSagra.id : list[0].id;
         }
 
         // Validate Event 2
@@ -3030,7 +3064,8 @@
 
         const sagras = eventsTableState.rawList || [];
         if (!inspectState.selectedSagraId && sagras.length > 0) {
-            inspectState.selectedSagraId = sagras[0].id;
+            const defSagra = getDefaultSelectedSagra(sagras);
+            inspectState.selectedSagraId = defSagra ? defSagra.id : sagras[0].id;
         }
 
         renderInspectEventDropdownOptions(sagras, '');
