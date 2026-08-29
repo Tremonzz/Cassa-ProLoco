@@ -35,9 +35,9 @@ L'applicazione non richiede una connessione ad internet.
 
 ## 2. Schermata Iniziale & Gestione Eventi  
 
-Dopo aver effettuato l'accesso all''applicazione viene mostrata la **Schermata Iniziale** con la panoramica di tutti gli eventi registrati.
+Dopo aver effettuato l'accesso all'applicazione viene mostrata la **Schermata Iniziale** con la panoramica di tutti gli eventi registrati.
 
-### Questa schermata contine:
+### Questa schermata contiene:
 
 *  #### Al centro
     * Una barra di ricerca per filtrare la lista eventi
@@ -100,7 +100,7 @@ Esistono quattro tipi diversi di prodotti:
 	* Sono caratterizzati da **Nome**, **Prezzo**, **Prodotti Collegati**.
 
 * **Prodotti con Selezione**:
-	* Sono prodotti che permettono la selezione dei vari componenti prima di esserre aggiunti al carrello. (*Es. Menu Completo. Le varie opzioni sono: due primi, tre secondi e quattro bibite. Selezionando questo prodotto verrà richiesto quale combinazione di scelte selezionare*)
+	* Sono prodotti che permettono la selezione dei vari componenti prima di essere aggiunti al carrello. (*Es. Menu Completo. Le varie opzioni sono: due primi, tre secondi e quattro bibite. Selezionando questo prodotto verrà richiesto quale combinazione di scelte selezionare*)
 	* Sono caratterizzati da **Nome**, **Prezzo**, **Prodotti Collegati**.
 
 Per aggiungere un **Prodotto Base** bisogna aprire la finestra laterale cliccando il tasto **`Prodotti Base`** sul bordo sinistro della schermata.
@@ -122,7 +122,7 @@ La schermata si presenta nella parte sinistra con la lista dei prodotti in vendi
 
 *  **Aggiunta al Carrello**: Clicca su una card per aggiungere una porzione al carrello. Ogni click successivo incrementa la quantità. É possibile aggiungere una determinata quantità in una sola volta facendo click col tasto destro sulla card e inserendo la quantità desiderata nell'apposita schermata che si apre.
 
-*  **Badge Disponibilità**: I prodotti per la quale sono gestite le scorte presentano un piccolo cerchio nell'angolo in alto a destra della card contenente la quantità rimanente. Non è possibile aggiungere il prodotto al carrello che le scorte sono terminate.
+*  **Badge Disponibilità**: I prodotti per i quali sono gestite le scorte presentano un piccolo cerchio nell'angolo in alto a destra della card contenente la quantità rimanente. Non è possibile aggiungere il prodotto al carrello se le scorte sono terminate.
 
 ### 4.2 Gestione del Carrello
 La sezione destra della schermata racchiude i comandi di stampa e l'ordine corrente. Da questa sezione è possibile:
@@ -219,7 +219,7 @@ Accessibile dalla **Schermata Principale** attraverso il tasto **`Resoconti`** i
 In alto a destra è presente il selettore del periodo di riferimento, è possibile selezionare un periodo suggerito (*Quest'anno, Anno Precedente, Mese Corrente, ...*) oppure indicare un periodo personalizzato tramite una **Data di Inizio** e una **Data di Fine**
 
 Tutti i grafici e le tabelle della pagina si riferiscono unicamente all'intervallo di tempo selezionato.
-*Se un evento ha una parte degli ordini fuori da questa linee temporale e una parte all'interno, vengono considerati a fine statistico solo gli ordini che rispettano il periodo di riferimento selezionato.*
+*Se un evento ha una parte degli ordini fuori da questa linea temporale e una parte all'interno, vengono considerati a fine statistico solo gli ordini che rispettano il periodo di riferimento selezionato.*
 
 ### 6.2 Scheda Panoramica
 
@@ -235,7 +235,7 @@ Offre la visione d'insieme dell'attività:
 
 ### 6.3 Scheda Dettagli Eventi
 
-*  **Tabella Comparativa**: Elenco di tutti gli eventi con incasso, numero ordini, scontrino medio e data. Cliccando sul nome di un evento è possibile visulizzare le sue statistiche.
+*  **Tabella Comparativa**: Elenco di tutti gli eventi con incasso, numero ordini, scontrino medio e data. Cliccando sul nome di un evento è possibile visualizzare le sue statistiche.
 
 *  **Confronto Duale**: Seleziona due eventi dai menu a tendina per confrontare le loro curve di vendita sovrapposte e analizzare quale edizione ha reso di più.
 
@@ -249,20 +249,20 @@ Offre la visione d'insieme dell'attività:
 *  **Top 5 & Flop 5**: I 5 piatti più venduti e i 5 meno venduti dell'evento.
 
 *  **Monitoraggio Scorte**
-	* **Prodotti Esaurti**: Lista dei prodotti le cui scorte sono esaurite con indicazione dell'orario in cui sono terminate.
+	* **Prodotti Esauriti**: Lista dei prodotti le cui scorte sono esaurite con indicazione dell'orario in cui sono terminate.
 	* **Prodotti Con Alte Scorte Rimanenti**: Lista dei prodotti le cui scorte sono rimaste per lo più invendute.
 
 ### 6.5 Scheda Ispezione Evento
 
 Permette di analizzare uno specifico evento nei minimi dettagli:
 
-*  **Selettore Evento**: Seleziona l'eventoper il quale si desidera visualizzare le statistiche.
+*  **Selettore Evento**: Seleziona l'evento per il quale si desidera visualizzare le statistiche.
 
 *  **4 Indicatori KPI**: Incasso Totale, Scontrini Emessi, Scontrino Medio e Totale Prodotti Venduti.
 
 *  **Curva Vendite Orarie**: Grafico delle vendite orarie che evidenzia i picchi di affluenza.
 
-*  **Lista Vendite Prodotti**: Lista completa di tutti i prodotti venduti ordinati in base in modo decrescente in base alla quantità venduta.
+*  **Lista Vendite Prodotti**: Lista completa di tutti i prodotti venduti ordinati in modo decrescente in base alla quantità venduta.
 *Cliccando sul nome del Prodotto è possibile vedere le sue statistiche con il grafico delle vendite orarie e la distribuzione tra i vari eventi.*
 
 *  **Monitoraggio Scorte**: Lista dei prodotti con scorte esaurite e con scorte invendute elevate.
