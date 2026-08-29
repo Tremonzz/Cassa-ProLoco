@@ -4578,7 +4578,7 @@ function showReceiptPreviewModal(preview) {
     const dividerStyle = (currentReceiptConfig && currentReceiptConfig.body && currentReceiptConfig.body.dividerStyle) || 'dashed';
     let dividerHtml = '<div class="thermal-divider"></div>';
     if (dividerStyle === 'none') {
-        dividerHtml = '<div class="thermal-divider" style="display: none;"></div>';
+        dividerHtml = '<div class="thermal-divider" style="border-top: none; height: 18px; margin: 0;"></div>';
     } else if (dividerStyle === 'solid') {
         dividerHtml = '<div class="thermal-divider" style="border-top: 1.5px solid #000; margin: 12px 0;"></div>';
     } else if (dividerStyle === 'dotted') {
@@ -5472,7 +5472,10 @@ function updateReceiptPreviewFromInputs() {
         div.removeAttribute('style');
         div.innerText = '';
         if (dividerStyle === 'none') {
-            div.style.display = 'none';
+            div.style.display = 'block';
+            div.style.borderTop = 'none';
+            div.style.height = '18px';
+            div.style.margin = '0';
         } else if (dividerStyle === 'solid') {
             div.style.display = 'block';
             div.style.borderTop = '1.5px solid #000000';
