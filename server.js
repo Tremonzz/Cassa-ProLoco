@@ -2563,6 +2563,49 @@ app.post('/api/download-and-install', (req, res) => {
   });
 });
 
+// DOCUMENTATION API - SERVES WIKI MARKDOWN FILES
+app.get('/api/docs', (req, res) => {
+  try {
+    let docsDir = path.join(__dirname, 'docs', 'wiki');
+    if (!fs.existsSync(docsDir)) {
+      docsDir = path.join(appRoot, 'docs', 'wiki');
+    }
+    if (!fs.existsSync(docsDir)) {
+      return res.json({ success: true, docs: [] });
+    }
+
+    const order = [
+      { id: 'Home', title: 'Home', icon: 'home', file: 'Home.md' },
+      { id: '1-Informazioni-Base', title: '1. Informazioni Base', icon: 'info', file: '1-Informazioni-Base.md' },
+      { id: '2-Gestione-Eventi', title: '2. Gestione Eventi', icon: 'festival', file: '2-Gestione-Eventi.md' },
+      { id: '3-Gestione-Menu', title: '3. Gestione Menu', icon: 'restaurant_menu', file: '3-Gestione-Menu.md' },
+      { id: '4-Schermata-Cassa', title: '4. Schermata Cassa', icon: 'point_of_sale', file: '4-Schermata-Cassa.md' },
+      { id: '5-Guida-alle-Impostazioni', title: '5. Impostazioni', icon: 'settings', file: '5-Guida-alle-Impostazioni.md' },
+      { id: '6-Resoconti-e-Statistiche', title: '6. Resoconti & Statistiche', icon: 'analytics', file: '6-Resoconti-e-Statistiche.md' },
+      { id: '7-Azioni-Rapide', title: '7. Azioni Rapide', icon: 'bolt', file: '7-Azioni-Rapide.md' }
+    ];
+
+    const docs = [];
+    for (const item of order) {
+      const filePath = path.join(docsDir, item.file);
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        docs.push({
+          id: item.id,
+          title: item.title,
+          icon: item.icon,
+          content: content
+        });
+      }
+    }
+
+    res.json({ success: true, docs });
+  } catch (err) {
+    console.error("Error reading docs:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 let portInUse = false;
 let serverInstance = null;
 

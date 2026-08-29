@@ -11,7 +11,3 @@ Di seguito la tabella con tutte le combinazioni di tasti e scorciatoie per opera
 | `F3` | Apre la Schermata di Gestione Menu | Schermata Cassa |
 | `Ctrl + Invio` | Inserisce un Nuovo Prodotto | Schermata Gestione Menu |
 | `Ctrl + Invio` | Stampa Ordine | Schermata Cassa |
-
----
-
-⬅️ **[6. Resoconti & Statistiche](6-Resoconti-e-Statistiche)** | 🏠 **[Torna alla Home](Home)**

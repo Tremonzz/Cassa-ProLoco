@@ -64,7 +64,3 @@ Dalla schermata iniziale è possibile accedere al pannello completo delle **Impo
 Questa sezione permette di verificare la versione del software attualmente in uso e di controllare la presenza di aggiornamenti.
 
 *La presenza di aggiornamenti viene automaticamente verificata all'apertura dell'app se è presente una connessione Internet e viene mostrata una notifica in caso di nuove versioni disponibili.*
-
----
-
-⬅️ **[4. Schermata Cassa](4-Schermata-Cassa)** | ➡️ **[6. Resoconti & Statistiche](6-Resoconti-e-Statistiche)**

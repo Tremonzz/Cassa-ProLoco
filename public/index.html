@@ -90,6 +90,10 @@
         <span class="material-symbols-rounded">settings</span>
         <span>Impostazioni</span>
       </button>
+      <button class="btn-top-docs" onclick="openDocsModal()" title="Manuale Utente e Documentazione">
+        <span class="material-symbols-rounded">menu_book</span>
+        <span>Documentazione</span>
+      </button>
       <button class="btn-top-exit" onclick="closeApp()" title="Chiudi applicazione">
         <span class="material-symbols-rounded">door_open</span>
         <span>Chiudi</span>
@@ -1466,6 +1470,50 @@
     </div>
   </div>
 
+  <!-- Documentation Modal -->
+  <div id="docs-modal" class="modal">
+    <div class="modal-content docs-modal-content">
+      <div class="modal-header docs-modal-header">
+        <div class="modal-title-group">
+          <span class="material-symbols-rounded docs-header-icon">menu_book</span>
+          <div>
+            <h2 style="margin: 0; line-height: 1.2; font-size: 1.25rem;">Documentazione &amp; Manuale Utente</h2>
+            <p class="docs-modal-subtitle">Guida operativa ufficiale per la cassa e la gestione degli eventi</p>
+          </div>
+        </div>
+        <span class="close-modal" onclick="closeDocsModal()">&times;</span>
+      </div>
+
+      <!-- Search bar inside Docs Modal -->
+      <div class="docs-search-bar-wrapper">
+        <div class="docs-search-input-group">
+          <span class="material-symbols-rounded docs-search-icon">search</span>
+          <input type="text" id="docs-search-input" class="docs-search-input" placeholder="Cerca nel manuale (es. resto, scorte, storico, scontrini, scorciatoie)..." oninput="handleDocsSearch(this.value)" autocomplete="off">
+          <button type="button" class="docs-search-clear-btn" id="docs-search-clear-btn" onclick="clearDocsSearch()" title="Cancella ricerca" style="display:none;">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="docs-modal-body">
+        <!-- Sidebar Navigation -->
+        <aside class="docs-sidebar" id="docs-sidebar">
+          <div class="docs-sidebar-heading">Capitoli</div>
+          <nav class="docs-sidebar-nav" id="docs-sidebar-nav">
+            <!-- Injected via docs-manager.js -->
+          </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="docs-content-container" id="docs-content-container">
+          <div class="docs-content-body" id="docs-content-body">
+            <!-- Injected via docs-manager.js -->
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
   <!-- Receipt Preview Modal (Test Mode) -->
   <div id="receipt-modal" class="modal">
     <div class="modal-content receipt-modal-content">
@@ -2106,6 +2154,7 @@
   <script src="js/menu-templates/template-a4-vintage.js"></script>
   <script src="js/html2canvas.min.js"></script>
   <script src="js/reports-manager.js"></script>
+  <script src="js/docs-manager.js"></script>
   <script src="js/app.js"></script>
 </body>
 

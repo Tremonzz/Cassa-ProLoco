@@ -36,7 +36,7 @@ Esistono quattro tipi diversi di prodotti:
   * Sono prodotti che permettono la selezione dei vari componenti prima di essere aggiunti al carrello (*Es. Menu Completo. Le opzioni sono: due primi, tre secondi e quattro bibite. Selezionando questo prodotto verrà richiesto quale combinazione di scelte selezionare*).
   * Sono caratterizzati da **Nome**, **Prezzo**, **Prodotti Collegati**.
 
-> 💡 **Nota Operativa**:
+> **Nota Operativa**:
 > * Per aggiungere un **Prodotto Base** bisogna aprire la finestra laterale cliccando il tasto **`Prodotti Base`** sul bordo sinistro della schermata.
 > * Per aggiungere gli altri tipi di prodotto bisogna cliccare il tasto corrispondente in fondo alla categoria nella quale si desidera aggiungerli.
 
@@ -48,7 +48,3 @@ Una volta inseriti tutti i prodotti nel menu è possibile effettuare le seguenti
 
 * **Ordinamento Menu**: Nella barra superiore cliccando il tasto **`Ordina Menu`** si aprirà una schermata in cui è possibile trascinare i vari piatti per ordinarli nel modo più comodo.
 * **Stampa Menu**: Nella barra superiore cliccando il tasto **`Stampa Menu`** è possibile esportare un file A4 contenente il Menu selezionando un **Modello di Stampa** e le varie voci che si desidera includere.
-
----
-
-⬅️ **[2. Schermata Iniziale & Gestione Eventi](2-Gestione-Eventi)** | ➡️ **[4. Schermata Cassa](4-Schermata-Cassa)**

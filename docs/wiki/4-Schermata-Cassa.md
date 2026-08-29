@@ -30,7 +30,7 @@ La sezione destra della schermata racchiude i comandi di stampa e l'ordine corre
 * **Visualizzare il Resto Dovuto**: Inserendo il contante ricevuto nello spazio apposito viene mostrato il resto dovuto; è inoltre possibile utilizzare i tasti predefiniti con i vari tagli delle banconote per velocizzare l'inserimento (*Questa sezione può variare in base alle impostazioni generali*).
 
 * **Stampare l'Ordine**: Premendo il tasto **`Stampa Ordine`** verrà stampato lo scontrino e l'ordine effettuato verrà salvato nello storico.
-  > 💡 **Stampa di Prova / Non Tracciata**: Per effettuare un ordine di prova/non tracciato e senza la diminuzione delle scorte è necessario cliccare con il **tasto destro del mouse** il pulsante **`Stampa Ordine`** e selezionare il tasto che comparirà con la scritta **`Stampa Senza Salvare`**.
+  > **Stampa di Prova / Non Tracciata**: Per effettuare un ordine di prova/non tracciato e senza la diminuzione delle scorte è necessario cliccare con il **tasto destro del mouse** il pulsante **`Stampa Ordine`** e selezionare il tasto che comparirà con la scritta **`Stampa Senza Salvare`**.
 
 * **Visualizzare lo Storico**: Cliccando il tasto **`Storico`** si aprirà la lista di tutti gli ordini effettuati ordinati dal più recente; per ogni ordine è possibile ristampare lo scontrino premendo il tasto **`Ristampa`**. È inoltre possibile esportare l'intera lista degli ordini in formato CSV premendo il tasto in alto a destra **`Esporta CSV`**.
 
@@ -39,7 +39,3 @@ La sezione destra della schermata racchiude i comandi di stampa e l'ordine corre
 ### 4.3 Blocco Cassa
 
 Cliccando su **`Blocca Cassa`** in basso a sinistra, la cassa viene bloccata e viene richiesto il codice d'accesso (se configurato) per sbloccarla.
-
----
-
-⬅️ **[3. Gestione Menu](3-Gestione-Menu)** | ➡️ **[5. Guida alle Impostazioni](5-Guida-alle-Impostazioni)**

@@ -32,7 +32,3 @@ Cliccando le impostazioni dell'evento o premendo il **tasto destro del mouse** s
 * **`Duplica Evento`**: Crea una copia dell'evento e del suo menù. Utile per non partire da zero nelle nuove edizioni.
 * **`Archivia Evento`**: Sposta l'evento nella sezione sottostante per indicare che è terminato.
 * **`Elimina Evento`**: Rimuove definitivamente l'evento e i relativi ordini.
-
----
-
-⬅️ **[1. Informazioni Base](1-Informazioni-Base)** | ➡️ **[3. Gestione Menu](3-Gestione-Menu)**

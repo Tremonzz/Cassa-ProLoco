@@ -3,7 +3,3 @@
 Per utilizzare l'applicazione è necessario un PC con Windows 10/11 e una stampante termica ad esso collegata.
 
 L'applicazione **non richiede una connessione ad internet** e funziona completamente offline.
-
----
-
-⬅️ **[Torna alla Home](Home)** | ➡️ **[2. Schermata Iniziale & Gestione Eventi](2-Gestione-Eventi)**

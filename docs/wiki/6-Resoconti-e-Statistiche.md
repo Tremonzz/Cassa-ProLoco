@@ -60,7 +60,3 @@ Permette di analizzare uno specifico evento nei minimi dettagli:
 ### 6.6 Esportazione Report
 
 Cliccando sul pulsante **`Esporta Report`** nella barra superiore, il programma genera uno **screenshot grafico ad alta risoluzione (PNG)** della pagina o della scheda visualizzata, perfetto per stampe o condivisione.
-
----
-
-⬅️ **[5. Guida alle Impostazioni](5-Guida-alle-Impostazioni)** | ➡️ **[7. Azioni Rapide](7-Azioni-Rapide)**

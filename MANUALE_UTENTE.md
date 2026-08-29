@@ -1,13 +1,11 @@
 
-# 📖 Manuale Utente Ufficiale — Cassa & Gestione Eventi ProLoco Lorenzago
-
-  
+# Manuale Utente Ufficiale — Cassa & Gestione Eventi ProLoco Lorenzago
 
 Benvenuto nel **Manuale Operativo Ufficiale** dell'applicazione. Questa guida descrive passo-passo tutte le funzionalità del programma, partendo dalle operazioni fondamentali fino alla gestione avanzata degli eventi, dei menu, delle stampe e dei resoconti statistici.
 
 ---
 
-## 📑 Indice dei Contenuti
+## Indice dei Contenuti
 
 1. [Informazioni Base](#1-informazioni-base)
 
