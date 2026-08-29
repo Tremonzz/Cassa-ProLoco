@@ -4327,14 +4327,27 @@ function syncCustomSelect(selectId) {
     const selectedOpt = options.find(o => o.selected) || options[0];
 
     if (selectedOpt) {
-        valueEl.innerText = selectedOpt.text;
+        const iconName = selectedOpt.getAttribute('data-icon') || (selectId === 'printer-select' ? 'print' : '');
+        if (iconName) {
+            valueEl.innerHTML = `
+                <span class="material-symbols-rounded custom-select-opt-icon">${iconName}</span>
+                <span>${selectedOpt.text}</span>
+            `;
+        } else {
+            valueEl.innerText = selectedOpt.text;
+        }
     }
 
     options.forEach(opt => {
         const item = document.createElement('div');
         item.className = 'custom-select-option' + (opt.selected ? ' selected' : '');
+        const iconName = opt.getAttribute('data-icon') || (selectId === 'printer-select' ? 'print' : '');
+        const iconHtml = iconName ? `<span class="material-symbols-rounded custom-select-opt-icon">${iconName}</span>` : '';
         item.innerHTML = `
-            <span>${opt.text}</span>
+            <div class="custom-select-option-left">
+                ${iconHtml}
+                <span>${opt.text}</span>
+            </div>
             <span class="material-symbols-rounded check-icon">check</span>
         `;
         item.addEventListener('click', (e) => {

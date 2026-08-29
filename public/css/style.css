@@ -1320,6 +1320,30 @@ select.hidden-native-select {
   font-weight: 600;
 }
 
+.custom-select-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-option-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-select-opt-icon {
+  font-size: 1.2rem;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
 .custom-select-option .check-icon {
   font-size: 1.1rem;
   color: var(--primary);
