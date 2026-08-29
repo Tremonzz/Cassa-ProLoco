@@ -4449,29 +4449,73 @@ window.openSettings = async function () {
     }
     syncCustomSelect('template-select');
 
-    try {
-        const res = await fetch('/api/printers');
-        const printers = await res.json();
+    cachedPrintersData = [];
+    const showAllToggle = document.getElementById('show-all-printers-toggle');
+    if (showAllToggle) showAllToggle.checked = false;
+    await loadPrintersList();
+}
 
+let cachedPrintersData = [];
+
+async function loadPrintersList() {
+    const printerSelect = document.getElementById('printer-select');
+    if (!printerSelect) return;
+
+    try {
+        if (!cachedPrintersData || cachedPrintersData.length === 0) {
+            const res = await fetch('/api/printers');
+            cachedPrintersData = await res.json();
+        }
+
+        const showAll = document.getElementById('show-all-printers-toggle')?.checked ?? false;
         printerSelect.innerHTML = '<option value="">-- Seleziona Stampante --</option>';
         const savedPrinter = localStorage.getItem('thermalPrinterName');
 
-        if (Array.isArray(printers)) {
-            printers.forEach(p => {
+        let listToDisplay = [];
+        if (Array.isArray(cachedPrintersData)) {
+            if (showAll) {
+                listToDisplay = cachedPrintersData;
+            } else {
+                // Filter compatible thermal printers, excluding virtual ones
+                const thermalPrinters = cachedPrintersData.filter(p => (typeof p === 'object' ? p.isThermal : true));
+                if (thermalPrinters.length > 0) {
+                    listToDisplay = thermalPrinters;
+                } else {
+                    // Fallback to non-virtual printers if no specific thermal printer matched
+                    const nonVirtual = cachedPrintersData.filter(p => (typeof p === 'object' ? !p.isVirtual : true));
+                    listToDisplay = nonVirtual.length > 0 ? nonVirtual : cachedPrintersData;
+                }
+            }
+
+            listToDisplay.forEach(p => {
                 const opt = document.createElement('option');
-                opt.value = p;
-                opt.innerText = p;
-                if (p === savedPrinter) opt.selected = true;
+                const pName = typeof p === 'object' ? p.name : p;
+                const isThermal = typeof p === 'object' ? p.isThermal : true;
+                const isVirtual = typeof p === 'object' ? p.isVirtual : false;
+
+                opt.value = pName;
+                opt.innerText = pName;
+                if (isThermal) {
+                    opt.setAttribute('data-icon', 'receipt_long');
+                } else if (isVirtual) {
+                    opt.setAttribute('data-icon', 'picture_as_pdf');
+                } else {
+                    opt.setAttribute('data-icon', 'print');
+                }
+
+                if (pName === savedPrinter) opt.selected = true;
                 printerSelect.appendChild(opt);
             });
         }
         syncCustomSelect('printer-select');
     } catch (e) {
-        console.error(e);
-        printerSelect.innerHTML = '<option>Errore caricamento</option>';
+        console.error("Printer loading error:", e);
+        printerSelect.innerHTML = '<option value="">Errore caricamento</option>';
         syncCustomSelect('printer-select');
     }
 }
+
+window.loadPrintersList = loadPrintersList;
 
 window.closeSettings = function () {
     settingsModal.style.display = 'none';

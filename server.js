@@ -1998,24 +1998,43 @@ app.get('/api/reports/product-detail', async (req, res) => {
 
 // LIST PRINTERS API
 app.get('/api/printers', (req, res) => {
-  const cmd = `powershell "Get-Printer | Select-Object Name | ConvertTo-Json"`;
+  const cmd = `powershell "Get-Printer | Select-Object Name, DriverName, PortName, Type, Shared | ConvertTo-Json"`;
   exec(cmd, (err, stdout, stderr) => {
     if (err) {
       console.error("Printer List Error:", err);
       return res.status(500).json({ error: "Failed to list printers" });
     }
     try {
-      let printers = JSON.parse(stdout);
-      // Handle single result (object) vs multiple (array)
-      if (!Array.isArray(printers)) {
-        printers = [printers];
+      let rawPrinters = JSON.parse(stdout);
+      if (!Array.isArray(rawPrinters)) {
+        rawPrinters = rawPrinters ? [rawPrinters] : [];
       }
-      // Extract just the names
-      const printerNames = printers.map(p => p.Name);
-      res.json(printerNames);
+
+      const virtualKeywords = /pdf|onenote|fax|xps|anydesk|virtual|send to|document writer|root\.print/i;
+      const virtualPorts = /^(portprompt:|nul:|shrfax:|ad_port|file:)$/i;
+      const thermalKeywords = /pos|thermal|receipt|termica|scontrin|tm-t|tsp|xprinter|xp-|rp-|bixolon|citizen|snbc|sewoo|zj-|metapace|munbyn|netum|hoin|zebra|custom|epson|generic \/ text only/i;
+
+      const printers = rawPrinters.map(p => {
+        const name = p.Name || '';
+        const driver = p.DriverName || '';
+        const port = p.PortName || '';
+
+        const isVirtual = virtualKeywords.test(name) || virtualKeywords.test(driver) || virtualPorts.test(port.trim());
+        const isThermal = !isVirtual && (thermalKeywords.test(name) || thermalKeywords.test(driver) || /^usb|^com|^esdprt/i.test(port.trim()));
+
+        return {
+          name,
+          driver,
+          port,
+          isVirtual,
+          isThermal
+        };
+      });
+
+      res.json(printers);
     } catch (e) {
       console.error("Printer Parse Error:", e, stdout);
-      res.json([]); // Return empty if parsing fails (e.g. no printers)
+      res.json([]);
     }
   });
 });

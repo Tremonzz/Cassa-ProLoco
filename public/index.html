@@ -1295,7 +1295,13 @@
           </div>
 
           <div class="form-group">
-            <label for="printer-select">Stampante Termica</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label for="printer-select" style="margin-bottom: 0;">Stampante Termica</label>
+              <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-light); cursor: pointer; user-select: none;">
+                <input type="checkbox" id="show-all-printers-toggle" onchange="loadPrintersList()" style="cursor: pointer;">
+                <span>Mostra tutte</span>
+              </label>
+            </div>
             <div class="printer-select-row">
               <select id="printer-select" class="input-field">
                 <option value="">Caricamento...</option>
