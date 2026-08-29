@@ -8,7 +8,7 @@ Dalla schermata iniziale è possibile accedere al pannello completo delle **Impo
 
 * **Stampante Termica**:
   * Selezionare la stampante corretta dal menu a tendina che si apre cliccando il tasto **`Seleziona Stampante`**.
-  * L'applicazione supporta le stampanti termiche per scontrini (ESC/POS standard da 80mm o 58mm), sia collegate tramite cavo USB, sia tramite rete Ethernet/Wi-Fi.
+  * L'applicazione supporta e mostra le stampanti termiche per scontrini (ESC/POS standard da 80mm o 58mm), sia collegate tramite cavo USB, sia tramite rete Ethernet/Wi-Fi. Se la Stampante è collegata e non viene mostrata nella lista cliccare il tasto **`Mostra Tutte`** sopra il tasto `Test`
   * Utilizzando il tasto **`Test`** è possibile verificare che la stampante sia collegata correttamente e non presenti problemi.
 
 * **Modello Scontrino**:
