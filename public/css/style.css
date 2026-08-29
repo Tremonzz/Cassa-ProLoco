@@ -4836,6 +4836,11 @@ img {
   letter-spacing: 0.5px !important;
 }
 
+.receipt-preview-sidebar .sidebar-section-title {
+  justify-content: center !important;
+  text-align: center !important;
+}
+
 .thermal-paper-receipt-container {
   flex: 1 !important;
   overflow-y: auto !important;
