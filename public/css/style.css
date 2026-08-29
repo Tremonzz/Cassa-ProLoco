@@ -4975,6 +4975,132 @@ img {
   gap: 16px !important;
 }
 
+/* Receipt Customizer Custom Select Dropdown */
+#rc-divider-select-wrap {
+  width: 100% !important;
+  display: block !important;
+}
+
+#rc-divider-select-wrap .reports-custom-select-box {
+  width: 100% !important;
+  display: block !important;
+}
+
+#rc-divider-select-wrap .reports-custom-select-btn {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 100% !important;
+  padding: 10px 14px !important;
+  font-size: 0.9rem !important;
+  border-radius: var(--radius-sm, 8px) !important;
+  background: var(--input-bg, #ffffff) !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  justify-content: space-between !important;
+}
+
+#rc-divider-select-wrap .reports-custom-dropdown-panel {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+#rc-divider-select-wrap .reports-dropdown-option {
+  padding: 10px 14px !important;
+  font-size: 0.88rem !important;
+}
+
+.rc-dropdown-option-content {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 14px;
+}
+
+.rc-dropdown-option-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+
+.rc-option-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.rc-option-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+/* Visual Divider Sample Bars */
+.rc-divider-sample {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  height: 16px;
+  margin-right: 22px;
+}
+
+.rc-sample-dashed {
+  border-top: 1.5px dashed var(--text-main, #334155);
+}
+
+.rc-sample-solid {
+  border-top: 1.5px solid var(--text-main, #334155);
+}
+
+.rc-sample-dotted {
+  border-top: 2px dotted var(--text-main, #334155);
+}
+
+.rc-sample-double {
+  height: 6px;
+  border-top: 1.5px dashed var(--text-main, #334155);
+  border-bottom: 1.5px dashed var(--text-main, #334155);
+}
+
+.rc-sample-stars {
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='12' viewBox='0 0 14 12'%3E%3Ctext x='7' y='10' font-family='Courier New, monospace' font-size='12' font-weight='bold' fill='%23334155' text-anchor='middle'%3E*%3C/text%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: left center;
+}
+
+.rc-sample-none {
+  font-size: 0.8rem;
+  color: var(--text-light, #94a3b8);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+#rc-divider-select-wrap .option-check {
+  width: 20px;
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+#rc-divider-select-wrap .reports-dropdown-option:not(.active) .option-check {
+  visibility: hidden !important;
+  display: inline-block !important;
+}
+
+#rc-divider-select-wrap .reports-dropdown-option.active .option-check {
+  visibility: visible !important;
+  display: inline-block !important;
+}
+
 /* --- PPO ACTION CARDS (POS Right-Click Modal) --- */
 .ppo-add-cart-btn {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;

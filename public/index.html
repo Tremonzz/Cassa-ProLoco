@@ -1732,17 +1732,90 @@
 
               <div class="settings-card-row" style="flex-direction: column; align-items: stretch; gap: 10px;">
                 <div class="settings-card-info">
-                  <label for="rc-divider-style" class="clickable-label">Stile Divisore di Sezione</label>
+                  <label class="clickable-label">Stile Divisore di Sezione</label>
                   <span class="settings-card-sub">Seleziona il tipo di riga / trattini per separare le sezioni dello scontrino</span>
                 </div>
-                <select id="rc-divider-style" class="input-field" onchange="updateReceiptPreviewFromInputs()" style="cursor: pointer;">
-                  <option value="dashed">Trattini Semplici (- - - - - - - - - - - - -)</option>
-                  <option value="solid">Linea Continua (__________________________)</option>
-                  <option value="dotted">Puntini (. . . . . . . . . . . . . . . . . . . . . . . . .)</option>
-                  <option value="double">Doppia Spezzettata (= = = = = = = = = = = = =)</option>
-                  <option value="stars">Asterischi (* * * * * * * * * * * * * * * * * * *)</option>
-                  <option value="none">Nessun Divisore (Spazio vuoto)</option>
-                </select>
+                
+                <input type="hidden" id="rc-divider-style" value="dashed">
+
+                <div class="reports-custom-select-container" id="rc-divider-select-wrap" style="width: 100%;">
+                  <div class="reports-custom-select-box" style="width: 100%;">
+                    <button type="button" class="reports-custom-select-btn" id="rc-divider-select-btn" onclick="toggleRcDividerDropdown(event)" style="width: 100%;">
+                      <div class="rc-dropdown-option-content" style="flex: 1; margin-right: 12px;">
+                        <div class="rc-dropdown-option-left">
+                          <span class="material-symbols-rounded rc-option-icon" id="rc-divider-btn-icon">more_horiz</span>
+                          <span class="rc-option-title" id="rc-divider-select-text">Trattini Semplici</span>
+                        </div>
+                        <div class="rc-divider-sample rc-sample-dashed" id="rc-divider-btn-sample"></div>
+                      </div>
+                      <span class="material-symbols-rounded reports-dropdown-chevron" id="rc-divider-chevron">expand_more</span>
+                    </button>
+                    <div class="reports-custom-dropdown-panel" id="rc-divider-dropdown-panel" style="display: none; width: 100%; box-sizing: border-box; left: 0 !important; right: auto !important;">
+                      <div class="reports-dropdown-options-list" id="rc-divider-options-list">
+                        <button type="button" class="reports-dropdown-option active" data-value="dashed" onclick="selectRcDividerOption('dashed', 'Trattini Semplici', 'more_horiz', event)">
+                          <div class="rc-dropdown-option-content">
+                            <div class="rc-dropdown-option-left">
+                              <span class="material-symbols-rounded rc-option-icon" style="color: var(--primary);">more_horiz</span>
+                              <span class="rc-option-title">Trattini Semplici</span>
+                            </div>
+                            <div class="rc-divider-sample rc-sample-dashed"></div>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary);">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="solid" onclick="selectRcDividerOption('solid', 'Linea Continua', 'horizontal_rule', event)">
+                          <div class="rc-dropdown-option-content">
+                            <div class="rc-dropdown-option-left">
+                              <span class="material-symbols-rounded rc-option-icon" style="color: var(--text-light);">horizontal_rule</span>
+                              <span class="rc-option-title">Linea Continua</span>
+                            </div>
+                            <div class="rc-divider-sample rc-sample-solid"></div>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary); display: none;">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="dotted" onclick="selectRcDividerOption('dotted', 'Puntini', 'grain', event)">
+                          <div class="rc-dropdown-option-content">
+                            <div class="rc-dropdown-option-left">
+                              <span class="material-symbols-rounded rc-option-icon" style="color: var(--text-light);">grain</span>
+                              <span class="rc-option-title">Puntini</span>
+                            </div>
+                            <div class="rc-divider-sample rc-sample-dotted"></div>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary); display: none;">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="double" onclick="selectRcDividerOption('double', 'Doppia Spezzettata', 'drag_handle', event)">
+                          <div class="rc-dropdown-option-content">
+                            <div class="rc-dropdown-option-left">
+                              <span class="material-symbols-rounded rc-option-icon" style="color: var(--text-light);">drag_handle</span>
+                              <span class="rc-option-title">Doppia Spezzettata</span>
+                            </div>
+                            <div class="rc-divider-sample rc-sample-double"></div>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary);">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="stars" onclick="selectRcDividerOption('stars', 'Asterischi', 'asterisk', event)">
+                          <div class="rc-dropdown-option-content">
+                            <div class="rc-dropdown-option-left">
+                              <span class="material-symbols-rounded rc-option-icon" style="color: var(--text-light);">asterisk</span>
+                              <span class="rc-option-title">Asterischi</span>
+                            </div>
+                            <div class="rc-divider-sample rc-sample-stars"></div>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary);">check</span>
+                        </button>
+                        <button type="button" class="reports-dropdown-option" data-value="none" onclick="selectRcDividerOption('none', 'Nessun Divisore', 'space_bar', event)">
+                          <div class="rc-dropdown-option-content">
+                            <div class="rc-dropdown-option-left">
+                              <span class="material-symbols-rounded rc-option-icon" style="color: var(--text-light);">space_bar</span>
+                              <span class="rc-option-title">Nessun Divisore</span>
+                            </div>
+                            <div class="rc-divider-sample rc-sample-none"><em>(Spazio vuoto)</em></div>
+                          </div>
+                          <span class="material-symbols-rounded option-check" style="font-size: 16px; color: var(--primary); display: none;">check</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

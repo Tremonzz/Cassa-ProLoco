@@ -5580,7 +5580,9 @@ async function openReceiptCustomizerModal() {
     if (document.getElementById('rc-title')) document.getElementById('rc-title').value = currentReceiptConfig.header.title || '';
     if (document.getElementById('rc-show-event-name')) document.getElementById('rc-show-event-name').checked = currentReceiptConfig.header.showEventName !== false;
     if (document.getElementById('rc-event-name-prefix')) document.getElementById('rc-event-name-prefix').value = currentReceiptConfig.header.eventNamePrefix !== undefined ? currentReceiptConfig.header.eventNamePrefix : 'Evento: ';
-    if (document.getElementById('rc-divider-style')) document.getElementById('rc-divider-style').value = currentReceiptConfig.body.dividerStyle || 'dashed';
+    const dividerVal = currentReceiptConfig.body.dividerStyle || 'dashed';
+    if (document.getElementById('rc-divider-style')) document.getElementById('rc-divider-style').value = dividerVal;
+    updateRcDividerDropdownUI(dividerVal);
     if (document.getElementById('rc-show-thanks')) document.getElementById('rc-show-thanks').checked = currentReceiptConfig.footer.showThanks !== false;
     if (document.getElementById('rc-thanks-message')) document.getElementById('rc-thanks-message').value = currentReceiptConfig.footer.thanksMessage || '';
     if (document.getElementById('rc-show-date')) document.getElementById('rc-show-date').checked = currentReceiptConfig.footer.showDate !== false;
@@ -5600,7 +5602,112 @@ function closeReceiptCustomizerModal() {
         modal.classList.remove('visible');
         modal.style.display = 'none';
     }
+    closeRcDividerDropdown();
 }
+
+function toggleRcDividerDropdown(event) {
+    if (event) event.stopPropagation();
+    const panel = document.getElementById('rc-divider-dropdown-panel');
+    const chevron = document.getElementById('rc-divider-chevron');
+    if (!panel) return;
+
+    const isVisible = panel.style.display === 'block';
+    panel.style.display = isVisible ? 'none' : 'block';
+    if (chevron) {
+        chevron.style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+}
+
+function closeRcDividerDropdown() {
+    const panel = document.getElementById('rc-divider-dropdown-panel');
+    const chevron = document.getElementById('rc-divider-chevron');
+    if (panel) panel.style.display = 'none';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+}
+
+function setDividerSampleElement(sampleEl, value) {
+    if (!sampleEl) return;
+    sampleEl.className = 'rc-divider-sample';
+    sampleEl.innerText = '';
+    sampleEl.innerHTML = '';
+    if (value === 'solid') {
+        sampleEl.classList.add('rc-sample-solid');
+    } else if (value === 'dotted') {
+        sampleEl.classList.add('rc-sample-dotted');
+    } else if (value === 'double') {
+        sampleEl.classList.add('rc-sample-double');
+    } else if (value === 'stars') {
+        sampleEl.classList.add('rc-sample-stars');
+    } else if (value === 'none') {
+        sampleEl.classList.add('rc-sample-none');
+        sampleEl.innerHTML = '<em>(Spazio vuoto)</em>';
+    } else {
+        sampleEl.classList.add('rc-sample-dashed');
+    }
+}
+
+function selectRcDividerOption(value, label, iconName, event) {
+    if (event) event.stopPropagation();
+    const hiddenInput = document.getElementById('rc-divider-style');
+    const textSpan = document.getElementById('rc-divider-select-text');
+    const btnIcon = document.getElementById('rc-divider-btn-icon');
+    const btnSample = document.getElementById('rc-divider-btn-sample');
+    if (hiddenInput) hiddenInput.value = value;
+    if (textSpan) textSpan.innerText = label;
+    if (btnIcon && iconName) btnIcon.innerText = iconName;
+    if (btnSample) setDividerSampleElement(btnSample, value);
+
+    // Update active class & checkmarks
+    const options = document.querySelectorAll('#rc-divider-options-list .reports-dropdown-option');
+    options.forEach(opt => {
+        const isMatch = opt.getAttribute('data-value') === value;
+        opt.classList.toggle('active', isMatch);
+        const check = opt.querySelector('.option-check');
+        if (check) check.style.display = isMatch ? 'block' : 'none';
+        const icon = opt.querySelector('.rc-dropdown-option-left .material-symbols-rounded');
+        if (icon) icon.style.color = isMatch ? 'var(--primary)' : 'var(--text-light)';
+    });
+
+    closeRcDividerDropdown();
+    updateReceiptPreviewFromInputs();
+}
+
+function updateRcDividerDropdownUI(value) {
+    const dividerConfig = {
+        'dashed': { label: 'Trattini Semplici', icon: 'more_horiz' },
+        'solid': { label: 'Linea Continua', icon: 'horizontal_rule' },
+        'dotted': { label: 'Puntini', icon: 'grain' },
+        'double': { label: 'Doppia Spezzettata', icon: 'drag_handle' },
+        'stars': { label: 'Asterischi', icon: 'asterisk' },
+        'none': { label: 'Nessun Divisore', icon: 'space_bar' }
+    };
+    const info = dividerConfig[value] || dividerConfig['dashed'];
+    const hiddenInput = document.getElementById('rc-divider-style');
+    const textSpan = document.getElementById('rc-divider-select-text');
+    const btnIcon = document.getElementById('rc-divider-btn-icon');
+    const btnSample = document.getElementById('rc-divider-btn-sample');
+    if (hiddenInput) hiddenInput.value = value;
+    if (textSpan) textSpan.innerText = info.label;
+    if (btnIcon) btnIcon.innerText = info.icon;
+    if (btnSample) setDividerSampleElement(btnSample, value);
+
+    const options = document.querySelectorAll('#rc-divider-options-list .reports-dropdown-option');
+    options.forEach(opt => {
+        const isMatch = opt.getAttribute('data-value') === value;
+        opt.classList.toggle('active', isMatch);
+        const check = opt.querySelector('.option-check');
+        if (check) check.style.display = isMatch ? 'block' : 'none';
+        const icon = opt.querySelector('.rc-dropdown-option-left .material-symbols-rounded');
+        if (icon) icon.style.color = isMatch ? 'var(--primary)' : 'var(--text-light)';
+    });
+}
+
+document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('rc-divider-select-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        closeRcDividerDropdown();
+    }
+});
 
 async function saveReceiptCustomization() {
     updateReceiptPreviewFromInputs();
@@ -5625,5 +5732,9 @@ window.openReceiptCustomizerModal = openReceiptCustomizerModal;
 window.closeReceiptCustomizerModal = closeReceiptCustomizerModal;
 window.updateReceiptPreviewFromInputs = updateReceiptPreviewFromInputs;
 window.saveReceiptCustomization = saveReceiptCustomization;
+window.toggleRcDividerDropdown = toggleRcDividerDropdown;
+window.closeRcDividerDropdown = closeRcDividerDropdown;
+window.selectRcDividerOption = selectRcDividerOption;
+window.updateRcDividerDropdownUI = updateRcDividerDropdownUI;
 
 init();
