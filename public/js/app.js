@@ -4584,9 +4584,9 @@ function showReceiptPreviewModal(preview) {
     } else if (dividerStyle === 'dotted') {
         dividerHtml = '<div class="thermal-divider" style="border-top: 1.5px dotted #000; margin: 12px 0;"></div>';
     } else if (dividerStyle === 'double') {
-        dividerHtml = '<div class="thermal-divider" style="border-top: 3px double #000; margin: 12px 0;"></div>';
+        dividerHtml = '<div class="thermal-divider" style="border-top: none; text-align: center; font-size: 0.88rem; font-weight: normal; letter-spacing: 1px; line-height: 1; font-family: \'Courier New\', Courier, monospace; margin: 8px 0; overflow: hidden; white-space: nowrap;">==========================================================</div>';
     } else if (dividerStyle === 'stars') {
-        dividerHtml = '<div class="thermal-divider" style="border-top: none; text-align: center; font-size: 0.85rem; font-weight: bold; letter-spacing: 3px; margin: 8px 0;">* * * * * * * * * * * * * * * * *</div>';
+        dividerHtml = '<div class="thermal-divider" style="border-top: none; text-align: center; font-size: 0.88rem; font-weight: normal; letter-spacing: 1.5px; line-height: 1; font-family: \'Courier New\', Courier, monospace; margin: 8px 0; overflow: hidden; white-space: nowrap;">**********************************************************</div>';
     }
 
     let html = '<div class="thermal-paper-wrapper">';
@@ -5483,17 +5483,30 @@ function updateReceiptPreviewFromInputs() {
             div.style.margin = '12px 0';
         } else if (dividerStyle === 'double') {
             div.style.display = 'block';
-            div.style.borderTop = '3px double #000000';
-            div.style.margin = '12px 0';
+            div.style.borderTop = 'none';
+            div.style.textAlign = 'center';
+            div.style.fontSize = '0.88rem';
+            div.style.fontWeight = 'normal';
+            div.style.letterSpacing = '1px';
+            div.style.lineHeight = '1';
+            div.style.fontFamily = "'Courier New', Courier, monospace";
+            div.style.margin = '8px 0';
+            div.style.overflow = 'hidden';
+            div.style.whiteSpace = 'nowrap';
+            div.innerText = '==========================================================';
         } else if (dividerStyle === 'stars') {
             div.style.display = 'block';
             div.style.borderTop = 'none';
             div.style.textAlign = 'center';
-            div.style.fontSize = '0.85rem';
-            div.style.fontWeight = 'bold';
-            div.style.letterSpacing = '3px';
+            div.style.fontSize = '0.88rem';
+            div.style.fontWeight = 'normal';
+            div.style.letterSpacing = '1.5px';
+            div.style.lineHeight = '1';
+            div.style.fontFamily = "'Courier New', Courier, monospace";
             div.style.margin = '8px 0';
-            div.innerText = '* * * * * * * * * * * * * * * * *';
+            div.style.overflow = 'hidden';
+            div.style.whiteSpace = 'nowrap';
+            div.innerText = '**********************************************************';
         } else {
             div.style.display = 'block';
             div.style.borderTop = '1px dashed #000000';
