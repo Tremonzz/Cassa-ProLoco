@@ -8032,8 +8032,35 @@ img {
   padding-left: 24px;
 }
 
+.docs-content-body ul ul,
+.docs-content-body ol ol,
+.docs-content-body ul ol,
+.docs-content-body ol ul {
+  margin: 6px 0 6px 0;
+  padding-left: 22px;
+}
+
+.docs-content-body ul {
+  list-style-type: disc;
+}
+
+.docs-content-body ul ul {
+  list-style-type: circle;
+}
+
+.docs-content-body ul ul ul {
+  list-style-type: square;
+}
+
 .docs-content-body li {
   margin-bottom: 6px;
+  line-height: 1.6;
+}
+
+.docs-content-body .doc-list-desc {
+  margin: 4px 0 8px 0;
+  color: var(--text-main);
+  line-height: 1.5;
 }
 
 .docs-content-body blockquote {

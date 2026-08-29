@@ -284,8 +284,8 @@
         if (!md) return '';
         let lines = md.replace(/\r\n/g, '\n').split('\n');
         let html = '';
-        let inList = false;
-        let inOrderedList = false;
+        let listStack = [];
+        let consecutiveBlankLines = 0;
         let inTable = false;
         let tableRows = [];
         let inBlockquote = false;
@@ -329,13 +329,10 @@
 
         function flushLists() {
             let res = '';
-            if (inList) {
-                res += '</ul>';
-                inList = false;
-            }
-            if (inOrderedList) {
-                res += '</ol>';
-                inOrderedList = false;
+            while (listStack.length > 0) {
+                const top = listStack.pop();
+                if (top.hasOpenLi) res += '</li>';
+                res += `</${top.type}>`;
             }
             return res;
         }
@@ -347,34 +344,69 @@
             blockquoteLines = [];
             
             let bqHtml = '';
-            let bqInList = false;
-            let bqInOl = false;
+            let bqListStack = [];
+
+            function flushBqLists() {
+                let res = '';
+                while (bqListStack.length > 0) {
+                    const top = bqListStack.pop();
+                    if (top.hasOpenLi) res += '</li>';
+                    res += `</${top.type}>`;
+                }
+                return res;
+            }
 
             for (let j = 0; j < bqLines.length; j++) {
-                const trimmed = bqLines[j].trim();
+                const rawBqLine = bqLines[j];
+                const trimmed = rawBqLine.trim();
                 if (!trimmed) {
-                    if (bqInList) { bqHtml += '</ul>'; bqInList = false; }
-                    if (bqInOl) { bqHtml += '</ol>'; bqInOl = false; }
                     continue;
                 }
-                if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-                    if (!bqInList) { bqHtml += '<ul>'; bqInList = true; }
-                    bqHtml += `<li>${formatInlineMarkdown(trimmed.substring(2))}</li>`;
+
+                const bqListMatch = rawBqLine.match(/^(\s*)(?:([*+-])|(\d+)\.)\s+(.*)$/);
+                if (bqListMatch) {
+                    const indentSpaces = bqListMatch[1].replace(/\t/g, '  ').length;
+                    const targetLevel = Math.floor(indentSpaces / 2);
+                    const isOrdered = !bqListMatch[2];
+                    const listType = isOrdered ? 'ol' : 'ul';
+                    const itemContent = bqListMatch[4];
+
+                    while (bqListStack.length > targetLevel + 1) {
+                        const top = bqListStack.pop();
+                        if (top.hasOpenLi) bqHtml += '</li>';
+                        bqHtml += `</${top.type}>`;
+                    }
+
+                    if (bqListStack.length === targetLevel + 1 && bqListStack[targetLevel].type !== listType) {
+                        const top = bqListStack.pop();
+                        if (top.hasOpenLi) bqHtml += '</li>';
+                        bqHtml += `</${top.type}>`;
+                    }
+
+                    while (bqListStack.length <= targetLevel) {
+                        const curType = (bqListStack.length === targetLevel) ? listType : 'ul';
+                        bqHtml += `<${curType}>`;
+                        bqListStack.push({ type: curType, hasOpenLi: false });
+                    }
+
+                    if (bqListStack[targetLevel].hasOpenLi) {
+                        bqHtml += '</li>';
+                    }
+                    bqHtml += `<li>${formatInlineMarkdown(itemContent)}`;
+                    bqListStack[targetLevel].hasOpenLi = true;
                     continue;
                 }
-                const olM = trimmed.match(/^(\d+)\.\s+(.*)$/);
-                if (olM) {
-                    if (!bqInOl) { bqHtml += '<ol>'; bqInOl = true; }
-                    bqHtml += `<li>${formatInlineMarkdown(olM[2])}</li>`;
+
+                if (bqListStack.length > 0 && /^\s{2,}|\t+/.test(rawBqLine) && trimmed !== '') {
+                    bqHtml += `<div class="doc-list-desc">${formatInlineMarkdown(trimmed)}</div>`;
                     continue;
                 }
-                if (bqInList) { bqHtml += '</ul>'; bqInList = false; }
-                if (bqInOl) { bqHtml += '</ol>'; bqInOl = false; }
+
+                bqHtml += flushBqLists();
                 bqHtml += `<p>${formatInlineMarkdown(trimmed)}</p>`;
             }
 
-            if (bqInList) bqHtml += '</ul>';
-            if (bqInOl) bqHtml += '</ol>';
+            bqHtml += flushBqLists();
             return `<blockquote>${bqHtml}</blockquote>`;
         }
 
@@ -413,9 +445,13 @@
 
             // Blank line
             if (line === '') {
-                html += flushLists();
+                consecutiveBlankLines++;
+                if (consecutiveBlankLines >= 2) {
+                    html += flushLists();
+                }
                 continue;
             }
+            consecutiveBlankLines = 0;
 
             // Headings
             if (line.startsWith('#### ')) {
@@ -446,26 +482,44 @@
                 continue;
             }
 
-            // Bullet List
-            if (line.startsWith('* ') || line.startsWith('- ')) {
-                if (!inList) {
-                    html += flushLists();
-                    html += '<ul>';
-                    inList = true;
+            // List item (Bullet or Ordered, with indentation support)
+            const listMatch = rawLine.match(/^(\s*)(?:([*+-])|(\d+)\.)\s+(.*)$/);
+            if (listMatch) {
+                const indentSpaces = listMatch[1].replace(/\t/g, '  ').length;
+                const targetLevel = Math.floor(indentSpaces / 2);
+                const isOrdered = !listMatch[2];
+                const listType = isOrdered ? 'ol' : 'ul';
+                const itemContent = listMatch[4];
+
+                while (listStack.length > targetLevel + 1) {
+                    const top = listStack.pop();
+                    if (top.hasOpenLi) html += '</li>';
+                    html += `</${top.type}>`;
                 }
-                html += `<li>${formatInlineMarkdown(line.substring(2))}</li>`;
+
+                if (listStack.length === targetLevel + 1 && listStack[targetLevel].type !== listType) {
+                    const top = listStack.pop();
+                    if (top.hasOpenLi) html += '</li>';
+                    html += `</${top.type}>`;
+                }
+
+                while (listStack.length <= targetLevel) {
+                    const curType = (listStack.length === targetLevel) ? listType : 'ul';
+                    html += `<${curType}>`;
+                    listStack.push({ type: curType, hasOpenLi: false });
+                }
+
+                if (listStack[targetLevel].hasOpenLi) {
+                    html += '</li>';
+                }
+                html += `<li>${formatInlineMarkdown(itemContent)}`;
+                listStack[targetLevel].hasOpenLi = true;
                 continue;
             }
 
-            // Ordered List
-            const olMatch = line.match(/^(\d+)\.\s+(.*)$/);
-            if (olMatch) {
-                if (!inOrderedList) {
-                    html += flushLists();
-                    html += '<ol>';
-                    inOrderedList = true;
-                }
-                html += `<li>${formatInlineMarkdown(olMatch[2])}</li>`;
+            // List item continuation description
+            if (listStack.length > 0 && /^\s{2,}|\t+/.test(rawLine) && line !== '') {
+                html += `<div class="doc-list-desc">${formatInlineMarkdown(line)}</div>`;
                 continue;
             }
 
