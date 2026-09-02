@@ -7604,6 +7604,26 @@ img {
   flex: 1;
 }
 
+.reports-dropdown-option-left .cat-icon-svg-wrap,
+#rep-prod-cat-btn-icon.cat-icon-svg-wrap,
+.reports-event-name-cell .cat-icon-svg-wrap {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary, #2563eb);
+  flex-shrink: 0;
+}
+
+.reports-dropdown-option-left .cat-icon-svg-wrap svg,
+#rep-prod-cat-btn-icon.cat-icon-svg-wrap svg,
+.reports-event-name-cell .cat-icon-svg-wrap svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .reports-dropdown-option-left .option-name {
   white-space: nowrap;
   overflow: hidden;

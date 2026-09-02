@@ -1599,11 +1599,31 @@ app.get('/api/reports/products', async (req, res) => {
       params.push(sagra_id);
     }
 
+    const allCategories = await new Promise((resolve) => {
+      db.all(`
+        SELECT c.name as category_name, c.icon as category_icon, s.id as sagra_id, s.created_at
+        FROM categories c
+        JOIN sagras s ON c.sagra_id = s.id
+        ORDER BY s.created_at DESC, c.id DESC
+      `, [], (err, rows) => {
+        resolve(rows || []);
+      });
+    });
+
+    const categoryIcons = {};
+    allCategories.forEach(cat => {
+      const name = (cat.category_name || '').trim();
+      if (name && cat.category_icon && !categoryIcons[name]) {
+        categoryIcons[name] = cat.category_icon;
+      }
+    });
+
     const products = await new Promise((resolve, reject) => {
       db.all(`
         SELECT 
           oi.product_name,
           COALESCE(c.name, 'Altro') as category_name,
+          c.icon as category_icon,
           SUM(oi.quantity) as total_qty,
           SUM(oi.price * oi.quantity) as total_revenue,
           AVG(oi.price) as avg_price,
@@ -1842,6 +1862,7 @@ app.get('/api/reports/products', async (req, res) => {
       grandTotalRevenue,
       grandTotalQty,
       products,
+      categoryIcons,
       exhaustedProducts,
       surplusProducts
     });

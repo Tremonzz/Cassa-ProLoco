@@ -2057,6 +2057,7 @@
             }
 
             productsTableState.rawList = data.products || [];
+            productsTableState.categoryIcons = data.categoryIcons || {};
             productsTableState.exhaustedList = data.exhaustedProducts || [];
             productsTableState.surplusList = data.surplusProducts || [];
             productsTableState.grandTotalRevenue = Number(data.grandTotalRevenue) || 0;
@@ -2372,13 +2373,13 @@
             const sharePctFormatted = `${share.toFixed(1)}%`;
 
             const cat = (p.category_name || 'Altro').trim();
-            const catIcon = getCategoryIconName(cat);
+            const catSvg = getCategorySvgIcon(cat, p.category_icon);
 
             return `
                 <tr onclick="openReportsProductModal('${escapeHtml(p.product_name)}')" style="cursor: pointer;" title="Clicca per visualizzare le statistiche dettagliate del piatto">
                     <td>
                         <div class="reports-event-name-cell">
-                            <span class="material-symbols-rounded" style="font-size: 18px; color: var(--primary, #2563eb); margin-right: 4px;">${catIcon}</span>
+                            <span class="cat-icon-svg-wrap" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: var(--primary, #2563eb); margin-right: 6px; flex-shrink: 0;">${catSvg}</span>
                             <span class="reports-event-name">${escapeHtml(p.product_name)}</span>
                         </div>
                     </td>
@@ -2628,6 +2629,82 @@
     }
 
     /**
+     * Helper to get appropriate SVG icon for a category.
+     * Uses configured icon from database (most recent sagra precedence), or intelligent fallback.
+     */
+    function getCategorySvgIcon(catName, specificIconId) {
+        if (!catName || catName === 'all') {
+            return typeof getCategoryIconSvg === 'function' ? getCategoryIconSvg('category') : '';
+        }
+        const cleanName = catName.trim();
+        const iconId = specificIconId || productsTableState.categoryIcons?.[cleanName] || getDefaultCategoryIconId(cleanName);
+        if (typeof getCategoryIconSvg === 'function') {
+            return getCategoryIconSvg(iconId);
+        }
+        return '';
+    }
+
+    /**
+     * Helper to guess default icon ID from category name if none is explicitly saved.
+     */
+    function getDefaultCategoryIconId(catName) {
+        if (!catName || catName === 'all') return 'category';
+        const name = catName.trim().toLowerCase();
+        if (name === 'cibo' || name.includes('cucin') || name.includes('prim') || name.includes('second') || name.includes('piatt') || name.includes('gastronom')) {
+            return 'restaurant';
+        }
+        if (name.includes('panin') || name.includes('burger') || name.includes('toast') || name.includes('sandwich')) {
+            return 'lunch_dining';
+        }
+        if (name.includes('pizz') || name.includes('focacc')) {
+            return 'pizza';
+        }
+        if (name.includes('pesce') || name.includes('frittur') || name.includes('mare')) {
+            return 'set_meal';
+        }
+        if (name.includes('carn') || name.includes('spied') || name.includes('grigl') || name.includes('bbq') || name.includes('costic')) {
+            return 'local_fire_department';
+        }
+        if (name === 'bevande' || name.includes('drink') || name.includes('bar') || name.includes('aperitiv') || name.includes('cocktail')) {
+            return 'local_bar';
+        }
+        if (name.includes('birr') || name.includes('pub') || name.includes('spina')) {
+            return 'sports_bar';
+        }
+        if (name.includes('vin') || name.includes('calic') || name.includes('prosecc')) {
+            return 'wine_bar';
+        }
+        if (name.includes('grapp') || name.includes('liquor') || name.includes('amar')) {
+            return 'liquor';
+        }
+        if (name.includes('caff') || name.includes('espress')) {
+            return 'local_cafe';
+        }
+        if (name.includes('acqu') || name.includes('bibit') || name.includes('soda')) {
+            return 'water_full';
+        }
+        if (name === 'dolci' || name.includes('dessert') || name.includes('tort') || name.includes('pasticc')) {
+            return 'cake';
+        }
+        if (name.includes('gelat') || name.includes('cono')) {
+            return 'icecream';
+        }
+        if (name.includes('biscott') || name.includes('snack')) {
+            return 'cookie';
+        }
+        if (name.includes('scont') || name.includes('offert') || name.includes('prom')) {
+            return 'discount';
+        }
+        if (name.includes('fest') || name.includes('event') || name.includes('party')) {
+            return 'celebration';
+        }
+        if (name.includes('asport') || name.includes('gadget') || name.includes('take away')) {
+            return 'shopping_bag';
+        }
+        return 'category';
+    }
+
+    /**
      * Render options list for the Product Tab Category Filter custom dropdown.
      */
     function renderProdCatDropdownOptions(query) {
@@ -2640,10 +2717,19 @@
 
         raw.forEach(p => {
             const cName = (p.category_name || 'Altro').trim();
-            catMap.set(cName, (catMap.get(cName) || 0) + 1);
+            const prev = catMap.get(cName) || { count: 0, icon: p.category_icon || null };
+            catMap.set(cName, {
+                count: prev.count + 1,
+                icon: prev.icon || p.category_icon || null
+            });
         });
 
-        let catList = Array.from(catMap.entries()).map(([name, count]) => ({ name, count }));
+        let catList = Array.from(catMap.entries()).map(([name, val]) => ({
+            name,
+            count: val.count,
+            icon: val.icon || productsTableState.categoryIcons?.[name] || null
+        }));
+
         if (cleanQuery) {
             catList = catList.filter(c => c.name.toLowerCase().includes(cleanQuery));
         }
@@ -2654,7 +2740,9 @@
             html += `
                 <button type="button" class="reports-dropdown-option ${isAllActive ? 'active' : ''}" onclick="selectProdCatDropdownOption('all')">
                     <div class="reports-dropdown-option-left">
-                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">category</span>
+                        <span class="cat-icon-svg-wrap" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0;">
+                            ${getCategorySvgIcon('all')}
+                        </span>
                         <span class="option-name font-bold">Tutte le categorie</span>
                     </div>
                 </button>
@@ -2668,11 +2756,13 @@
 
         html += catList.map(c => {
             const isActive = productsTableState.selectedCategory === c.name;
-            const icon = getCategoryIconName(c.name);
+            const svg = getCategorySvgIcon(c.name, c.icon);
             return `
                 <button type="button" class="reports-dropdown-option ${isActive ? 'active' : ''}" onclick="selectProdCatDropdownOption('${escapeHtml(c.name)}')">
                     <div class="reports-dropdown-option-left">
-                        <span class="material-symbols-rounded" style="font-size:18px; color:var(--primary);">${icon}</span>
+                        <span class="cat-icon-svg-wrap" style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0;">
+                            ${svg}
+                        </span>
                         <span class="option-name" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</span>
                     </div>
                     <span class="reports-dropdown-option-right" style="font-size:0.75rem;">${c.count} piatti</span>
@@ -2684,28 +2774,7 @@
     }
 
     /**
-     * Helper to get appropriate Material Symbol icon name for a category.
-     */
-    function getCategoryIconName(catName) {
-        if (!catName || catName === 'all') return 'category';
-        const name = catName.trim().toLowerCase();
-        if (name === 'cibo' || name.includes('cucin') || name.includes('prim') || name.includes('second') || name.includes('panin') || name.includes('piad') || name.includes('pizz') || name.includes('piatt') || name.includes('gastronom')) {
-            return 'restaurant';
-        }
-        if (name === 'bevande' || name.includes('drink') || name.includes('bar') || name.includes('birr') || name.includes('vin') || name.includes('bibit') || name.includes('acqua') || name.includes('caff') || name.includes('cocktail')) {
-            return 'local_bar';
-        }
-        if (name === 'dolci' || name.includes('dessert') || name.includes('torta') || name.includes('gelat') || name.includes('pasticc')) {
-            return 'cake';
-        }
-        if (name === 'prodotti base' || name.includes('base') || name.includes('ingredient') || name.includes('materie')) {
-            return 'inventory_2';
-        }
-        return 'label';
-    }
-
-    /**
-     * Update label of Product Tab Category trigger button.
+     * Update label and icon of Product Tab Category trigger button.
      */
     function updateProdCatButtonLabel() {
         const textEl = document.getElementById('rep-prod-cat-select-text');
@@ -2714,10 +2783,10 @@
 
         if (productsTableState.selectedCategory === 'all') {
             textEl.innerText = 'Tutte le categorie';
-            if (iconEl) iconEl.innerText = 'category';
+            if (iconEl) iconEl.innerHTML = getCategorySvgIcon('all');
         } else {
             textEl.innerText = productsTableState.selectedCategory;
-            if (iconEl) iconEl.innerText = getCategoryIconName(productsTableState.selectedCategory);
+            if (iconEl) iconEl.innerHTML = getCategorySvgIcon(productsTableState.selectedCategory);
         }
     }
 
