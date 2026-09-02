@@ -72,16 +72,22 @@ Cliccando le impostazioni dell'evento o premendo il tasto destro del mouse si po
 Una volta aperto un evento è possibile dalla barra superiore accedere alla schermata di **Gestione Menu** cliccando il tasto **`Modifica Menu`**.
 
 ### 3.1 Creazione e Modifica Categorie
-
-Le categorie permettono di raggruppare i piatti e gestire la stampa di scontrini divisi.
-
-Le categorie predefinite sono: "**Cibo**" e "**Bevande**", nel caso di utilizzo della stampa di due scontrini uno per il cibo uno per le bevande, è essenziale usare questa categoria "Bevande" in quanto la divisione si basa su di essa.
-
-#### Per creare una nuova categoria:
  
+Le categorie permettono di raggruppare i piatti, organizzare la cassa e gestire la stampa di scontrini divisi.
+ 
+Le categorie predefinite sono: "**Cibo**" e "**Bevande**", nel caso di utilizzo della stampa di due scontrini uno per il cibo uno per le bevande, è essenziale usare questa categoria "Bevande" in quanto la divisione si basa su di essa.
+ 
+#### Per creare una nuova categoria:
+  
 1. Clicca su **`Aggiungi Categoria`**.
 2. Inserisci il nome (es. *"Dolci"*).
+3. Personalizza l'icona grafica della categoria (opzionale).
  
+#### Selezione Icona Categoria:
+Accanto al nome di ciascuna categoria è presente il pulsante dell'icona associata, cliccandolo si apre la lista delle icone disponibili suddivise in diverse categorie (**Tutte**, **Cibo**, **Bevande**, **Dolci**, **Altro**).
+É disponibile una barra di ricerca per trovare rapidamente l'icona desiderata.
+ 
+---
 ### 3.2 Tipologie di Prodotti
 Esistono quattro tipi diversi di prodotti:
 

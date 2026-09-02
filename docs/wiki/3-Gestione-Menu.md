@@ -6,13 +6,18 @@ Una volta aperto un evento è possibile accedere alla schermata di **Gestione Me
 
 ### 3.1 Creazione e Modifica Categorie
 
-Le categorie permettono di raggruppare i piatti e gestire la stampa di scontrini divisi.
+Le categorie permettono di raggruppare i piatti, organizzare la cassa e gestire la stampa di scontrini divisi.
 
 Le categorie predefinite sono: "**Cibo**" e "**Bevande**". Nel caso di utilizzo della stampa di due scontrini (uno per il cibo e uno per le bevande), è essenziale usare la categoria "Bevande" in quanto la divisione automatica si basa su di essa.
 
 #### Per creare una nuova categoria:
 1. Clicca su **`Aggiungi Categoria`**.
 2. Inserisci il nome (es. *"Dolci"*).
+3. Personalizza l'icona grafica della categoria (opzionale).
+
+#### Selezione Icona Categoria:
+Accanto al nome di ciascuna categoria è presente il pulsante dell'icona associata, cliccandolo si apre la lista delle icone disponibili suddivise in diverse categorie (**Tutte**, **Cibo**, **Bevande**, **Dolci**, **Altro**).
+É disponibile una barra di ricerca per trovare rapidamente l'icona desiderata.
 
 ---
 
