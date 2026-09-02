@@ -295,4 +295,4 @@ Cliccando sul pulsante **`Esporta Report`** nella barra superiore il programma g
 
 ---
 
-*Ultimo aggiornamento 29/08/2026 - Tommaso Tremonti*
+*Ultimo aggiornamento 02/09/2026 Tommaso Tremonti*

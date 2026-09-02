@@ -2644,7 +2644,13 @@ app.get('/api/docs', (req, res) => {
       }
     }
 
-    res.json({ success: true, docs });
+    let footer = '';
+    const footerPath = path.join(docsDir, '_Footer.md');
+    if (fs.existsSync(footerPath)) {
+      footer = fs.readFileSync(footerPath, 'utf8');
+    }
+
+    res.json({ success: true, docs, footer });
   } catch (err) {
     console.error("Error reading docs:", err);
     res.status(500).json({ success: false, error: err.message });

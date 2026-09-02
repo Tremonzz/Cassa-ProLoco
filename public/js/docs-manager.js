@@ -5,6 +5,7 @@
 
 (function () {
     let docsData = [];
+    let docsFooter = '';
     let activeChapterId = 'Home';
     let isDocsLoaded = false;
 
@@ -64,6 +65,7 @@
             const data = await res.json();
             if (data.success && Array.isArray(data.docs) && data.docs.length > 0) {
                 docsData = data.docs;
+                docsFooter = data.footer || '';
                 isDocsLoaded = true;
             } else {
                 throw new Error("Nessun capitolo trovato");
@@ -105,6 +107,23 @@
                 </button>
             `;
         }).join('');
+
+        const sidebar = document.getElementById('docs-sidebar');
+        let footerEl = document.getElementById('docs-sidebar-footer');
+        if (!footerEl && sidebar) {
+            footerEl = document.createElement('div');
+            footerEl.id = 'docs-sidebar-footer';
+            footerEl.className = 'docs-sidebar-footer';
+            sidebar.appendChild(footerEl);
+        }
+
+        if (footerEl) {
+            if (docsFooter) {
+                footerEl.innerHTML = parseMarkdownToHtml(docsFooter);
+            } else {
+                footerEl.innerHTML = '<p>Ultimo aggiornamento: 02/09/2026 <em>Tommaso Tremonti</em></p>';
+            }
+        }
     }
 
     /**
