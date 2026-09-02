@@ -134,10 +134,12 @@ function runMigrations() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         is_hidden INTEGER DEFAULT 0,
+        icon TEXT DEFAULT NULL,
         sagra_id INTEGER DEFAULT 1
       )
     `, (err) => {
       db.run("ALTER TABLE categories ADD COLUMN is_hidden INTEGER DEFAULT 0", (e) => { });
+      db.run("ALTER TABLE categories ADD COLUMN icon TEXT DEFAULT NULL", (e) => { });
     });
 
     // Products
@@ -273,7 +275,7 @@ app.post('/api/database/export-selected', async (req, res) => {
       exportDb.serialize(() => {
         exportDb.run(`CREATE TABLE IF NOT EXISTS sagras (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, status TEXT DEFAULT 'active', created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
         exportDb.run("PRAGMA foreign_keys=OFF");
-        exportDb.run(`CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, is_hidden INTEGER DEFAULT 0, sagra_id INTEGER DEFAULT 1)`);
+        exportDb.run(`CREATE TABLE IF NOT EXISTS categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, is_hidden INTEGER DEFAULT 0, icon TEXT DEFAULT NULL, sagra_id INTEGER DEFAULT 1)`);
         exportDb.run(`CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, price REAL NOT NULL, quantity INTEGER DEFAULT NULL, is_composite INTEGER DEFAULT 0, components TEXT DEFAULT NULL, is_selection INTEGER DEFAULT 0, position INTEGER DEFAULT 0, type TEXT DEFAULT 'simple', category_id INTEGER, FOREIGN KEY(category_id) REFERENCES categories(id))`);
         exportDb.run(`CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, seq INTEGER DEFAULT 0, total REAL NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, sagra_id INTEGER DEFAULT 1)`);
         exportDb.run(`CREATE TABLE IF NOT EXISTS order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER, product_name TEXT NOT NULL, quantity INTEGER NOT NULL, price REAL NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id))`);
@@ -297,10 +299,11 @@ app.post('/api/database/export-selected', async (req, res) => {
 
       const categories = await dbAll("SELECT * FROM categories WHERE sagra_id = ?", [sagraId]);
       for (const cat of categories) {
-        await queryDbRun(exportDb, "INSERT INTO categories (id, name, is_hidden, sagra_id) VALUES (?, ?, ?, ?)", [
+        await queryDbRun(exportDb, "INSERT INTO categories (id, name, is_hidden, icon, sagra_id) VALUES (?, ?, ?, ?, ?)", [
           cat.id,
           cat.name,
           cat.is_hidden || 0,
+          cat.icon || null,
           cat.sagra_id
         ]);
 
@@ -547,9 +550,10 @@ app.post('/api/database/import-selected', async (req, res) => {
       // Copy Categories & Products
       const categories = await queryDbAll(inspectDb, "SELECT * FROM categories WHERE sagra_id = ?", [sagraId]);
       for (const cat of categories) {
-        const catResult = await dbRun("INSERT INTO categories (name, is_hidden, sagra_id) VALUES (?, ?, ?)", [
+        const catResult = await dbRun("INSERT INTO categories (name, is_hidden, icon, sagra_id) VALUES (?, ?, ?, ?)", [
           cat.name,
           cat.is_hidden || 0,
+          cat.icon || null,
           newSagraId
         ]);
         const newCatId = catResult.lastID;
@@ -753,7 +757,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
     // Duplicate Categories and all Product types (Simple, Base [type='base'], Composite, Selection) & Links
     const categories = await dbAll("SELECT * FROM categories WHERE sagra_id = ?", [sourceId]);
     for (const cat of categories) {
-      const catResult = await dbRun("INSERT INTO categories (name, is_hidden, sagra_id) VALUES (?, ?, ?)", [cat.name, cat.is_hidden || 0, newSagraId]);
+      const catResult = await dbRun("INSERT INTO categories (name, is_hidden, icon, sagra_id) VALUES (?, ?, ?, ?)", [cat.name, cat.is_hidden || 0, cat.icon || null, newSagraId]);
       const newCatId = catResult.lastID;
 
       const products = await dbAll("SELECT * FROM products WHERE category_id = ? ORDER BY position ASC, id ASC", [cat.id]);
@@ -785,7 +789,7 @@ app.post('/api/sagras/:id/duplicate', async (req, res) => {
 app.get('/api/sagras/:id/products', async (req, res) => {
   const sagraId = req.params.id;
   const sql = `
-      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, p.id, p.name, p.price, p.quantity, p.type, p.is_composite, p.is_selection, p.components, p.position
+      SELECT c.id as category_id, c.name as category, c.is_hidden as category_is_hidden, c.icon as category_icon, p.id, p.name, p.price, p.quantity, p.type, p.is_composite, p.is_selection, p.components, p.position
       FROM categories c
       LEFT JOIN products p ON c.id = p.category_id
       WHERE c.sagra_id = ?
@@ -800,7 +804,7 @@ app.get('/api/sagras/:id/products', async (req, res) => {
     rows.forEach(curr => {
       if (!grouped[curr.category]) {
         grouped[curr.category] = [];
-        meta[curr.category] = { is_hidden: curr.category_is_hidden || 0 };
+        meta[curr.category] = { is_hidden: curr.category_is_hidden || 0, icon: curr.category_icon || null };
       }
       if (curr.id) {
         let parsedComponents = [];
@@ -863,7 +867,8 @@ app.put('/api/sagras/:id/menu', async (req, res) => {
 
     for (const cat of categories) {
       const isHidden = cat.is_hidden ? 1 : 0;
-      const result = await dbRun("INSERT INTO categories (name, sagra_id, is_hidden) VALUES (?, ?, ?)", [cat.name, sagraId, isHidden]);
+      const catIcon = cat.icon || null;
+      const result = await dbRun("INSERT INTO categories (name, sagra_id, is_hidden, icon) VALUES (?, ?, ?, ?)", [cat.name, sagraId, isHidden, catIcon]);
       const catId = result.lastID;
       if (cat.products && cat.products.length > 0) {
         let pIdx = 0;

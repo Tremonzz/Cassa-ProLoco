@@ -1924,6 +1924,57 @@
     </div>
   </div>
 
+  <!-- Category Icon Picker Modal -->
+  <div id="category-icon-picker-modal" class="modal">
+    <div class="modal-content category-icon-modal-content">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="material-symbols-rounded modal-title-icon">category</span>
+          <div>
+            <h2 style="margin: 0; font-size: 1.2rem;">Scegli Icona Categoria</h2>
+            <p style="margin: 2px 0 0 0; font-size: 0.8rem; color: var(--text-light); font-weight: 500;" id="cat-icon-modal-subtitle">Seleziona un'icona per personalizzare la categoria</p>
+          </div>
+        </div>
+        <span class="close-modal" onclick="closeCategoryIconPickerModal()">&times;</span>
+      </div>
+
+      <div class="modal-body category-icon-modal-body">
+        <!-- Search & Filter Controls -->
+        <div class="cat-icon-controls">
+          <div class="cat-icon-search-wrap">
+            <span class="material-symbols-rounded cat-icon-search-icon">search</span>
+            <input type="text" id="cat-icon-search-input" placeholder="Cerca icona (es. pasta, birra, pizza, carne...)" oninput="filterCategoryIcons()">
+            <button type="button" id="cat-icon-search-clear" class="cat-icon-clear-btn" onclick="clearCategoryIconSearch()" style="display: none;">
+              <span class="material-symbols-rounded" style="font-size: 16px;">close</span>
+            </button>
+          </div>
+          
+          <div class="cat-icon-filter-pills" id="cat-icon-filter-pills">
+            <button type="button" class="cat-icon-pill active" data-group="all" onclick="setCategoryIconFilter('all', this)">Tutte</button>
+            <button type="button" class="cat-icon-pill" data-group="cibo" onclick="setCategoryIconFilter('cibo', this)">Cibo</button>
+            <button type="button" class="cat-icon-pill" data-group="bevande" onclick="setCategoryIconFilter('bevande', this)">Bevande</button>
+            <button type="button" class="cat-icon-pill" data-group="dolci" onclick="setCategoryIconFilter('dolci', this)">Dolci</button>
+            <button type="button" class="cat-icon-pill" data-group="speciali" onclick="setCategoryIconFilter('speciali', this)">Altro</button>
+          </div>
+        </div>
+
+        <!-- Icons Grid Container -->
+        <div class="cat-icons-grid" id="cat-icons-grid">
+          <!-- Injected JS -->
+        </div>
+      </div>
+
+      <div class="modal-footer category-icon-modal-footer">
+        <button type="button" class="btn-pos-secondary" onclick="resetCategoryIconToDefault()" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">restart_alt</span> Ripristina Predefinita
+        </button>
+        <button type="button" class="btn-pos-secondary" onclick="closeCategoryIconPickerModal()" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-rounded" style="font-size: 1.1rem;">close</span> Chiudi
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- POS Selection Modal -->
   <div id="pos-selection-modal" class="modal">
     <div class="modal-content" style="max-width: 500px;">
@@ -2233,6 +2284,7 @@
   <script src="js/menu-templates/template-a4-vintage.js"></script>
   <script src="js/html2canvas.min.js"></script>
   <script src="js/reports-manager.js"></script>
+  <script src="js/category-icons.js"></script>
   <script src="js/docs-manager.js"></script>
   <script src="js/app.js"></script>
 </body>

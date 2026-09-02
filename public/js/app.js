@@ -1378,12 +1378,15 @@ function renderEditor() {
         const prods = STATE.products[catName] || [];
         const meta = STATE.categoryMeta ? STATE.categoryMeta[catName] : null;
         let isHidden = false;
-        if (meta && meta.is_hidden === 1) {
-            isHidden = true;
-        } else if (prods.length > 0 && prods[0].category_is_hidden === 1) {
-            isHidden = true;
+        let icon = null;
+        if (meta) {
+            if (meta.is_hidden === 1) isHidden = true;
+            if (meta.icon) icon = meta.icon;
+        } else if (prods.length > 0) {
+            if (prods[0].category_is_hidden === 1) isHidden = true;
+            if (prods[0].category_icon) icon = prods[0].category_icon;
         }
-        addCategoryUI(catName, prods, isHidden);
+        addCategoryUI(catName, prods, isHidden, icon);
     });
 
     renderBaseProductsUI();
@@ -1428,7 +1431,7 @@ function sortCategoryProducts(btnEl, mode) {
 }
 window.sortCategoryProducts = sortCategoryProducts;
 
-function addCategoryUI(name = '', products = [], isHidden = false) {
+function addCategoryUI(name = '', products = [], isHidden = false, icon = null) {
     const listEl = document.getElementById('editor-sections-list') || editorContainer;
     const div = document.createElement('div');
     div.className = `editor-section ${isHidden ? 'is-hidden-category' : ''}`;
@@ -1438,19 +1441,29 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
     const isBevande = (trimmedName === 'Bevande');
     const isFixedCategory = isCibo || isBevande;
 
-    let categoryIcon = 'category';
-    if (isCibo) {
-        categoryIcon = 'restaurant';
-    } else if (isBevande) {
-        categoryIcon = 'local_bar';
+    let categoryIcon = icon;
+    if (!categoryIcon) {
+        if (isCibo) categoryIcon = 'restaurant';
+        else if (isBevande) categoryIcon = 'local_bar';
+        else categoryIcon = 'category';
     }
+
+    const iconSvgHtml = (typeof getCategoryIconSvg === 'function') ? getCategoryIconSvg(categoryIcon) : `<span class="material-symbols-rounded">${categoryIcon}</span>`;
+
+    const iconBtnHtml = `
+        <button type="button" class="cat-icon-btn" onclick="openCategoryIconPickerModal(this)" title="Clicca per cambiare icona" data-icon="${categoryIcon}">
+            <span class="cat-icon-svg">${iconSvgHtml}</span>
+            <span class="material-symbols-rounded cat-icon-edit-badge">edit</span>
+        </button>
+        <input type="hidden" class="cat-icon-input" value="${categoryIcon}">
+    `;
 
     let headerTitleHTML = '';
     let actionBtnHTML = '';
 
     if (isFixedCategory) {
         headerTitleHTML = `
-            <span class="material-symbols-rounded" style="font-size: 1.4rem; color: var(--primary);">${categoryIcon}</span>
+            ${iconBtnHtml}
             <span class="fixed-cat-title-text" style="font-size: 1.15rem; font-weight: 700; color: var(--primary);">${trimmedName}</span>
             <input type="hidden" class="cat-name-input" value="${trimmedName}">
         `;
@@ -1462,11 +1475,11 @@ function addCategoryUI(name = '', products = [], isHidden = false) {
         `;
     } else {
         headerTitleHTML = `
-            <span class="material-symbols-rounded" style="font-size: 1.4rem; color: var(--primary);">${categoryIcon}</span>
+            ${iconBtnHtml}
             <input type="text" class="cat-name-input" placeholder="Nome Categoria (es. Dolci)" value="${name}">
         `;
         actionBtnHTML = `
-            <button type="button" class="btn-del-cat" onclick="this.closest('.editor-section').remove()">
+            <button type="button" class="btn-del-cat" onclick="this.closest('.editor-section').remove(); markMenuDirty();">
                 <span class="material-symbols-rounded" style="font-size: 1.1rem;">delete</span> Elimina Categoria
             </button>
         `;
@@ -2323,9 +2336,9 @@ function openProductReorderModal() {
             hasProducts = true;
 
             const trimmedName = catName.trim();
-            let catIcon = 'category';
-            if (trimmedName === 'Cibo') catIcon = 'restaurant';
-            if (trimmedName === 'Bevande') catIcon = 'local_bar';
+            const meta = STATE.categoryMeta ? STATE.categoryMeta[catName] : null;
+            let catIcon = (meta && meta.icon) ? meta.icon : (trimmedName === 'Cibo' ? 'restaurant' : (trimmedName === 'Bevande' ? 'local_bar' : 'category'));
+            const catSvg = (typeof getCategoryIconSvg === 'function') ? getCategoryIconSvg(catIcon) : `<span class="material-symbols-rounded">${catIcon}</span>`;
 
             const catSec = document.createElement('div');
             catSec.className = 'category-section reorder-cat-section';
@@ -2350,9 +2363,9 @@ function openProductReorderModal() {
 
             catSec.innerHTML = `
                 <div class="category-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span class="material-symbols-rounded" style="font-size: 1.3rem;">${catIcon}</span>
-                        ${catName}
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="cat-title-svg" style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--primary);">${catSvg}</span>
+                        <span>${catName}</span>
                     </div>
                     <div style="display:flex; gap:6px;">
                         <button type="button" class="btn-sort-cat" onclick="sortReorderGrid(this, 'name')" title="Ordina A-Z in questa categoria">
@@ -2754,6 +2767,8 @@ async function saveMenu(stayInEditor = false, customToastMsg = null) {
         if (!catName) return;
 
         const isHidden = sec.classList.contains('is-hidden-category');
+        const catIconInput = sec.querySelector('.cat-icon-input');
+        const catIcon = catIconInput ? catIconInput.value.trim() : null;
         const products = [];
 
         // Always preserve and save products even when category is hidden
@@ -2791,7 +2806,7 @@ async function saveMenu(stayInEditor = false, customToastMsg = null) {
         // Sort products by position before saving so backend writes them in position order
         products.sort((a, b) => (a.position !== undefined ? a.position : 0) - (b.position !== undefined ? b.position : 0));
 
-        payload.categories.push({ name: catName, is_hidden: isHidden, products });
+        payload.categories.push({ name: catName, is_hidden: isHidden, icon: catIcon, products });
     });
 
     // Gather Base Products for system category 'Prodotti Base' with type = 'base'
@@ -2877,17 +2892,16 @@ function renderProducts() {
         renderedCount++;
 
         const trimmedName = category.trim();
-        let catIcon = 'category';
-        if (trimmedName === 'Cibo') catIcon = 'restaurant';
-        if (trimmedName === 'Bevande') catIcon = 'local_bar';
+        let catIcon = (meta && meta.icon) ? meta.icon : (trimmedName === 'Cibo' ? 'restaurant' : (trimmedName === 'Bevande' ? 'local_bar' : 'category'));
+        const catSvg = (typeof getCategoryIconSvg === 'function') ? getCategoryIconSvg(catIcon) : `<span class="material-symbols-rounded">${catIcon}</span>`;
 
         const section = document.createElement('div');
         section.className = 'category-section';
 
         section.innerHTML = `
-      <div class="category-title">
-        <span class="material-symbols-rounded" style="font-size: 1.3rem;">${catIcon}</span>
-        ${category}
+      <div class="category-title" style="display: flex; align-items: center; gap: 8px;">
+        <span class="cat-title-svg" style="width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--primary);">${catSvg}</span>
+        <span>${category}</span>
       </div>
       <div class="product-grid">
         ${products.map(p => {
@@ -5784,6 +5798,176 @@ async function saveReceiptCustomization() {
         showToast("Errore di connessione durante il salvataggio", "error");
     }
 }
+
+// --- CATEGORY ICON PICKER MODAL CONTROLLER ---
+let activeIconPickerTargetSec = null;
+let currentIconFilterGroup = 'all';
+
+function openCategoryIconPickerModal(btnEl) {
+    const sec = btnEl.closest('.editor-section');
+    if (!sec) return;
+    activeIconPickerTargetSec = sec;
+
+    const catNameInput = sec.querySelector('.cat-name-input');
+    const catName = catNameInput ? (catNameInput.value.trim() || 'Nuova Categoria') : 'Categoria';
+    const catIconInput = sec.querySelector('.cat-icon-input');
+    const currentIcon = catIconInput ? catIconInput.value.trim() : (btnEl.dataset.icon || 'category');
+
+    const subtitleEl = document.getElementById('cat-icon-modal-subtitle');
+    if (subtitleEl) {
+        subtitleEl.innerText = `Personalizza l'icona per: "${catName}"`;
+    }
+
+    const searchInput = document.getElementById('cat-icon-search-input');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    const clearBtn = document.getElementById('cat-icon-search-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    currentIconFilterGroup = 'all';
+    document.querySelectorAll('#cat-icon-filter-pills .cat-icon-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.getAttribute('data-group') === 'all');
+    });
+
+    renderCategoryIconsGrid(currentIcon);
+
+    const modal = document.getElementById('category-icon-picker-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            if (searchInput) searchInput.focus();
+        }, 50);
+    }
+}
+
+function closeCategoryIconPickerModal() {
+    const modal = document.getElementById('category-icon-picker-modal');
+    if (modal) modal.style.display = 'none';
+    activeIconPickerTargetSec = null;
+}
+
+function renderCategoryIconsGrid(selectedIconId) {
+    const grid = document.getElementById('cat-icons-grid');
+    if (!grid) return;
+
+    const allIcons = (typeof getAllCategoryIcons === 'function') ? getAllCategoryIcons() : [];
+    const query = (document.getElementById('cat-icon-search-input')?.value || '').trim().toLowerCase();
+
+    let filtered = allIcons;
+
+    if (currentIconFilterGroup !== 'all') {
+        filtered = filtered.filter(i => i.group === currentIconFilterGroup);
+    }
+
+    if (query) {
+        filtered = filtered.filter(i => {
+            const nameMatch = (i.name || '').toLowerCase().includes(query);
+            const idMatch = (i.id || '').toLowerCase().includes(query);
+            const tagMatch = (i.tags || []).some(t => t.toLowerCase().includes(query));
+            return nameMatch || idMatch || tagMatch;
+        });
+    }
+
+    if (filtered.length === 0) {
+        grid.innerHTML = `
+            <div class="cat-icons-empty">
+                <span class="material-symbols-rounded" style="font-size: 2.2rem; color: var(--text-light); margin-bottom: 6px; display: block;">search_off</span>
+                <span>Nessuna icona trovata per "${query}"</span>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = filtered.map(item => {
+        const isSelected = item.id === selectedIconId;
+        return `
+            <div class="cat-icon-card ${isSelected ? 'selected' : ''}" onclick="selectCategoryIcon('${item.id}')" title="${item.name}">
+                <div class="cat-icon-card-svg">${item.svg}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectCategoryIcon(iconId) {
+    if (!activeIconPickerTargetSec) {
+        closeCategoryIconPickerModal();
+        return;
+    }
+
+    const iconInput = activeIconPickerTargetSec.querySelector('.cat-icon-input');
+    const iconBtn = activeIconPickerTargetSec.querySelector('.cat-icon-btn');
+    const svgWrap = activeIconPickerTargetSec.querySelector('.cat-icon-svg');
+
+    if (iconInput) iconInput.value = iconId;
+    if (iconBtn) iconBtn.dataset.icon = iconId;
+    if (svgWrap && typeof getCategoryIconSvg === 'function') {
+        svgWrap.innerHTML = getCategoryIconSvg(iconId);
+    }
+
+    closeCategoryIconPickerModal();
+    markMenuDirty();
+    showToast("Icona categoria aggiornata", "success", 2000);
+}
+
+function resetCategoryIconToDefault() {
+    if (!activeIconPickerTargetSec) {
+        closeCategoryIconPickerModal();
+        return;
+    }
+
+    const catNameInput = activeIconPickerTargetSec.querySelector('.cat-name-input');
+    const catName = catNameInput ? catNameInput.value.trim() : '';
+
+    let defaultIcon = 'category';
+    if (catName === 'Cibo') defaultIcon = 'restaurant';
+    else if (catName === 'Bevande') defaultIcon = 'local_bar';
+
+    selectCategoryIcon(defaultIcon);
+}
+
+function filterCategoryIcons() {
+    const input = document.getElementById('cat-icon-search-input');
+    const clearBtn = document.getElementById('cat-icon-search-clear');
+    if (clearBtn && input) {
+        clearBtn.style.display = input.value.trim() ? 'flex' : 'none';
+    }
+
+    const currentIcon = activeIconPickerTargetSec?.querySelector('.cat-icon-input')?.value || 'category';
+    renderCategoryIconsGrid(currentIcon);
+}
+
+function clearCategoryIconSearch() {
+    const input = document.getElementById('cat-icon-search-input');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    const clearBtn = document.getElementById('cat-icon-search-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    const currentIcon = activeIconPickerTargetSec?.querySelector('.cat-icon-input')?.value || 'category';
+    renderCategoryIconsGrid(currentIcon);
+}
+
+function setCategoryIconFilter(group, pillEl) {
+    currentIconFilterGroup = group;
+    document.querySelectorAll('#cat-icon-filter-pills .cat-icon-pill').forEach(pill => {
+        pill.classList.remove('active');
+    });
+    if (pillEl) pillEl.classList.add('active');
+
+    const currentIcon = activeIconPickerTargetSec?.querySelector('.cat-icon-input')?.value || 'category';
+    renderCategoryIconsGrid(currentIcon);
+}
+
+window.openCategoryIconPickerModal = openCategoryIconPickerModal;
+window.closeCategoryIconPickerModal = closeCategoryIconPickerModal;
+window.selectCategoryIcon = selectCategoryIcon;
+window.resetCategoryIconToDefault = resetCategoryIconToDefault;
+window.filterCategoryIcons = filterCategoryIcons;
+window.clearCategoryIconSearch = clearCategoryIconSearch;
+window.setCategoryIconFilter = setCategoryIconFilter;
 
 window.openReceiptCustomizerModal = openReceiptCustomizerModal;
 window.closeReceiptCustomizerModal = closeReceiptCustomizerModal;
